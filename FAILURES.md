@@ -172,3 +172,80 @@ docker run --rm -v "$(pwd -W)":/src -w /src golang:1.26 go test -race ./...
 ```
 
 Worth noting for the writeup: this is the second environment constraint that pushed work into the container, after the missing C toolchain. Neither was visible from the plan.
+
+---
+
+## F10 — Three documented ways to narrow the child's toolset, all three broken
+
+The design claims defence in depth: the child container is constrained to `payments,orders,refunds`, and `rzp-guard` narrows further to reads plus `create_refund`. The first half turned out to be much harder than reading the README suggested.
+
+### Attempt 1 — the documented `TOOLSETS` environment variable
+
+```
+2026/08/24 16:41:06 failed to run stdio server: failed to create server:
+failed to create toolsets: toolset payments,orders,refunds does not exist
+```
+
+`cmd/razorpay-mcp-server/stdio.go:51` reads `viper.GetStringSlice("toolsets")`. Viper does **not** split an environment string into a slice, so `"payments,orders,refunds"` arrives as one element and is looked up as a single toolset name.
+
+Verified by measurement, not inference — single values work and compose the counts you would expect:
+
+```
+TOOLSETS=payments  -> 9 tools
+TOOLSETS=refunds   -> 6 tools
+TOOLSETS=payments,orders,refunds -> "does not exist"
+```
+
+So the documented env var can express exactly one toolset.
+
+### Attempt 2 — the CLI flag, appended to `docker run`
+
+This appeared to work and did not:
+
+```
+docker run ... razorpay/mcp stdio --toolsets payments,orders,refunds   -> 41 tools
+docker run ... razorpay/mcp stdio --toolsets definitely_not_a_toolset  -> 41 tools, no error
+```
+
+A bogus toolset producing no error was the tell. 41 is the *entire* surface, which `EnableToolsets` returns when the name list is empty. The arguments never reached the binary:
+
+```
+Entrypoint=[sh -c ./razorpay-mcp-server stdio --key ${RAZORPAY_KEY_ID} ...]
+```
+
+The entrypoint is `sh -c` with a **fixed command string**. Anything appended becomes a positional parameter to that shell (`$0`, `$1`, …) and is silently discarded.
+
+**The wrong hypothesis:** I first assumed the flag had worked and that 20-ish tools was simply wrong about which toolsets existed. Testing a deliberately invalid value is what exposed it — a control I would not have run if the first result had looked plausible.
+
+### Attempt 3 — the `CONFIG` file the entrypoint offers
+
+The entrypoint contains `${CONFIG:+--config ${CONFIG}}`, so a mounted YAML file with a real list should work:
+
+```
+Error: unknown flag: --config
+```
+
+The entrypoint offers a flag **the binary in the same image does not support**. Its own help output lists only `--key`, `--secret`, `--log-file`, `--read-only`, `--toolsets`. Entrypoint and binary are out of sync in the published image.
+
+### The fix
+
+Override the entrypoint to invoke the *same unmodified binary* in the *same pinned image* with its own documented flag:
+
+```
+docker run --rm -i --entrypoint ./razorpay-mcp-server \
+  -e RAZORPAY_KEY_ID -e RAZORPAY_KEY_SECRET <digest> stdio --toolsets payments,orders,refunds
+```
+
+```
+41 -> 20 tools
+create_instant_settlement: 0
+create_payment_link:       0
+create_refund:             1
+fetch_payment:             1
+```
+
+This is not a fork and not a modification: same image, same binary, its own public CLI. It is also **strictly safer than the stock entrypoint**, which places the API key and secret in the container's argv where any process listing can read them; the override passes them in the environment instead.
+
+**What it cost:** the first live run of the executable failed outright, and the honest first reaction was to assume my own flag plumbing was wrong. It was not — three separate vendor-side breakages stacked on top of each other, and only measuring tool counts against known-good single values untangled them.
+
+**What it changes about the claim:** `initiate_payment` is still exposed by the child even at 20 tools, because it lives in the `payments` toolset alongside the reads the mandate needs. That is precisely why `rzp-guard` keeps its own build-level allowlist rather than trusting the child's configuration — the two boundaries are independent, and this is the concrete reason.
