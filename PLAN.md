@@ -4,7 +4,7 @@
 **Phase 0 deliverable.** Phase 0.5 conformance corpus committed; no policy code written yet.
 Date: 2026-08-24 · Deadline: 2026-09-05 (12 days)
 
-**Version 4**, after three rounds of adversarial review — see [REVIEW_LOG.md](REVIEW_LOG.md). **The plan has shrunk every round.** v4 deletes a pipeline stage as provably redundant, cuts automatic reconciliation to preserve the architecture's central claim, and merges two state machines into one.
+**Version 5**, after four rounds of adversarial review — see [REVIEW_LOG.md](REVIEW_LOG.md). **The plan has shrunk every round.** v5's change is the largest: the headline metric claim is withdrawn from the fixture corpus entirely and rebuilt on real agent traces (Phase 4b).
 
 Claims withdrawn across all rounds:
 
@@ -19,6 +19,9 @@ Claims withdrawn across all rounds:
 | **"Razorpay's docs contradict each other"** | **My error.** I quoted a WebFetch summary as if it were source text — see below | §2.6 |
 | **Provenance as an enforcement gate** | Provably redundant given the capability list | §3.3 |
 | **Automatic reconciliation** | Would have falsified the transparent-relay claim | §3.4 |
+| **Fixture corpus as a detector evaluation** | Labels are computed from the matcher's own predicate — conformance, not detection | Phase 0.5 / 4b |
+| **"Independent oracle"** | Independent of the implementation, not of the design | Phase 0.5 G0.3 |
+| **Confidence intervals on the corpus** | 5 sessions per template are replicas; bootstrapping them is pseudoreplication | Phase 4a G4.2 |
 
 **Standing correction to my own method:** `WebFetch` answers prompts against a page *using a small fast model*, so its output is a paraphrase, not a quote. It can point at behaviour worth verifying; it cannot support a claim about what a document says. I violated this while writing the document that states it. API-semantics claims now come from runtime observation only.
 
@@ -26,7 +29,9 @@ Claims withdrawn across all rounds:
 
 ## 1. The claim (one sentence, one action)
 
-> **`rzp-guard` enforces a merchant-issued capability list over `create_refund` calls made by an AI agent holding valid Razorpay MCP credentials, blocking any refund outside that list, with measured TPR/FPR on a pre-registered held-out corpus.**
+> **`rzp-guard` enforces a merchant-issued capability list over `create_refund` calls made by an AI agent holding valid Razorpay MCP credentials, blocking any refund outside that list.**
+
+**Measurement claim, stated separately because round 4 showed they are not the same thing:** conformance to that capability list is demonstrated on a frozen fixture corpus (descriptive, no inference). Detector performance against *real agent behaviour* is measured in Phase 4b on observed traces, with intent specified independently of the mandate. The fixture corpus cannot support the second claim and is no longer offered as if it could.
 
 Stated as a capability list rather than "prevents unauthorized refunds" deliberately. Where the merchant issues a **bounded** grant (§3.2), amounts inside that bound are authorized *by the merchant's own choice* — the mandate records which. Overclaiming that as "every unauthorized refund" would not survive the first panel question.
 
