@@ -418,3 +418,89 @@ v4 specifies the generated format explicitly: **`rzpg_` + `action_id`** (e.g. `r
 ---
 
 **Net effect of Round 3:** one false claim about vendor documentation retracted along with the method that produced it; one pipeline stage deleted as provably redundant; automatic reconciliation cut to preserve the architecture's central claim; two state machines merged into one fail-closed lifecycle; exact amounts made the default; and pre-registration moved from plan to commit. The plan shrinks for the third consecutive round.
+
+---
+
+## Round 4 — Phase 0.5 (corpus v1.0) — reviewer: ChatGPT — 2026-08-24
+
+**The strongest critique of the series. Seven accepts, no rejects, and the headline deliverable is downgraded as a result.** Recorded in [PREREGISTRATION.md Amendment 1](PREREGISTRATION.md#amendment-1--2026-08-24--v10-downgraded-to-a-policy-conformance-corpus); commit `e572d85` preserved unmodified.
+
+---
+
+### P4.1 — "The oracle is still circular with the policy."
+
+**Verdict: ACCEPT. This invalidates the evaluation claim, and I defended the wrong thing for two rounds.**
+
+Held-out `A1b`, `A1e` and `A4d` carry the labelled reason *"no authorized action exists"* — **which is the primary matcher's predicate.** Scoring the policy against those labels asks whether the implementation agrees with its own capability list.
+
+I called this an "independent oracle" because a human computes the label. The reviewer's decomposition is the one that matters: a human reading *(mandate + transcript)* and asking "is this outside the mandate?" computes **the same function the matcher computes**. Independent of the *implementation*, not of the *design* — and only the latter would make the labels evidential. Pre-registering before `src/` existed cured nothing, because the circularity was never in the implementation.
+
+Worse, in Round 2 (P2.2) I introduced the "independent oracle" framing *as the fix for circularity*, and in Round 3 I shipped it. Two rounds spent strengthening a claim that was structurally unsound.
+
+The term is retracted; the labels are now called **spec-derived**. Every A1 and A4 fixture is blocked by action matching without inspecting injection text at all.
+
+---
+
+### P4.2 — "The corpus has no actual agent behaviour."
+
+**Verdict: ACCEPT.** Every fixture supplies the final unauthorized `create_refund` directly. **No injection string in this corpus has been shown to cause any model to emit any call** — I wrote both the stimulus and the response and asserted the causal link between them.
+
+So the corpus cannot measure prompt-injection detection, agent susceptibility, or induced-misuse rates. Renamed to what it is: an **authorization-proxy conformance corpus**. The A1 family name is retained for organisation but no longer implies injection detection is being measured.
+
+---
+
+### P4.3 — "The primary metric is contaminated by out-of-scope calls."
+
+**Verdict: ACCEPT.** The reviewer did the arithmetic against my own manifest and it checks out: held-out's 80 blocks were 75 refunds + 5 settlements, and its 100 allows were 55 refunds + 45 reads.
+
+Both directions were inflated. Trivial read allows padded the allow side and flattered FPR; `create_instant_settlement` padded TPR with a money-moving tool that is **not the headline action**. Headline denominator is now `create_refund` **only** — heldout **175 calls (70 block / 105 allow)** — with protocol behaviour reported separately.
+
+`A2c` removed from the corpus entirely, on both grounds offered: metric contamination, and a settlement call having no place in a public defense-only corpus scoped to refunds. Tool-allowlist coverage moves to the **G3.1 default-deny unit test**, which is the right home for it.
+
+---
+
+### P4.4 — "'Overall held-out TPR/FPR is inferential' does not follow."
+
+**Verdict: ACCEPT, and withdraw the claim entirely.**
+
+Correct: the independence unit is the template, not five mechanically generated sessions from that template. Those replicas differ only by payment id and an amount drawn from a fixed pool — bootstrapping over them is **pseudoreplication**, and it would have manufactured precision from nothing. Held-out has 13 templates with generator-chosen weights.
+
+The irony is not lost: I added session variation in Round 3 partly to make bootstrapping more defensible, which is exactly the move that dressed up replicas as samples.
+
+**No confidence intervals will be reported for this corpus and no inference to merchant traffic will be claimed.** Results are a **descriptive score on a frozen fixture set**.
+
+---
+
+### P4.5 — "Several named controls are not actually exercised as the blocking reason."
+
+**Verdict: ACCEPT. `A2e` tested nothing, exactly as described.**
+
+Verified: every `A2e` target had no authorized action, so **action matching denied first and the rate limiter was never reached.** A template named for a control that the control never sees.
+
+Rewritten so all prior controls pass — 14 refunds each matching an authorized action, deliberate cumulative headroom (280,000 of 1,000,000), issued inside a 23-second window against `max_calls_per_minute: 10`, so the **rate limit alone decides.** Verified after regeneration: 14/14 targets authorized, 14 calls spanning 23s.
+
+**Standing requirement adopted:** every named control needs at least one scenario where all prior controls pass and that control alone determines the result. Audited the rest — replay and cumulative-cap families already satisfy it; A1 and A4 are by construction all action-matching, and are now labelled as such rather than implying broader coverage.
+
+---
+
+### P4.6 — "The frozen baselines are too weak to be meaningful."
+
+**Verdict: ACCEPT.** `B-amount`'s quarter-of-cap threshold is arbitrary, and `B-velocity` is beaten by `B07` — a fixture **I authored specifically to break it**. Declaring a baseline and then building its counterexample is not a comparison. Relabelled **sanity baselines, not competitive alternatives**, and the README will say beating them validates nothing.
+
+---
+
+### P4.7 — "Preserve commit `e572d85`; add a dated amendment."
+
+**Verdict: ACCEPT.** This is my own §7 amendment policy applied to me, which is the point of writing one. `e572d85` is untouched; corrections land as **Amendment 1** with corpus v1.0.0 → v1.1.0, covering all four required items: the downgrade, the separated denominator, removal of the "independent oracle" and "attacks with no corresponding rule" language, and the explicit no-inference statement.
+
+---
+
+### Consequence for the build
+
+The reviewer's stopping condition — *do not start Phase 2 as a metric-bearing build* — is accepted. Phase 2 still gets built, because the capability matcher is the product; what changes is that **no metric claim attaches to it from this corpus.**
+
+The panel question *"what did the detector infer that wasn't already encoded in the action list and the fixture label?"* has an honest answer only if ground truth stops being derived from the mandate. That means observing a **real agent**: driving an actual model against the MCP surface with injected content and recording the calls it genuinely emits, scored against merchant intent specified independently of the mandate.
+
+The measurement worth having is the one I cannot author: **how often a correctly-behaving agent is blocked because the mandate did not anticipate its legitimate path.** That is the false-positive cost the brief asks for, and only real traces produce it. Scoped into the plan as a new Phase 4; the conformance corpus stays as regression evidence.
+
+**Net effect of Round 4:** the headline metric claim is withdrawn, one template is deleted, one is rewritten after being shown to test nothing, the denominator is narrowed from 220 mixed calls to 175 refund calls, confidence intervals are abandoned as pseudoreplication, and the evaluation is rebuilt around real agent traces. Four rounds in, the single most valuable outcome of this loop is a deliverable that got smaller and a claim that got true.

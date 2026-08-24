@@ -18,11 +18,11 @@
     },
     "A2": {
       "heldout": {
-        "allow": 0,
-        "block": 35,
-        "calls": 35,
-        "sessions": 15,
-        "templates": 3
+        "allow": 50,
+        "block": 25,
+        "calls": 75,
+        "sessions": 10,
+        "templates": 2
       },
       "tuning": {
         "allow": 15,
@@ -145,15 +145,6 @@
       "sessions": 5,
       "split": "heldout"
     },
-    "A2c": {
-      "allow": 0,
-      "block": 5,
-      "calls": 5,
-      "description": "Tool outside the mandate's allowed_tools.",
-      "family": "A2",
-      "sessions": 5,
-      "split": "heldout"
-    },
     "A2d": {
       "allow": 15,
       "block": 5,
@@ -164,10 +155,10 @@
       "split": "tuning"
     },
     "A2e": {
-      "allow": 0,
-      "block": 25,
-      "calls": 25,
-      "description": "Rate-limit breach: rapid unauthorized refunds.",
+      "allow": 50,
+      "block": 20,
+      "calls": 70,
+      "description": "Rate limit ISOLATED: every refund is authorized; only the issuance rate is wrong.",
       "family": "A2",
       "sessions": 5,
       "split": "heldout"
@@ -344,7 +335,9 @@
       "split": "heldout"
     }
   },
-  "corpus_version": "1.0.0",
+  "claim_NOT_supported": "detection of AI-induced misuse; prompt-injection detection; agent susceptibility; inference to real merchant traffic",
+  "claim_supported": "implementation conforms to the capability-list spec",
+  "corpus_version": "1.1.0",
   "disjointness_unit": "scenario template",
   "file_sha256": {
     "heldout/A1b_s00.jsonl": "5059f13ec1849383d103c28d9dec4e55df9513e3e4dd8d2b717f9dc80779c656",
@@ -362,16 +355,11 @@
     "heldout/A2b_s02.jsonl": "03320cb22e81a65e523ebbe86e723b284f1ee01a53fa3a8a4a627d10e4f31c1e",
     "heldout/A2b_s03.jsonl": "15dfc3b054bdac571c8456ffc99af34b47b7eb40d23cc20258e3b0a5eb497b6e",
     "heldout/A2b_s04.jsonl": "9b1da246fd3575f00dd20835eaba33e61e72bd2c7334422cc2cd16a47f82be12",
-    "heldout/A2c_s00.jsonl": "7e2b47303c56f192df3271cfd3b4be8159d672512999a285da5fee78eaff5fba",
-    "heldout/A2c_s01.jsonl": "6b398a1291fb9756fd0bc8afc32a709543cff51ea3bc5bad6700b26938afb8f5",
-    "heldout/A2c_s02.jsonl": "2fc280f5d67814264045e43b77b3c61a0be61ee90301c75ad12c8409509fda2d",
-    "heldout/A2c_s03.jsonl": "4f7a217324ba4008361233295191ba62630a9199587c69c003b390fd6e7472f4",
-    "heldout/A2c_s04.jsonl": "29e11f8902f5ee34bd462101a2d3b0b8e88f17a7ad0fe1577b82a83dd3f132a1",
-    "heldout/A2e_s00.jsonl": "a31950e56d6cf996d1c76e5f65521c18eee0dfec3ad9651185428cf5d2f558b8",
-    "heldout/A2e_s01.jsonl": "354814a31ee7f8c22debbb4eeacb6c903ba15024fa3208a3c7b0827634778a93",
-    "heldout/A2e_s02.jsonl": "22f99c91045c18fa5ccc11ba2f702b3b28a209f4cfc80820bc0077b1238f3371",
-    "heldout/A2e_s03.jsonl": "b38736456280ee25b049efa12cc75686c3a1764ef7078ceb41538945f39806b6",
-    "heldout/A2e_s04.jsonl": "2a408a144f06692dcfb8b06b005236f726cf44714cc27b2ad68e6252b75c89d2",
+    "heldout/A2e_s00.jsonl": "4a2d4fe57c5065129eb4f2db4bdf52a1c05ac9eb8ed1a40835cb2273efe65f30",
+    "heldout/A2e_s01.jsonl": "cdb3144d395e155f9b1e7310f60cc5e550db6dfb09cce9ad7440477a2e9e601a",
+    "heldout/A2e_s02.jsonl": "ac8af5c05b459c9011375c62a0279128941517dfda377b630cc689e86958df1c",
+    "heldout/A2e_s03.jsonl": "a99e7b0fcb3cb76ed9c3db9bc11a905e9f1c875cefb31db75f678262d702cfdd",
+    "heldout/A2e_s04.jsonl": "62c34a07cd1f9044f1ef45bb8f7c5ede805e735d73f82850eb096628246fd67a",
     "heldout/A3b_s00.jsonl": "fc3f145f29fdc4c670e5ba309dfc1585d6effad63f46268a37ce73c23bfd7240",
     "heldout/A3b_s01.jsonl": "d79295714fe79fcc9b19202a07bf13864c69a0d2c131503112d98c2f38018829",
     "heldout/A3b_s02.jsonl": "b34de0efc598ebe3cb25c09590b3be6d886dcba7068cdc6c15ecd37c2e492056",
@@ -417,7 +405,7 @@
     "heldout/B11_s02.jsonl": "30f5d1731789113409706b6cf35fdc31e5f4adf9cdd1fdc260d2a4b4d371d093",
     "heldout/B11_s03.jsonl": "6ae93bb5097ec43082a0081f32810a2cf783089874083dff7f9427ba45568654",
     "heldout/B11_s04.jsonl": "3c610d5dd93e76511e88ffbe6e8e0066134c6bd78b0de4658f32c5bd2afdcd04",
-    "labels.jsonl": "081f51bc7cc9b7ead3eadf74decb7a5db3356008c03b309e06866102248eb0f8",
+    "labels.jsonl": "4df6bd7b348a40a120de0b6640eacb3620ad9af9f4755ae5834c91e68901bb3c",
     "tuning/A1a_s00.jsonl": "787e76e576e52bee35394f7d8c3cd36736e3be2142131530322d0b65ca72614d",
     "tuning/A1a_s01.jsonl": "98ec2706587f0bfac1231203dec4a0ccba1cc12ff5872459c85d10ecf49a3b3e",
     "tuning/A1a_s02.jsonl": "601edc32f1499433f7e0082eae51e05562424b807edaf27869dd0ad1c68c62a3",
@@ -494,8 +482,36 @@
     "tuning/B10_s03.jsonl": "fcd69dd2a6e5728957fe6211a293489fbec0b25d0d32e825482d37ed47638ff6",
     "tuning/B10_s04.jsonl": "7dd74edd9fb1cf3de3dc448554a94bc1c41a19be31ed8154ea3747e04bfd7f6b"
   },
-  "generated_for": "rzp-guard Phase 0.5 pre-registration",
+  "generated_for": "rzp-guard policy-conformance corpus (see PREREGISTRATION.md Amendment 1 -- this is NOT a held-out detector evaluation)",
+  "headline_denominator": "create_refund calls ONLY",
+  "headline_slice": {
+    "heldout": {
+      "allow": 105,
+      "block": 70,
+      "calls": 175
+    },
+    "tuning": {
+      "allow": 55,
+      "block": 50,
+      "calls": 105
+    }
+  },
   "positive_class": "block (call should be denied by the proxy)",
+  "protocol_slice_reported_separately": {
+    "heldout": {
+      "calls": 45,
+      "tools": [
+        "fetch_all_payments",
+        "fetch_payment"
+      ]
+    },
+    "tuning": {
+      "calls": 25,
+      "tools": [
+        "fetch_payment"
+      ]
+    }
+  },
   "seed": 20260824,
   "sessions_per_template": 5,
   "split_templates": {
@@ -503,7 +519,6 @@
       "A1b",
       "A1e",
       "A2b",
-      "A2c",
       "A2e",
       "A3b",
       "A3c",
@@ -535,10 +550,10 @@
   },
   "splits": {
     "heldout": {
-      "allow": 100,
-      "block": 80,
-      "calls": 180,
-      "sessions": 70
+      "allow": 150,
+      "block": 70,
+      "calls": 220,
+      "sessions": 65
     },
     "tuning": {
       "allow": 80,
@@ -548,10 +563,10 @@
     }
   },
   "totals": {
-    "allow": 180,
-    "block": 130,
-    "calls": 310,
-    "sessions": 145
+    "allow": 230,
+    "block": 120,
+    "calls": 350,
+    "sessions": 140
   },
   "unit_of_evaluation": "one tools/call = one decision"
 }

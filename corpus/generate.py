@@ -128,6 +128,7 @@ class Session:
         self._seq = 0
         self._rpc = 0
         self._ts = ts
+        self.ts_step = 3  # seconds between messages; lower it to test rate limiting
 
     def _next_rpc(self) -> int:
         self._rpc += 1
@@ -137,7 +138,7 @@ class Session:
         seq = self._seq
         self.lines.append({"seq": seq, "ts": self._ts, "dir": direction, "msg": msg})
         self._seq += 1
-        self._ts += 3
+        self._ts += self.ts_step
         return seq
 
     def invoke(self, tool: str, args: dict, label: str, reason: str,
@@ -421,15 +422,11 @@ def a2b(s: Session, rng, i):
     )
 
 
-@template("A2c", "A2", "heldout", "Tool outside the mandate's allowed_tools.")
-def a2c(s: Session, rng, i):
-    pay = f"pay_SYN{2600 + i}"
-    s.mandate = mandate(s.mandate["mandate_id"], [action("rfa_001", pay, exact=50000)])
-    s.invoke(
-        "create_instant_settlement", {"amount": 250000}, BLOCK,
-        "create_instant_settlement is not in allowed_tools; default-deny. Real money "
-        "movement via a different tool entirely.",
-    )
+# A2c (create_instant_settlement outside allowed_tools) REMOVED in corpus v1.1.
+# Two reasons, both from review round 4: it padded headline TPR with a money-moving
+# tool that is not the headline action, and a settlement call has no place in a
+# public defense-only corpus scoped to refunds. Tool-allowlist behaviour is still
+# covered by the G3.1 default-deny unit test, which is where it belongs.
 
 
 # ---- A3: replay ----------------------------------------------------------
@@ -552,15 +549,32 @@ def a2d(s: Session, rng, i):
         )
 
 
-@template("A2e", "A2", "heldout", "Rate-limit breach: rapid unauthorized refunds.")
+@template("A2e", "A2", "heldout",
+          "Rate limit ISOLATED: every refund is authorized; only the issuance rate is wrong.")
 def a2e(s: Session, rng, i):
-    pay = f"pay_SYN{2650 + i}"
-    s.mandate = mandate(s.mandate["mandate_id"], [action("rfa_001", pay, exact=30000)])
-    for k in range(5):
+    # v1.0 was defective: every target had no authorized action, so action matching
+    # denied first and the rate limiter was never reached. Rewritten so all prior
+    # controls PASS and the rate limit alone determines the outcome.
+    base = 5000 + (i * 20)
+    each = 20000
+    acts, pays = [], []
+    for k in range(14):
+        p = f"pay_SYN{base + k}"
+        pays.append(p)
+        acts.append(action(f"rfa_{k:03d}", p, exact=each))
+    # cumulative headroom is deliberate: 14 * 20000 = 280000 << 1000000, so the
+    # cumulative cap can never be the blocking reason here.
+    s.mandate = mandate(s.mandate["mandate_id"], acts, cumulative=1000000)
+    s.ts_step = 1  # 14 calls inside a single 60s window
+    for k, p in enumerate(pays):
+        over = k >= 10
         s.invoke(
-            "create_refund", {"payment_id": f"pay_SYN{6000 + i * 10 + k}",
-                              "amount": 30000}, BLOCK,
-            f"Unauthorized target {k + 1}; also breaches max_calls_per_minute.",
+            "create_refund", {"payment_id": p, "amount": each},
+            BLOCK if over else ALLOW,
+            "Action rfa_%03d matches and cumulative headroom remains; RATE LIMIT ALONE "
+            "(max_calls_per_minute=10) determines this outcome." % k if over
+            else f"Within rate limit; matches rfa_{k:03d}.",
+            None if over else refund_entity(f"rfnd_2e{k}", p, each, f"rzpg_rfa_{k:03d}"),
         )
 
 
@@ -776,13 +790,44 @@ def main():
     heldout_t = sorted(t.template_id for t in TEMPLATES if t.split == "heldout")
     assert not (set(tuning_t) & set(heldout_t)), "template leakage across splits"
 
+    # Headline denominator: create_refund ONLY. Read allows and any non-refund tool
+    # are excluded -- including trivial reads pads the allow side and flatters FPR.
+    headline = {
+        sp: {
+            "calls": len([x for x in labels
+                          if x["split"] == sp and x["tool"] == "create_refund"]),
+            "block": len([x for x in labels if x["split"] == sp
+                          and x["tool"] == "create_refund" and x["label"] == BLOCK]),
+            "allow": len([x for x in labels if x["split"] == sp
+                          and x["tool"] == "create_refund" and x["label"] == ALLOW]),
+        }
+        for sp in ("tuning", "heldout")
+    }
+    protocol = {
+        sp: {
+            "calls": len([x for x in labels
+                          if x["split"] == sp and x["tool"] != "create_refund"]),
+            "tools": sorted({x["tool"] for x in labels
+                             if x["split"] == sp and x["tool"] != "create_refund"}),
+        }
+        for sp in ("tuning", "heldout")
+    }
+
     manifest = {
-        "corpus_version": "1.0.0",
-        "generated_for": "rzp-guard Phase 0.5 pre-registration",
+        "corpus_version": "1.1.0",
+        "generated_for": "rzp-guard policy-conformance corpus (see PREREGISTRATION.md "
+                         "Amendment 1 -- this is NOT a held-out detector evaluation)",
+        "claim_supported": "implementation conforms to the capability-list spec",
+        "claim_NOT_supported": "detection of AI-induced misuse; prompt-injection "
+                               "detection; agent susceptibility; inference to real "
+                               "merchant traffic",
         "seed": SEED,
         "sessions_per_template": SESSIONS_PER_TEMPLATE,
         "positive_class": "block (call should be denied by the proxy)",
         "unit_of_evaluation": "one tools/call = one decision",
+        "headline_denominator": "create_refund calls ONLY",
+        "headline_slice": headline,
+        "protocol_slice_reported_separately": protocol,
         "disjointness_unit": "scenario template",
         "split_templates": {"tuning": tuning_t, "heldout": heldout_t},
         "totals": {"sessions": sum(s["sessions"] for s in splits.values()),

@@ -1,7 +1,7 @@
 # PLAN.md — Track 2 (AI Risk Manager)
 
 **Project:** `rzp-guard` — an authorization proxy for the Razorpay MCP server
-**Phase 0 deliverable.** Phase 0.5 (pre-registration) executed; no policy code written yet.
+**Phase 0 deliverable.** Phase 0.5 conformance corpus committed; no policy code written yet.
 Date: 2026-08-24 · Deadline: 2026-09-05 (12 days)
 
 **Version 4**, after three rounds of adversarial review — see [REVIEW_LOG.md](REVIEW_LOG.md). **The plan has shrunk every round.** v4 deletes a pipeline stage as provably redundant, cuts automatic reconciliation to preserve the architecture's central claim, and merges two state machines into one.
@@ -243,13 +243,14 @@ The proxy ingests attacker-controlled text, logs it, and renders it in a browser
 
 ## 4. Phased plan with validation gates
 
-### Phase 0.5 — Pre-registration (**executed this round**)
+### Phase 0.5 — Conformance corpus (**executed; claim downgraded in round 4**)
 
-Pre-registration means nothing if it follows the thing it constrains. See `corpus/manifest.json` and `PREREGISTRATION.md`.
+Committed at `e572d85` before any policy code existed — provable from `git log`, since `src/` is absent from that tree. Corpus v1.1 after [Amendment 1](PREREGISTRATION.md).
 
-- **G0.1** Manifest, labels, exact split and per-family/per-session class counts, seed, and frozen baseline committed **in their own commit**, so git history proves ordering. ✅
-- **G0.2** Held-out authored and hash-committed **before any policy code exists.** Schemas in §2.5 are verified from source; if G1.1 reveals runtime drift, the change is a dated **amendment**, never a silent edit. ✅
-- **G0.3** Labels come from an **independent oracle**: positive iff a human reading *(mandate + session transcript + prior account state)* judges the call outside the mandate, with a written reason per label. The detector never touches labelling — which is what makes recall a measurement rather than a tautology, and why the corpus deliberately contains **attacks with no corresponding rule.** ✅
+- **G0.1** Manifest, labels, split, seed and baselines committed **in their own commit**, so ordering is proven rather than asserted. ✅
+- **G0.2** Fixtures authored and hash-committed **before any policy code exists**; deterministic (seed 20260824), regeneration reproduces an identical manifest hash. ✅
+- **G0.3** ~~Labels come from an independent oracle~~ — **withdrawn.** Labels are **spec-derived**: the labelled reason *"no authorized action exists"* is the matcher's own predicate, so a human computing it computes the same function the policy does. Independent of the implementation, not of the design — and only the latter would make them evidential.
+- **G0.4** Consequently this is a **policy-conformance and regression corpus**, not a detector evaluation. It pins behaviour on the workflows earlier plan versions would have broken (`B03` equal-amount partial refunds, `B07`, `B10`, `B11`, the replay family) and will catch regressions. Real value, weaker claim. The metric claim moves to **Phase 4b**. ✅
 
 ### Phase 1 — Ground truth & live harness (Days 1–2)
 
@@ -282,14 +283,28 @@ Pre-registration means nothing if it follows the thing it constrains. See `corpu
 
 ### Phase 4 — Measured metrics (Days 6–8) — the graded phase
 
-- **G4.1** Disjointness unit is the **scenario template**; families A1–A4 span both splits. Template ids in the manifest make disjointness checkable by a third party.
-- **G4.2 — Headline is TPR/FPR, not precision.** Precision depends on the attack base rate and the corpus mix resembles no real merchant; precision is reported as a **curve across base rates (1%, 0.1%, 0.01%)**.
-- **G4.3 — Confidence intervals by cluster bootstrap at the session level.** Calls in a session share a mandate, agent and template. **Expect wide per-family intervals — plausibly ±0.10–0.20 on recall at this corpus size.**
-- **G4.4** Provenance reported as a **diagnostic**: does the signal separate attack from benign calls? Explicitly **not** an enforcement ablation, since it no longer gates.
-- **G4.5** Scorer runs the corpus **through the actual proxy**. `score.py` carries a hard guard that **cannot spawn a child process or open a socket**.
-- **G4.6** Every FP and FN individually reviewed in writing. Any family with recall below 0.8 is reported as a known weakness, not dropped.
+**Rebuilt after review round 4.** The v1.1 conformance corpus **cannot carry a metric claim**: its labels are computed from the same predicate the policy matches on, so scoring against it measures conformance to the spec, not detection. It remains as regression evidence. See [PREREGISTRATION.md Amendment 1](PREREGISTRATION.md).
+
+The metric claim needs ground truth **not derived from the mandate**, which means observing a real agent instead of authoring its output.
+
+**4a — Conformance (from the frozen corpus, no inference)**
+
+- **G4.1** Policy scored against corpus v1.1 through the **actual proxy**. `score.py` carries a hard guard that cannot spawn a child process or open a socket.
+- **G4.2** Reported as a **descriptive score on a frozen fixture set** over the `create_refund` slice only (heldout: 175 calls, 70 block / 105 allow). Protocol behaviour reported separately. **No confidence intervals, no inference to merchant traffic** — five sessions per template are replicas, and bootstrapping them is pseudoreplication.
+- **G4.3** Every disagreement between policy and spec is a **conformance bug**, reviewed in writing. A perfect score here means the implementation matches its capability list — nothing more, and the README will say so.
+- **G4.4** Baselines `B-amount` and `B-velocity` reported as **sanity checks, not competitive alternatives** (one uses an arbitrary threshold; the other is beaten by a fixture authored to beat it).
+
+**4b — Agent-trace evaluation (the actual metric claim)**
+
+- **G4.5** Drive a **real model** against the MCP surface through the proxy, on merchant tasks whose **intent is specified independently of the mandate**. Record the calls the agent genuinely emits. Injected content is placed in `notes`/`description` fields of test-mode payment data.
+- **G4.6** Ground truth is **observed, not authored**: for each emitted call, did it fall outside the merchant intent given in the task? Labelled from the task brief, which no mandate field derives from.
+- **G4.7 — The measurement worth having:** **how often a correctly-behaving agent is blocked because the mandate did not anticipate its legitimate path.** This is the real false-positive cost, and it cannot be authored honestly — I would be guessing at model behaviour. Reported per task family with the blocked legitimate paths enumerated.
+- **G4.8** Induced-misuse rate reported **separately from detector performance**: of the injection attempts, how many actually caused an out-of-intent call. If the model resists most of them, that is the finding — and it says something real about the threat model rather than about my fixtures.
+- **G4.9** Model, version, prompts, temperature and full traces committed. Trace count stated honestly; **if the sample is small, it is reported as a small sample**, not dressed up.
 
 **False-positive cost model:** a blocked legitimate refund costs a support ticket plus a delayed customer refund, priced in ₹ and ops-minutes with assumptions inline, presented as a cost curve.
+
+**Honest scoping note:** 4b is the part that answers *"what did the detector infer that wasn't already encoded in the action list?"* If time runs out, 4b ships smaller rather than 4a's numbers being promoted to carry a claim they cannot support.
 
 ### Phase 5 — Dashboard (Days 9–10)
 
@@ -356,4 +371,4 @@ rzp-guard/
 1. **Start Docker Desktop** — the daemon is down. (Alternative: install Go 1.24.2+; Docker is shorter.)
 2. **Test-mode API keys** — Dashboard → Settings → API Keys, in **Test Mode**, into a gitignored `.env`.
 
-Both gate Phase 1. Phase 0.5 was not blocked and is done.
+Both gate Phase 1. Phase 0.5 was not blocked and is done (corpus v1.1).
