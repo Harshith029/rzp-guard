@@ -109,6 +109,39 @@ The header is unreachable because `razorpay-go`'s signature is `Refund(paymentID
 
 **Consequence for §3.4:** a duplicate `receipt` is expected to *reject* rather than *replay the original result*, so a timed-out refund cannot be resolved by retrying — a retry teaches nothing about whether the first attempt landed.
 
+### 2.8 RUNTIME TRUTH — supersedes every source claim above (gate G1.1 ✅)
+
+Probed the real container over stdio with `initialize` + `tools/list`. Raw capture in `evidence/tools_list_raw.jsonl`, parsed in `evidence/tools_list.json`.
+
+```
+image   razorpay/mcp@sha256:435109006d6247103899938cf7b1747ba8be1c1a8a28d452cf9fa8eff506e5c6
+built   2025-09-26   arch amd64   size 17.0 MB
+server  razorpay-mcp-server 1.0.0   protocolVersion 2024-11-05
+tools   41
+```
+
+**The pinned image lags `main` by ~6 months, and the tool surface genuinely differs.** This is exactly why the digest is pinned and why runtime supersedes the README:
+
+| In README (main, 2026-03) but **not** in the image | In the image but **not** in the README |
+|---|---|
+| `create_payment_link_upi`, `send_payment_link`, `fetch_payout_by_id`, `create_registration_link`, `revoke_token`, `detect_stack`, `integrate_razorpay_checkout` | `payment_link_upi_create`, `payment_link_notify`, `fetch_payout_with_id` |
+
+Three are renames (`create_payment_link_upi` → `payment_link_upi_create`, `send_payment_link` → `payment_link_notify`, `fetch_payout_by_id` → `fetch_payout_with_id`); four simply do not exist yet in the pinned build. **Had the guard hard-coded the README's names, its allowlist would have silently referenced tools the child does not expose.**
+
+`create_payout` is **absent at runtime too**, confirming §2.1 correction #1 against the running server rather than the source.
+
+**`create_refund` runtime schema — and a finding that matters for F1.a:**
+
+```json
+{"properties":{
+  "payment_id":{"type":"string","description":"... ID should have a pay_ prefix."},
+  "amount":{"type":"number","minimum":100,"description":"... smallest currency unit"},
+  "speed":{"type":"string"}, "notes":{"type":"object"}, "receipt":{"type":"string"}},
+ "required":["payment_id","amount"]}
+```
+
+`amount` is **`type: number`, not `integer`.** A fractional amount is schema-valid at the MCP layer, so **the child will not reject it** — which makes the prototype's truncate-then-forward defect ([FAILURES.md F1.a](FAILURES.md)) reachable in practice rather than theoretical. The guard must reject fractions itself; nothing downstream will.
+
 ### 2.7 Environment blockers (§8)
 
 - **Docker daemon is not running.** CLI `29.7.2`; `docker pull razorpay/mcp` → `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`.
@@ -135,7 +168,11 @@ MCP client ──stdio──► rzp-guard ──stdio (ALLOW only)──► razo
 
 **This claim is now literally true.** v3 had the proxy issuing its own reconciliation reads through the child, which would have required it to become an MCP client — internal id generation, two-way multiplexing, response suppression, collision handling — and would have falsified byte-for-byte relay. That is cut (§3.4). The proxy never originates a JSON-RPC request.
 
-**Decision B — Python 3.11 + asyncio + FastAPI, one process, no database.** Go isn't installed and the child is a container anyway. Python keeps relay, scorer and metrics in one language, and the measurement is the graded deliverable.
+**Decision B — Go 1.24+ is the sole runtime.** Relay, mandate compiler, policy, lifecycle, durable state, dashboard and operator command are all Go; the dashboard is `net/http` with embedded templates. Razorpay's MCP server is Go, so the product matches the ecosystem it plugs into, ships as one static binary, and gets `go test -race` for the concurrency claims the Python prototype asserted without exercising ([FAILURES.md F3](FAILURES.md)).
+
+The Python package is **frozen as a behavioural reference** in `prototype/python/` — its 28 tests pin the decision semantics the port must reproduce, and the six defects found in it are required test cases. There are deliberately **not** two production implementations.
+
+**Decision B2 — one justified dependency: SQLite.** In-memory state is not fail-closed. A crash loses reserved budget, consumed actions and `IN_DOUBT`, so the same mandate replays and the cap is bypassed ([FAILURES.md F2](FAILURES.md)). Durable local state for mandates, action lifecycle, receipts and decision records; `IN_DOUBT` stays locked across restart. Justified by a live gate, not by taste.
 
 **Decision C — no LLM in the decision path.** Ships only if held-out measurement shows a deterministic recall gap it actually closes, with a frozen baseline comparison and full model/prompt disclosure.
 
