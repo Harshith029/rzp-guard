@@ -528,3 +528,132 @@ func TestUnparseableInputIsNotForwarded(t *testing.T) {
 		t.Fatalf("agent got no parse error: %s", agent.String())
 	}
 }
+
+// THE EXACT ATTACK: an authorized refund as id 8, then tools/list as id 8. The
+// read is not a tools/call, so an earlier revision forwarded it unchecked and
+// its reply resolved the refund's correlation entry -- forcing a perfectly good
+// refund into IN_DOUBT via a response that had nothing to do with it.
+func TestNonToolRequestCannotReuseAnOutstandingRefundID(t *testing.T) {
+	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+	r, child, agent := newRelay(t, g)
+
+	feed(t, r,
+		`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":`+
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`,
+		`{"jsonrpc":"2.0","id":8,"method":"tools/list","params":{}}`)
+
+	if n := len(child.Lines()); n != 1 {
+		t.Fatalf("child got %d lines, want 1: tools/list reused an outstanding id", n)
+	}
+	if !strings.Contains(agent.String(), "duplicate in-flight JSON-RPC id") {
+		t.Fatalf("tools/list with a reused id was not refused: %s", agent.String())
+	}
+
+	// The protection is the refusal above: the read never reached the child, so
+	// the child can never produce a reply on id 8 other than the refund's.
+	//
+	// If a mismatched reply somehow arrives on that id anyway, the safe outcome
+	// is IN_DOUBT -- never COMMITTED. The relay cannot know a reply is spurious,
+	// so it must not treat it as execution evidence.
+	listReply := `{"jsonrpc":"2.0","id":8,"result":{"tools":[{"name":"create_refund"}]}}`
+	if err := r.PumpChild(strings.NewReader(listReply + "\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got := g.State("rfa_001"); got == lifecycle.Committed {
+		t.Fatalf("state = %s: a tools/list reply was treated as refund execution evidence", got)
+	}
+	if enc := g.Encumbered(); enc != 20000 {
+		t.Fatalf("encumbered = %d, want 20000: budget must stay held", enc)
+	}
+}
+
+// Non-tool requests are tracked, so their ids are also protected from reuse.
+func TestNonToolRequestIDIsAlsoProtectedFromReuse(t *testing.T) {
+	g := newGuard(t, `[]`)
+	r, child, agent := newRelay(t, g)
+
+	feed(t, r,
+		`{"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}`,
+		`{"jsonrpc":"2.0","id":3,"method":"initialize","params":{}}`)
+
+	if n := len(child.Lines()); n != 1 {
+		t.Fatalf("child got %d lines, want 1", n)
+	}
+	if !strings.Contains(agent.String(), "duplicate in-flight JSON-RPC id") {
+		t.Fatalf("second request reusing id 3 was not refused: %s", agent.String())
+	}
+}
+
+// Notifications carry no id and must still pass through untouched, or the MCP
+// handshake breaks.
+func TestNotificationsPassThroughAndAreNotTracked(t *testing.T) {
+	g := newGuard(t, `[]`)
+	r, child, _ := newRelay(t, g)
+
+	feed(t, r,
+		`{"jsonrpc":"2.0","method":"notifications/initialized"}`,
+		`{"jsonrpc":"2.0","method":"notifications/initialized"}`)
+
+	if n := len(child.Lines()); n != 2 {
+		t.Fatalf("child got %d lines, want 2: id-less notifications must pass", n)
+	}
+}
+
+// A refund sent as a notification has no reply lifecycle: it could never be
+// resolved, and CloseInflight could never promote it for an operator.
+func TestIDLessRefundNeverReachesTheChild(t *testing.T) {
+	for _, tc := range []struct{ name, line string }{
+		{"no id field", `{"jsonrpc":"2.0","method":"tools/call","params":` +
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`},
+		{"explicit null id", `{"jsonrpc":"2.0","id":null,"method":"tools/call","params":` +
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := newGuard(t,
+				`[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+			r, child, agent := newRelay(t, g)
+
+			feed(t, r, tc.line)
+
+			if got := child.String(); got != "" {
+				t.Fatalf("an id-less refund was forwarded:\n%s", got)
+			}
+			if g.State("rfa_001") != lifecycle.Available {
+				t.Fatalf("state = %s, want AVAILABLE: nothing should have been reserved",
+					g.State("rfa_001"))
+			}
+			if g.Encumbered() != 0 {
+				t.Fatalf("encumbered = %d, want 0", g.Encumbered())
+			}
+			if !strings.Contains(agent.String(), "requires a non-null JSON-RPC id") {
+				t.Fatalf("agent got no explanation: %s", agent.String())
+			}
+		})
+	}
+}
+
+// A refund result must carry a provider-assigned id. Without one, an echo of
+// our own request fields would count as evidence that a refund was created.
+func TestCommitRequiresAProviderAssignedRefundID(t *testing.T) {
+	receipt, _ := mandate.ReceiptFor("mnd_test", "rfa_001")
+	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+	r, _, _ := newRelay(t, g)
+
+	feed(t, r, `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":`+
+		`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`)
+
+	// Same shape as a success, but no provider id.
+	entity := fmt.Sprintf(
+		`{"entity":"refund","amount":20000,"payment_id":"pay_SYN0001","receipt":%q}`, receipt)
+	b, _ := json.Marshal(entity)
+	reply := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":11,"result":{"content":[{"type":"text","text":%s}]}}`, string(b))
+
+	if err := r.PumpChild(strings.NewReader(reply + "\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got := g.State("rfa_001"); got != lifecycle.InDoubt {
+		t.Fatalf("state = %s, want IN_DOUBT: a refund object with no id is not "+
+			"evidence that one was created", got)
+	}
+}

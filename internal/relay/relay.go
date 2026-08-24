@@ -118,10 +118,34 @@ func (r *Relay) handleAgentLine(line []byte) error {
 			fmt.Sprintf("rzp-guard: could not parse JSON-RPC message: %v", err)))
 	}
 
+	// Duplicate-id refusal applies to EVERY id-bearing request, not just
+	// tools/call. Otherwise an agent could send an authorized refund as id 8 and
+	// then tools/list as id 8: the read is forwarded, its reply resolves the
+	// refund's correlation entry, and the refund is forced into IN_DOUBT by a
+	// response that has nothing to do with it.
+	hasID := hasRequestID(msg.ID)
+	if hasID && r.isInFlight(string(msg.ID)) {
+		return r.writeAgent(errorResponse(msg.ID, -32600,
+			fmt.Sprintf("rzp-guard: %v: id %s is still outstanding",
+				ErrDuplicateRequestID, msg.ID)))
+	}
+
 	if msg.Method != "tools/call" {
 		// Everything else -- initialize, tools/list, notifications, resources --
-		// is forwarded byte-for-byte.
-		_, err := r.writeChild(line)
+		// is forwarded byte-for-byte, but an id-bearing request is still tracked
+		// so its id cannot be reused while outstanding.
+		if hasID {
+			r.mu.Lock()
+			r.inflight[string(msg.ID)] = pending{}
+			r.mu.Unlock()
+		}
+		n, err := r.writeChild(line)
+		if err != nil && hasID {
+			r.mu.Lock()
+			delete(r.inflight, string(msg.ID))
+			r.mu.Unlock()
+			_ = n
+		}
 		return err
 	}
 
@@ -133,13 +157,17 @@ func (r *Relay) handleAgentLine(line []byte) error {
 			fmt.Sprintf("rzp-guard: could not parse tools/call params: %v", err)))
 	}
 
-	// An id already outstanding is refused before any authorization work. A
-	// reused id would overwrite the correlation entry, so a later reply could be
-	// matched to the wrong request.
-	if len(msg.ID) > 0 && r.isInFlight(string(msg.ID)) {
-		return r.writeAgent(errorResponse(msg.ID, -32600,
-			fmt.Sprintf("rzp-guard: %v: id %s is still outstanding",
-				ErrDuplicateRequestID, msg.ID)))
+	// A money-moving tool REQUIRES a request id.
+	//
+	// Without one there is no correlation entry and no reply lifecycle: the
+	// reservation would sit RESERVED forever in a running process, and
+	// CloseInflight could not promote it for operator resolution. An
+	// un-answerable refund is not a refund anyone can be accountable for.
+	if tp.Name == policy.RefundTool && !hasID {
+		return r.writeAgent(errorResponse(nil, -32600,
+			"rzp-guard: create_refund requires a non-null JSON-RPC id; a refund "+
+				"sent as a notification has no reply lifecycle and could never be "+
+				"resolved or recovered"))
 	}
 
 	d := r.guard.Decide(tp.Name, tp.Arguments, r.now())
@@ -150,7 +178,7 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		return r.writeAgent(toolDenied(msg.ID, d))
 	}
 
-	if len(msg.ID) > 0 {
+	if hasID {
 		p := pending{actionID: d.MatchedActionID, isRefund: d.MatchedActionID != ""}
 		if p.isRefund {
 			p.paymentID, _ = d.Forwarded["payment_id"].(string)
@@ -195,6 +223,13 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		return werr
 	}
 	return nil
+}
+
+// hasRequestID reports whether this message is a request that expects a reply.
+// A missing id and an explicit JSON null are both notifications.
+func hasRequestID(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && !bytes.Equal(trimmed, []byte("null"))
 }
 
 func (r *Relay) isInFlight(id string) bool {
@@ -319,11 +354,14 @@ func isToolError(result json.RawMessage) bool {
 // refundEntityMatches reports whether a tool result carries a refund entity for
 // exactly the payment, amount and receipt this relay authorized.
 //
-// The expected shape is Razorpay's documented refund entity, which includes
-// `receipt` -- confirmed present in the entity field list. It is NOT yet
-// verified against a live Test Mode response. That is gate G1.6, and until it
-// passes the failure mode here is fail-closed: an unrecognised success shape
-// yields IN_DOUBT and an operator look, never a wrong COMMIT.
+// UNVERIFIED COMPATIBILITY PATH. The expected shape is Razorpay's *documented*
+// refund entity; no live MCP success envelope has been captured yet. Automatic
+// COMMITTED is therefore a compatibility guess, not demonstrated product
+// behaviour, and must not be presented as the latter until gate G1.6 records a
+// real Test Mode response.
+//
+// Only the fallback is demonstrated: an unrecognised success shape yields
+// IN_DOUBT and an operator look, never a wrong COMMIT.
 func refundEntityMatches(result json.RawMessage, p pending) bool {
 	var wrapper struct {
 		Content []struct {
@@ -339,6 +377,7 @@ func refundEntityMatches(result json.RawMessage, p pending) bool {
 			continue
 		}
 		var e struct {
+			ID        string      `json:"id"`
 			Entity    string      `json:"entity"`
 			PaymentID string      `json:"payment_id"`
 			Amount    json.Number `json:"amount"`
@@ -349,7 +388,10 @@ func refundEntityMatches(result json.RawMessage, p pending) bool {
 		if err := dec.Decode(&e); err != nil {
 			continue
 		}
-		if e.Entity != "refund" {
+		if e.Entity != "refund" || e.ID == "" {
+			// A provider-assigned identifier is the minimum evidence that an
+			// object was actually created. Without it, any structurally matching
+			// echo of our own request would count as execution evidence.
 			continue
 		}
 		amt, err := e.Amount.Int64()
