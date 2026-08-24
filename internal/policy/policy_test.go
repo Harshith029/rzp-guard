@@ -172,7 +172,7 @@ func TestActionIDWithSpacesOrPunctuationIsRejectedAtLoad(t *testing.T) {
 	}
 }
 
-func TestReceiptIsUniqueAcrossMandatesForTheSameActionID(t *testing.T) {
+func TestReceiptIsCollisionResistantAcrossMandatesNotGuaranteedUnique(t *testing.T) {
 	a, err := mandate.ReceiptFor("mnd_alpha", "rfa_001")
 	if err != nil {
 		t.Fatal(err)
@@ -184,6 +184,9 @@ func TestReceiptIsUniqueAcrossMandatesForTheSameActionID(t *testing.T) {
 	if a == b {
 		t.Fatalf("receipts collide across mandates: %q", a)
 	}
+	// 48-bit truncated hash: this shows collision RESISTANCE, not uniqueness.
+	// Uniqueness is a database constraint, covered by
+	// TestReceiptUniquenessIsEnforcedByTheDatabase.
 	// Deterministic: idempotency depends on it.
 	again, _ := mandate.ReceiptFor("mnd_alpha", "rfa_001")
 	if again != a {

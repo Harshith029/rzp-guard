@@ -24,11 +24,26 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-var ErrReceiptExists = errors.New("receipt already issued")
+var (
+	ErrReceiptExists = errors.New("receipt already issued")
+	// ErrNotOwner means another guard process already owns this state file.
+	ErrNotOwner = errors.New("state file is owned by another guard process")
+	// ErrNoRowChanged means an expected-state write matched nothing.
+	ErrNoRowChanged = errors.New("no row changed: action was not in the expected state")
+)
+
+func nowUnixNano() int64 { return time.Now().UTC().UnixNano() }
 
 const schema = `
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
+
+-- Written at startup purely to force the EXCLUSIVE lock to be acquired.
+CREATE TABLE IF NOT EXISTS owner (
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  mandate_id  TEXT NOT NULL,
+  acquired_at TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS action_state (
   mandate_id   TEXT    NOT NULL,
@@ -42,6 +57,14 @@ CREATE TABLE IF NOT EXISTS action_state (
   updated_at   TEXT    NOT NULL,
   PRIMARY KEY (mandate_id, action_id)
 );
+
+-- Rate-limit window. Persisted because an in-memory limiter resets on restart,
+-- which would let a crash-loop bypass max_calls_per_minute entirely.
+CREATE TABLE IF NOT EXISTS call_log (
+  mandate_id   TEXT    NOT NULL,
+  at_unix_nano INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS call_log_window ON call_log (mandate_id, at_unix_nano);
 
 CREATE TABLE IF NOT EXISTS audit (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,9 +94,31 @@ func Open(path, mandateID string) (*Store, error) {
 	// One writer: the guard is a single process and SQLite writes serialize
 	// anyway. Avoids "database is locked" under concurrent reservations.
 	db.SetMaxOpenConns(1)
+
+	// Single-instance ownership. Two guard processes over one state file would
+	// each restore their own in-memory ledger and check the cumulative cap
+	// locally, so between them they could reserve past the mandate cap.
+	// SetMaxOpenConns(1) only serializes writers WITHIN one process.
+	//
+	// EXCLUSIVE locking mode makes this connection retain the database lock for
+	// its lifetime, so a second process fails fast instead of silently sharing.
+	if _, err := db.Exec(`PRAGMA locking_mode = EXCLUSIVE`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("storage: locking mode: %w", err)
+	}
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("storage: schema: %w", err)
+		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
+	}
+	// Force the exclusive lock to be taken now rather than on first write, so
+	// ownership is decided at startup and not mid-refund.
+	if _, err := db.Exec(
+		`INSERT INTO owner (id, mandate_id, acquired_at) VALUES (1, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET mandate_id = excluded.mandate_id,
+		                               acquired_at = excluded.acquired_at`,
+		mandateID, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
 	}
 	return &Store{db: db, mandateID: mandateID}, nil
 }
@@ -118,7 +163,7 @@ func (s *Store) RecoverStartup() ([]string, error) {
 // the child's stdin, so a crash mid-flight leaves a recoverable row rather than
 // a silently released authorization.
 func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		`INSERT INTO action_state (mandate_id, action_id, receipt, state, amount_paise, updated_at)
 		 VALUES (?, ?, ?, 'RESERVED', ?, ?)
 		 ON CONFLICT(mandate_id, action_id) DO UPDATE SET
@@ -129,18 +174,72 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 	if err != nil {
 		return fmt.Errorf("storage: reserve %s: %w", actionID, err)
 	}
+	// The ON CONFLICT guard silently changes NOTHING when the action is already
+	// RESERVED / COMMITTED / IN_DOUBT. Without this check the caller would treat
+	// a no-op as success and mark the action reserved in memory anyway.
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("storage: reserve %s: rows affected: %w", actionID, err)
+	}
+	if n != 1 {
+		return fmt.Errorf("storage: reserve %s: %w (%d rows)", actionID, ErrNoRowChanged, n)
+	}
 	return nil
 }
 
 // SetState records a terminal or recovered state.
 func (s *Store) SetState(actionID, state string) error {
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		`UPDATE action_state SET state = ?, updated_at = ? WHERE mandate_id = ? AND action_id = ?`,
 		state, time.Now().UTC().Format(time.RFC3339Nano), s.mandateID, actionID)
 	if err != nil {
 		return fmt.Errorf("storage: set state %s=%s: %w", actionID, state, err)
 	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("storage: set state %s: rows affected: %w", actionID, err)
+	}
+	if n != 1 {
+		return fmt.Errorf("storage: set state %s=%s: %w (%d rows)",
+			actionID, state, ErrNoRowChanged, n)
+	}
 	return nil
+}
+
+// RecordCall appends a forwarded call to the durable rate window.
+func (s *Store) RecordCall(atUnixNano int64) error {
+	if _, err := s.db.Exec(
+		`INSERT INTO call_log (mandate_id, at_unix_nano) VALUES (?, ?)`,
+		s.mandateID, atUnixNano); err != nil {
+		return fmt.Errorf("storage: record call: %w", err)
+	}
+	return nil
+}
+
+// RecentCalls returns forwarded-call timestamps at or after cutoff, and prunes
+// everything older so the table cannot grow without bound.
+func (s *Store) RecentCalls(cutoffUnixNano int64) ([]int64, error) {
+	if _, err := s.db.Exec(
+		`DELETE FROM call_log WHERE mandate_id = ? AND at_unix_nano < ?`,
+		s.mandateID, cutoffUnixNano); err != nil {
+		return nil, fmt.Errorf("storage: prune call log: %w", err)
+	}
+	rows, err := s.db.Query(
+		`SELECT at_unix_nano FROM call_log WHERE mandate_id = ? AND at_unix_nano >= ?
+		 ORDER BY at_unix_nano`, s.mandateID, cutoffUnixNano)
+	if err != nil {
+		return nil, fmt.Errorf("storage: recent calls: %w", err)
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var v int64
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }
 
 // Snapshot is the durable view used to rebuild in-memory state at startup.

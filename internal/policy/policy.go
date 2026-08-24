@@ -138,10 +138,37 @@ func parseAmountPaise(v any) (int64, error) {
 	}
 }
 
+// RateStore persists the rate window. An in-memory limiter resets on restart,
+// which would let a crash-loop bypass max_calls_per_minute entirely.
+type RateStore interface {
+	RecordCall(atUnixNano int64) error
+	RecentCalls(cutoffUnixNano int64) ([]int64, error)
+}
+
 type rateLimiter struct {
 	mu    sync.Mutex
 	max   int
 	times []time.Time
+	store RateStore
+}
+
+// restore reloads the durable window at startup, before any traffic.
+func (r *rateLimiter) restore(now time.Time) error {
+	if r.store == nil {
+		return nil
+	}
+	cutoff := now.Add(-time.Minute).UnixNano()
+	seen, err := r.store.RecentCalls(cutoff)
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.times = r.times[:0]
+	for _, ns := range seen {
+		r.times = append(r.times, time.Unix(0, ns).UTC())
+	}
+	return nil
 }
 
 func (r *rateLimiter) evictLocked(now time.Time) {
@@ -172,10 +199,14 @@ func (r *rateLimiter) hasHeadroom(now time.Time) bool {
 	return len(r.times) < r.max
 }
 
-func (r *rateLimiter) record(now time.Time) {
+func (r *rateLimiter) record(now time.Time) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.times = append(r.times, now)
+	r.mu.Unlock()
+	if r.store == nil {
+		return nil
+	}
+	return r.store.RecordCall(now.UnixNano())
 }
 
 // Guard is session-scoped authorization state, bound to the process lifetime.
@@ -193,8 +224,16 @@ func New(m *mandate.Mandate) *Guard { return NewWithStore(m, nil) }
 
 // NewWithStore builds a Guard whose reservations are durable.
 func NewWithStore(m *mandate.Mandate, store lifecycle.Persister) *Guard {
-	return NewWithLedger(m, lifecycle.NewLedger(m.Limits.MaxCumulativePaise, store))
+	g := NewWithLedger(m, lifecycle.NewLedger(m.Limits.MaxCumulativePaise, store))
+	if rs, ok := store.(RateStore); ok {
+		g.rate.store = rs
+	}
+	return g
 }
+
+// RestoreRateWindow reloads the durable rate window. Call at startup alongside
+// Restore, before accepting traffic.
+func (g *Guard) RestoreRateWindow(now time.Time) error { return g.rate.restore(now) }
 
 // NewWithLedger composes a Guard over a caller-owned Ledger.
 //
@@ -355,7 +394,14 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	}
 
 	// Only now is the rate slot consumed: this call really is going to the child.
-	g.rate.record(now)
+	// If the durable write fails the reservation is rolled back, because a
+	// forwarded call that is not in the rate window is a bypass.
+	if err := g.rate.record(now); err != nil {
+		_ = g.ledger.ReleaseConfirmedRejection(action.ActionID)
+		return deny(tool, MalformedArguments,
+			fmt.Sprintf("durable rate-window write failed, refusing to forward: %v", err),
+			action.ActionID)
+	}
 
 	forwarded := make(map[string]any, len(args)+1)
 	for k, v := range args {

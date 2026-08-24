@@ -203,8 +203,13 @@ func (m *Mandate) Literals() map[string]struct{} {
 //   - guaranteed charset, whatever the action id looks like;
 //   - guaranteed length floor, even for a short action id (the prototype
 //     produced the 6-character "rzpg_a" against a documented 10 minimum);
-//   - uniqueness across mandates, not merely within one in-memory mandate,
-//     which matters because this is a provider-side correlation key.
+//   - collision resistance across mandates, not merely uniqueness within one
+//     in-memory mandate, which matters because this is a provider-side
+//     correlation key.
+//
+// It is a 48-bit TRUNCATED hash: collision-resistant, NOT guaranteed unique.
+// Actual uniqueness is enforced by a UNIQUE constraint in storage, which
+// rejects a collision rather than preventing one.
 //
 // It stays deterministic: the same mandate and action always yield the same
 // receipt, which is what makes a duplicate detectable at Razorpay.
