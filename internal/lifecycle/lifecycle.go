@@ -1,19 +1,17 @@
 // Package lifecycle owns action consumption and budget as ONE state machine,
-// under a mutex, failing closed on ambiguity.
+// under a mutex, failing closed on ambiguity, and durable across restart.
 //
 // The governing rule: RELEASE ONLY ON CONFIRMED PROVIDER REJECTION.
 //
 // Releasing on timeout fails open. Razorpay may have processed the refund while
 // the proxy lost the response; handing budget back would return headroom for
-// money that already left, and the cap breaks exactly when it matters. Equally,
-// a request that provably never reached the provider must not permanently burn a
-// legitimate merchant authorization -- hence release on *confirmed* rejection,
-// and only that.
+// money that already left. Equally, a request that provably never reached the
+// provider must not permanently burn a legitimate merchant authorization --
+// hence release on *confirmed* rejection, and only that.
 //
-// InDoubt is terminal until a human resolves it. Resolution is deliberately NOT
-// reachable from this package's request-handling surface: it lives on Console,
-// which requires an operator token and writes an audit record. The prototype's
-// equivalent was a public method with a comment claiming otherwise.
+// InDoubt is terminal until a human resolves it, and survives restart: a
+// reservation that was live when the process died is exactly the ambiguous
+// case, so recovery promotes it to InDoubt rather than dropping it.
 package lifecycle
 
 import (
@@ -39,6 +37,18 @@ var (
 	ErrNotAuthorized = errors.New("operator token rejected")
 )
 
+// Persister is the durable side. Reserve must be written BEFORE any byte
+// reaches the child, so a crash mid-flight leaves a recoverable row.
+type Persister interface {
+	Reserve(actionID, receipt string, amountPaise int64) error
+	SetState(actionID, state string) error
+}
+
+// ResolveStore performs the operator's decision and its audit record atomically.
+type ResolveStore interface {
+	ResolveInDoubt(actionID, toState, actor, reason string, refundLanded bool) error
+}
+
 type entry struct {
 	actionID  string
 	state     State
@@ -46,7 +56,7 @@ type entry struct {
 	committed int64
 }
 
-// AuditRecord is written for every operator-initiated transition.
+// AuditRecord mirrors what is written durably for an operator transition.
 type AuditRecord struct {
 	At           time.Time `json:"at"`
 	Operator     string    `json:"operator"`
@@ -59,21 +69,43 @@ type AuditRecord struct {
 
 // Ledger tracks per-action state and session cumulative spend.
 //
-// Every method takes the mutex. Budget counts reserved + committed, never
-// committed alone: two concurrent refunds must not both pass a cumulative check
-// before either result returns. MCP permits multiple in-flight requests by
-// JSON-RPC id, so that TOCTOU is reachable, not theoretical.
+// Budget counts reserved + committed, never committed alone: two concurrent
+// refunds must not both pass a cumulative check before either result returns.
 type Ledger struct {
 	mu                 sync.Mutex
 	maxCumulativePaise int64
 	entries            map[string]*entry
+	store              Persister
 }
 
-func NewLedger(maxCumulativePaise int64) *Ledger {
-	return &Ledger{maxCumulativePaise: maxCumulativePaise, entries: map[string]*entry{}}
+func NewLedger(maxCumulativePaise int64, store Persister) *Ledger {
+	return &Ledger{
+		maxCumulativePaise: maxCumulativePaise,
+		entries:            map[string]*entry{},
+		store:              store,
+	}
 }
 
-// entryLocked requires l.mu held.
+// Restore rebuilds in-memory state from a durable snapshot at startup.
+// Callers must have already run the store's recovery step, which promotes any
+// still-RESERVED row to IN_DOUBT.
+func (l *Ledger) Restore(states map[string]string, amounts map[string]int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for id, st := range states {
+		e := &entry{actionID: id, state: State(st)}
+		switch State(st) {
+		case Committed:
+			e.committed = amounts[id]
+		case Reserved, InDoubt:
+			// Both hold budget. A RESERVED row should already have been promoted
+			// to IN_DOUBT by recovery; if one survives, keep it encumbered.
+			e.reserved = amounts[id]
+		}
+		l.entries[id] = e
+	}
+}
+
 func (l *Ledger) entryLocked(actionID string) *entry {
 	e, ok := l.entries[actionID]
 	if !ok {
@@ -83,7 +115,6 @@ func (l *Ledger) entryLocked(actionID string) *entry {
 	return e
 }
 
-// encumberedLocked requires l.mu held.
 func (l *Ledger) encumberedLocked() int64 {
 	var total int64
 	for _, e := range l.entries {
@@ -129,10 +160,19 @@ func (l *Ledger) Committed() int64 {
 	return t
 }
 
-// Reserve atomically claims the action and its budget, before forwarding.
-// The check and the claim happen under one lock, so concurrent duplicates
-// cannot both succeed.
-func (l *Ledger) Reserve(actionID string, amountPaise int64) error {
+// HasHeadroom reports whether the cap admits amountPaise right now. Used to
+// check before consuming any other scarce resource, so a request that will fail
+// the cap does not burn a rate-limit slot on its way out.
+func (l *Ledger) HasHeadroom(amountPaise int64) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return amountPaise <= l.maxCumulativePaise-l.encumberedLocked()
+}
+
+// Reserve atomically claims the action and its budget and PERSISTS the
+// reservation before returning. The durable write happens inside the lock, so a
+// caller that sees success knows the row exists before it forwards anything.
+func (l *Ledger) Reserve(actionID, receipt string, amountPaise int64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	e := l.entryLocked(actionID)
@@ -143,50 +183,53 @@ func (l *Ledger) Reserve(actionID string, amountPaise int64) error {
 		return fmt.Errorf("%w: %d paise exceeds %d remaining of %d",
 			ErrCumulativeCap, amountPaise, remaining, l.maxCumulativePaise)
 	}
+	if l.store != nil {
+		if err := l.store.Reserve(actionID, receipt, amountPaise); err != nil {
+			// Durability failed, so the reservation does not exist. Fail closed:
+			// no in-memory claim either.
+			return fmt.Errorf("durable reserve failed, refusing to forward: %w", err)
+		}
+	}
 	e.state = Reserved
 	e.reserved = amountPaise
 	return nil
 }
 
-// Commit records a confirmed success.
-func (l *Ledger) Commit(actionID string) error {
+func (l *Ledger) transition(actionID string, want, next State, mutate func(*entry)) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	e := l.entryLocked(actionID)
-	if e.state != Reserved {
-		return fmt.Errorf("%w: cannot commit %s from %s", ErrBadTransition, actionID, e.state)
+	if e.state != want {
+		return fmt.Errorf("%w: cannot move %s from %s to %s", ErrBadTransition, actionID, e.state, next)
 	}
-	e.committed, e.reserved, e.state = e.reserved, 0, Committed
+	if l.store != nil {
+		if err := l.store.SetState(actionID, string(next)); err != nil {
+			return fmt.Errorf("durable state write failed: %w", err)
+		}
+	}
+	mutate(e)
+	e.state = next
 	return nil
 }
 
+// Commit records a confirmed success.
+func (l *Ledger) Commit(actionID string) error {
+	return l.transition(actionID, Reserved, Committed, func(e *entry) {
+		e.committed, e.reserved = e.reserved, 0
+	})
+}
+
 // ReleaseConfirmedRejection is the ONLY automatic path back to Available.
-//
-// Callers must hold positive evidence that the provider rejected the request.
-// A timeout, a dropped connection or a child crash is NOT evidence: use
-// MarkInDoubt for those.
+// Callers must hold positive evidence the provider rejected the request; a
+// timeout or crash is NOT evidence -- use MarkInDoubt.
 func (l *Ledger) ReleaseConfirmedRejection(actionID string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	e := l.entryLocked(actionID)
-	if e.state != Reserved {
-		return fmt.Errorf("%w: cannot release %s from %s", ErrBadTransition, actionID, e.state)
-	}
-	e.reserved, e.state = 0, Available
-	return nil
+	return l.transition(actionID, Reserved, Available, func(e *entry) { e.reserved = 0 })
 }
 
 // MarkInDoubt locks the action and its budget pending an operator. The reserved
 // amount is deliberately retained: the money may well have moved.
 func (l *Ledger) MarkInDoubt(actionID string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	e := l.entryLocked(actionID)
-	if e.state != Reserved {
-		return fmt.Errorf("%w: cannot mark %s in doubt from %s", ErrBadTransition, actionID, e.state)
-	}
-	e.state = InDoubt
-	return nil
+	return l.transition(actionID, Reserved, InDoubt, func(e *entry) {})
 }
 
 func (l *Ledger) InDoubtActions() []string {
@@ -201,51 +244,60 @@ func (l *Ledger) InDoubtActions() []string {
 	return out
 }
 
-// resolveInDoubt is unexported: the only caller is Console, so nothing on the
+// resolveInDoubt is unexported. Console is the only caller, so nothing on the
 // request-handling path can reach it.
-func (l *Ledger) resolveInDoubt(actionID string, refundLanded bool) (State, error) {
+func (l *Ledger) resolveInDoubt(actionID string, refundLanded bool, store ResolveStore,
+	actor, reason string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	e := l.entryLocked(actionID)
 	if e.state != InDoubt {
-		return e.state, fmt.Errorf("%w: %s is %s, not IN_DOUBT", ErrBadTransition, actionID, e.state)
+		return fmt.Errorf("%w: %s is %s, not IN_DOUBT", ErrBadTransition, actionID, e.state)
 	}
-	from := e.state
+	next := Available
 	if refundLanded {
-		e.committed, e.reserved, e.state = e.reserved, 0, Committed
-	} else {
-		e.reserved, e.state = 0, Available
+		next = Committed
 	}
-	return from, nil
+	if store != nil {
+		// State change and audit record land in one transaction, or neither does.
+		if err := store.ResolveInDoubt(actionID, string(next), actor, reason, refundLanded); err != nil {
+			return err
+		}
+	}
+	if refundLanded {
+		e.committed, e.reserved = e.reserved, 0
+	} else {
+		e.reserved = 0
+	}
+	e.state = next
+	return nil
 }
 
 // Console is the operator resolution path: separate from the relay surface,
-// token-gated, and audited. Constructing one requires the operator token, which
-// the relay never holds.
+// token-gated, and audited. The relay never holds the token.
 type Console struct {
 	ledger *Ledger
 	token  string
-	audit  func(AuditRecord)
+	store  ResolveStore
 }
 
-func NewConsole(l *Ledger, token string, audit func(AuditRecord)) (*Console, error) {
+func NewConsole(l *Ledger, token string, store ResolveStore) (*Console, error) {
 	if len(token) < 16 {
 		return nil, fmt.Errorf("operator token must be at least 16 characters")
 	}
-	if audit == nil {
-		return nil, fmt.Errorf("an audit sink is required: unaudited resolution of a " +
-			"possibly-completed refund is not an acceptable operation")
+	if store == nil {
+		return nil, fmt.Errorf("a durable audit store is required: unaudited resolution " +
+			"of a possibly-completed refund is not an acceptable operation")
 	}
-	return &Console{ledger: l, token: token, audit: audit}, nil
+	return &Console{ledger: l, token: token, store: store}, nil
 }
 
-// Resolve clears an IN_DOUBT reservation. Requires the operator token and always
-// writes an audit record.
+// Resolve clears an IN_DOUBT reservation.
 //
-// refundLanded must come from a human checking Razorpay for the injected
-// receipt. Absence of a matching record is NOT sufficient to pass false:
-// eventual consistency, a still-pending refund, or a failed lookup all produce
-// "not found" without meaning "did not happen".
+// refundLanded must come from a human checking Razorpay for the issued receipt.
+// Absence of a matching record is NOT sufficient to pass false: eventual
+// consistency, a still-pending refund, or a failed lookup all produce "not
+// found" without meaning "did not happen".
 func (c *Console) Resolve(token, operator, actionID string, refundLanded bool, reason string) error {
 	if token != c.token {
 		return ErrNotAuthorized
@@ -253,17 +305,5 @@ func (c *Console) Resolve(token, operator, actionID string, refundLanded bool, r
 	if operator == "" || reason == "" {
 		return fmt.Errorf("operator identity and reason are required for the audit record")
 	}
-	from, err := c.ledger.resolveInDoubt(actionID, refundLanded)
-	if err != nil {
-		return err
-	}
-	to := Available
-	if refundLanded {
-		to = Committed
-	}
-	c.audit(AuditRecord{
-		At: time.Now().UTC(), Operator: operator, ActionID: actionID,
-		From: from, To: to, RefundLanded: refundLanded, Reason: reason,
-	})
-	return nil
+	return c.ledger.resolveInDoubt(actionID, refundLanded, c.store, operator, reason)
 }

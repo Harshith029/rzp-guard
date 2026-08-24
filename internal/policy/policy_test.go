@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/harshith/rzp-guard/internal/lifecycle"
 	"github.com/harshith/rzp-guard/internal/mandate"
+	"github.com/harshith/rzp-guard/internal/storage"
 )
 
 var now = time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
@@ -83,7 +85,7 @@ func TestFractionalAmountIsRejected(t *testing.T) {
 	if d.Rule != MalformedArguments {
 		t.Fatalf("rule = %s, want %s", d.Rule, MalformedArguments)
 	}
-	if enc := g.Ledger().Encumbered(); enc != 0 {
+	if enc := g.Encumbered(); enc != 0 {
 		t.Fatalf("rejected call reserved %d paise", enc)
 	}
 }
@@ -201,7 +203,7 @@ func TestTwoEqualPartialRefundsBothPass(t *testing.T) {
 	if !first.Allowed {
 		t.Fatalf("first refund denied: %s", first.Reason)
 	}
-	if err := g.Ledger().Commit(first.MatchedActionID); err != nil {
+	if err := g.Commit(first.MatchedActionID); err != nil {
 		t.Fatal(err)
 	}
 	second := g.Decide(RefundTool, jsonArgs(t, args), now)
@@ -220,17 +222,33 @@ func TestReplayOfConsumedActionIsDenied(t *testing.T) {
 	g := New(mustMandate(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":50000}]`))
 	args := `{"payment_id":"pay_SYN0001","amount":50000}`
 	first := g.Decide(RefundTool, jsonArgs(t, args), now)
-	_ = g.Ledger().Commit(first.MatchedActionID)
+	_ = g.Commit(first.MatchedActionID)
 	if d := g.Decide(RefundTool, jsonArgs(t, args), now); d.Allowed || d.Rule != ActionConsumed {
 		t.Fatalf("replay allowed=%v rule=%s", d.Allowed, d.Rule)
 	}
 }
 
+// Two independent layers, and the test asserts which one fires.
 func TestDefaultDenyForUnlistedTools(t *testing.T) {
+	// Layer 1: outside the build surface entirely. Denied before the mandate is
+	// even consulted, so a mandate listing them cannot help.
 	g := New(mustMandate(t, `[]`))
 	for _, tool := range []string{"create_instant_settlement", "initiate_payment", "not_a_real_tool"} {
-		if d := g.Decide(tool, jsonArgs(t, `{"amount":100000}`), now); d.Allowed || d.Rule != ToolNotAllowed {
-			t.Fatalf("%s: allowed=%v rule=%s", tool, d.Allowed, d.Rule)
+		d := g.Decide(tool, jsonArgs(t, `{"amount":100000}`), now)
+		if d.Allowed || d.Rule != ToolNotSupported {
+			t.Fatalf("%s: allowed=%v rule=%s, want %s", tool, d.Allowed, d.Rule, ToolNotSupported)
+		}
+	}
+
+	// Layer 2: inside the build surface but absent from this mandate.
+	narrow := mustMandate(t, `[]`, func(doc map[string]any) {
+		doc["allowed_tools"] = []string{"fetch_payment"}
+	})
+	ng := New(narrow)
+	for _, tool := range []string{"create_refund", "fetch_all_refunds"} {
+		d := ng.Decide(tool, jsonArgs(t, `{"payment_id":"pay_SYN0001","amount":100}`), now)
+		if d.Allowed || d.Rule != ToolNotAllowed {
+			t.Fatalf("%s: allowed=%v rule=%s, want %s", tool, d.Allowed, d.Rule, ToolNotAllowed)
 		}
 	}
 }
@@ -341,13 +359,13 @@ func TestInDoubtHoldsBudgetAndActionLocked(t *testing.T) {
 		cumulative(100000)))
 	args := `{"payment_id":"pay_SYN0001","amount":60000}`
 	d := g.Decide(RefundTool, jsonArgs(t, args), now)
-	if err := g.Ledger().MarkInDoubt(d.MatchedActionID); err != nil {
+	if err := g.MarkInDoubt(d.MatchedActionID); err != nil {
 		t.Fatal(err)
 	}
-	if st := g.Ledger().State("rfa_001"); st != lifecycle.InDoubt {
+	if st := g.State("rfa_001"); st != lifecycle.InDoubt {
 		t.Fatalf("state = %s", st)
 	}
-	if enc := g.Ledger().Encumbered(); enc != 60000 {
+	if enc := g.Encumbered(); enc != 60000 {
 		t.Fatalf("encumbered = %d, want 60000: budget must NOT be handed back", enc)
 	}
 	if retry := g.Decide(RefundTool, jsonArgs(t, args), now); retry.Allowed {
@@ -359,10 +377,10 @@ func TestConfirmedRejectionReturnsTheActionWithoutBurningIt(t *testing.T) {
 	g := New(mustMandate(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`))
 	args := `{"payment_id":"pay_SYN0001","amount":20000}`
 	d := g.Decide(RefundTool, jsonArgs(t, args), now)
-	if err := g.Ledger().ReleaseConfirmedRejection(d.MatchedActionID); err != nil {
+	if err := g.ReleaseConfirmedRejection(d.MatchedActionID); err != nil {
 		t.Fatal(err)
 	}
-	if g.Ledger().Encumbered() != 0 {
+	if g.Encumbered() != 0 {
 		t.Fatal("budget still encumbered after a confirmed rejection")
 	}
 	// Rate limiter already recorded the first attempt, so this is call 2 of 10.
@@ -371,40 +389,257 @@ func TestConfirmedRejectionReturnsTheActionWithoutBurningIt(t *testing.T) {
 	}
 }
 
-// F1.f: operator resolution must be a boundary, not a comment. The prototype's
-// resolve_in_doubt was publicly callable with no auth and no audit trail.
-func TestOperatorResolutionRequiresTokenAndWritesAudit(t *testing.T) {
-	g := New(mustMandate(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`))
-	d := g.Decide(RefundTool, jsonArgs(t, `{"payment_id":"pay_SYN0001","amount":20000}`), now)
-	_ = g.Ledger().MarkInDoubt(d.MatchedActionID)
+// ------------------------------------------------- build-level tool surface
 
-	var audits []lifecycle.AuditRecord
-	if _, err := lifecycle.NewConsole(g.Ledger(), "short", func(lifecycle.AuditRecord) {}); err == nil {
-		t.Fatal("a weak operator token was accepted")
-	}
-	if _, err := lifecycle.NewConsole(g.Ledger(), strings.Repeat("k", 32), nil); err == nil {
-		t.Fatal("a console with no audit sink was accepted")
-	}
-	console, err := lifecycle.NewConsole(g.Ledger(), strings.Repeat("k", 32),
-		func(r lifecycle.AuditRecord) { audits = append(audits, r) })
+// A mandate is a session grant; it can only narrow the build surface, never
+// widen it. The previous revision forwarded ANY tool a mandate listed, verified:
+// initiate_payment, create_instant_settlement and revoke_token all returned
+// allowed=true.
+func TestMandateCannotWidenTheToolSurface(t *testing.T) {
+	doc := `{"mandate_id":"mnd_test","expires_at":"` +
+		now.Add(time.Hour).Format(time.RFC3339) + `",
+		"allowed_tools":["initiate_payment","create_instant_settlement","revoke_token",
+		                 "create_payment_link","capture_payment"],
+		"authorized_refund_actions":[],
+		"global":{"max_cumulative_paise":1000000,"max_calls_per_minute":10}}`
+	m, err := mandate.Load([]byte(doc))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := console.Resolve("wrong-token", "ops@merchant", "rfa_001", true, "checked"); err == nil {
-		t.Fatal("resolution succeeded with the wrong token")
+	g := New(m)
+	for _, tool := range []string{
+		"initiate_payment", "create_instant_settlement", "revoke_token",
+		"create_payment_link", "capture_payment",
+	} {
+		d := g.Decide(tool, jsonArgs(t, `{"amount":900000}`), now)
+		if d.Allowed {
+			t.Fatalf("%s was forwarded despite being outside the build surface", tool)
+		}
+		if d.Rule != ToolNotSupported {
+			t.Fatalf("%s: rule = %s, want %s", tool, d.Rule, ToolNotSupported)
+		}
 	}
-	if g.Ledger().State("rfa_001") != lifecycle.InDoubt {
-		t.Fatal("a rejected resolution changed state")
+}
+
+func TestSupportedReadToolsStillPassWhenTheMandateGrantsThem(t *testing.T) {
+	g := New(mustMandate(t, `[]`))
+	for _, tool := range []string{"fetch_payment", "fetch_all_payments"} {
+		if d := g.Decide(tool, jsonArgs(t, `{"count":1}`), now); !d.Allowed {
+			t.Fatalf("%s denied: %s (%s)", tool, d.Reason, d.Rule)
+		}
 	}
-	if err := console.Resolve(strings.Repeat("k", 32), "ops@merchant", "rfa_001", true,
-		"found receipt in Razorpay dashboard"); err != nil {
+}
+
+// ------------------------------------------------- rate slot accounting
+
+// A request denied by the cumulative cap never reaches the child, so it must not
+// consume rate capacity. The previous revision called tryRecord() before
+// Reserve(), burning a slot on every cap-denied call.
+func TestCapDeniedRequestDoesNotConsumeRateCapacity(t *testing.T) {
+	g := New(mustMandate(t, `[
+		{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":90000},
+		{"action_id":"rfa_002","payment_id":"pay_SYN0002","amount_paise":10000},
+		{"action_id":"rfa_003","payment_id":"pay_SYN0003","amount_paise":10000}]`,
+		cumulative(20000), perMinute(2)))
+
+	if d := g.Decide(RefundTool, jsonArgs(t,
+		`{"payment_id":"pay_SYN0001","amount":90000}`), now); d.Rule != CumulativeCapExceeded {
+		t.Fatalf("setup: rule = %s, want %s", d.Rule, CumulativeCapExceeded)
+	}
+	for _, pay := range []string{"pay_SYN0002", "pay_SYN0003"} {
+		d := g.Decide(RefundTool, jsonArgs(t,
+			`{"payment_id":"`+pay+`","amount":10000}`), now)
+		if !d.Allowed {
+			t.Fatalf("%s denied (%s): a cap-denied request consumed a rate slot",
+				pay, d.Rule)
+		}
+	}
+}
+
+// ------------------------------------------------- strict amount typing
+
+// Without UseNumber, 1e3 decodes to float64(1000); the previous revision
+// accepted it, bypassing the stated exponent rejection.
+func TestFloat64AmountIsRejectedOutrightNotCoerced(t *testing.T) {
+	g := New(mustMandate(t,
+		`[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":1000}]`))
+	var args map[string]any
+	if err := json.Unmarshal([]byte(`{"payment_id":"pay_SYN0001","amount":1e3}`), &args); err != nil {
 		t.Fatal(err)
 	}
-	if g.Ledger().State("rfa_001") != lifecycle.Committed {
-		t.Fatalf("state = %s, want COMMITTED", g.Ledger().State("rfa_001"))
+	if _, isFloat := args["amount"].(float64); !isFloat {
+		t.Fatalf("fixture precondition failed: amount is %T", args["amount"])
 	}
-	if len(audits) != 1 || audits[0].Operator != "ops@merchant" || !audits[0].RefundLanded {
-		t.Fatalf("audit record missing or wrong: %+v", audits)
+	d := g.Decide(RefundTool, args, now)
+	if d.Allowed {
+		t.Fatal("float64 amount was authorized; the UseNumber bypass is still open")
+	}
+	if d.Rule != MalformedArguments {
+		t.Fatalf("rule = %s, want %s", d.Rule, MalformedArguments)
+	}
+	for _, v := range []any{float64(1000), float64(0), float64(-1)} {
+		if _, err := parseAmountPaise(v); err == nil {
+			t.Fatalf("parseAmountPaise(float64 %v) accepted", v)
+		}
+	}
+}
+
+// ------------------------------------------------- durability
+
+func newDurable(t *testing.T, dbPath, actions string,
+	opts ...func(map[string]any)) (*Guard, *storage.Store) {
+	t.Helper()
+	m := mustMandate(t, actions, opts...)
+	st, err := storage.Open(dbPath, m.MandateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.RecoverStartup(); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := st.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := NewWithStore(m, st)
+	g.Restore(snap.States, snap.Amounts)
+	return g, st
+}
+
+// The design's central safety property has to survive Ctrl-C to mean anything.
+func TestReservationSurvivesRestartAndBecomesInDoubt(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "guard.db")
+	const actions = `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":60000}]`
+
+	g1, st1 := newDurable(t, db, actions, cumulative(100000))
+	d := g1.Decide(RefundTool, jsonArgs(t,
+		`{"payment_id":"pay_SYN0001","amount":60000}`), now)
+	if !d.Allowed {
+		t.Fatalf("reserve denied: %s", d.Reason)
+	}
+	if g1.State("rfa_001") != lifecycle.Reserved {
+		t.Fatalf("state = %s, want RESERVED", g1.State("rfa_001"))
+	}
+	// Crash mid-flight: no Commit, no Release, process dies.
+	if err := st1.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	g2, st2 := newDurable(t, db, actions, cumulative(100000))
+	defer st2.Close()
+
+	if got := g2.State("rfa_001"); got != lifecycle.InDoubt {
+		t.Fatalf("after restart state = %s, want IN_DOUBT: a live reservation is "+
+			"exactly the ambiguous case", got)
+	}
+	if enc := g2.Encumbered(); enc != 60000 {
+		t.Fatalf("after restart encumbered = %d, want 60000: budget must stay held", enc)
+	}
+	if retry := g2.Decide(RefundTool, jsonArgs(t,
+		`{"payment_id":"pay_SYN0001","amount":60000}`), now); retry.Allowed {
+		t.Fatal("restart released a locked action, enabling replay")
+	}
+}
+
+func TestCommittedStateSurvivesRestart(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "guard.db")
+	const actions = `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`
+
+	g1, st1 := newDurable(t, db, actions)
+	d := g1.Decide(RefundTool, jsonArgs(t,
+		`{"payment_id":"pay_SYN0001","amount":20000}`), now)
+	if err := g1.Commit(d.MatchedActionID); err != nil {
+		t.Fatal(err)
+	}
+	st1.Close()
+
+	g2, st2 := newDurable(t, db, actions)
+	defer st2.Close()
+	if g2.State("rfa_001") != lifecycle.Committed {
+		t.Fatalf("state = %s, want COMMITTED", g2.State("rfa_001"))
+	}
+	if g2.Committed() != 20000 {
+		t.Fatalf("committed = %d, want 20000", g2.Committed())
+	}
+	if replay := g2.Decide(RefundTool, jsonArgs(t,
+		`{"payment_id":"pay_SYN0001","amount":20000}`), now); replay.Allowed {
+		t.Fatal("a committed action replayed after restart")
+	}
+}
+
+func TestReceiptUniquenessIsEnforcedByTheDatabase(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "guard.db")
+	st, err := storage.Open(db, "mnd_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.Reserve("rfa_001", "rzpg_deadbeef1234", 1000); err != nil {
+		t.Fatal(err)
+	}
+	// The receipt is a TRUNCATED hash, so uniqueness is a database constraint,
+	// not a property of the hash.
+	if err := st.Reserve("rfa_002", "rzpg_deadbeef1234", 1000); err == nil {
+		t.Fatal("two actions were allowed to share a provider-side correlation key")
+	}
+}
+
+// ------------------------------------------------- operator boundary
+
+func TestOperatorResolutionIsTokenGatedAndDurablyAudited(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "guard.db")
+	m := mustMandate(t,
+		`[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+	st, err := storage.Open(db, m.MandateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	// Explicit composition: main owns the ledger and the token; the relay gets
+	// only the Guard, which exposes no path to resolution.
+	led := lifecycle.NewLedger(m.Limits.MaxCumulativePaise, st)
+	g := NewWithLedger(m, led)
+	const token = "operator-token-32-chars-minimum!"
+
+	if _, err := lifecycle.NewConsole(led, "short", st); err == nil {
+		t.Fatal("a weak operator token was accepted")
+	}
+	if _, err := lifecycle.NewConsole(led, token, nil); err == nil {
+		t.Fatal("a console without a durable audit store was accepted")
+	}
+	console, err := lifecycle.NewConsole(led, token, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d := g.Decide(RefundTool, jsonArgs(t,
+		`{"payment_id":"pay_SYN0001","amount":20000}`), now)
+	if err := g.MarkInDoubt(d.MatchedActionID); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := console.Resolve("wrong-token-wrong-token", "ops@merchant", "rfa_001",
+		true, "checked"); err == nil {
+		t.Fatal("resolution succeeded with the wrong token")
+	}
+	if g.State("rfa_001") != lifecycle.InDoubt {
+		t.Fatal("a rejected resolution changed state")
+	}
+	if n, _ := st.AuditCount(); n != 0 {
+		t.Fatalf("rejected resolution wrote %d audit rows", n)
+	}
+
+	if err := console.Resolve(token, "ops@merchant", "rfa_001", true,
+		"found receipt in Razorpay Test Mode dashboard"); err != nil {
+		t.Fatal(err)
+	}
+	if g.State("rfa_001") != lifecycle.Committed {
+		t.Fatalf("state = %s, want COMMITTED", g.State("rfa_001"))
+	}
+	n, err := st.AuditCount()
+	if err != nil || n != 1 {
+		t.Fatalf("audit rows = %d (err=%v), want exactly 1", n, err)
 	}
 }
 
@@ -442,7 +677,7 @@ func TestConcurrentDuplicatesExactlyOneReserves(t *testing.T) {
 			t.Fatalf("trial %d: %d of %d concurrent duplicates were authorized, want exactly 1",
 				trial, allowed, goroutines)
 		}
-		if enc := g.Ledger().Encumbered(); enc != 55000 {
+		if enc := g.Encumbered(); enc != 55000 {
 			t.Fatalf("trial %d: encumbered = %d, want 55000", trial, enc)
 		}
 	}
@@ -486,7 +721,7 @@ func TestConcurrentDistinctRefundsRespectCumulativeCap(t *testing.T) {
 		if allowed != 3 {
 			t.Fatalf("trial %d: %d refunds authorized against a 3-refund cap", trial, allowed)
 		}
-		if enc := g.Ledger().Encumbered(); enc > 90000 {
+		if enc := g.Encumbered(); enc > 90000 {
 			t.Fatalf("trial %d: encumbered %d exceeds cap 90000", trial, enc)
 		}
 	}

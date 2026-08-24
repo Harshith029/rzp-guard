@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -24,6 +23,38 @@ import (
 
 const RefundTool = "create_refund"
 
+// supportedTools is the surface THIS BUILD will ever forward, independent of
+// any mandate. A mandate is a session-scoped grant; it can only narrow this
+// set, never widen it. Without this, a mandate listing initiate_payment or
+// create_instant_settlement would have them forwarded untouched -- verified
+// behaviour of the previous revision, and a direct contradiction of "reads plus
+// create_refund only".
+//
+// Every name here was confirmed present at runtime in evidence/tools_list.json
+// against the pinned image digest, not taken from the README (which describes a
+// newer build with renamed tools).
+var supportedTools = map[string]struct{}{
+	"create_refund":                      {},
+	"fetch_payment":                      {},
+	"fetch_all_payments":                 {},
+	"fetch_order":                        {},
+	"fetch_order_payments":               {},
+	"fetch_refund":                       {},
+	"fetch_all_refunds":                  {},
+	"fetch_multiple_refunds_for_payment": {},
+	"fetch_specific_refund_for_payment":  {},
+}
+
+// SupportedTools returns the build-level surface, for the dashboard and tests.
+func SupportedTools() []string {
+	out := make([]string, 0, len(supportedTools))
+	for name := range supportedTools {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Rule identifiers, recorded verbatim in the decision log.
 const (
 	MandateExpired        = "MANDATE_EXPIRED"
@@ -34,6 +65,7 @@ const (
 	ActionConsumed        = "ACTION_CONSUMED"
 	RateLimitExceeded     = "RATE_LIMIT_EXCEEDED"
 	CumulativeCapExceeded = "CUMULATIVE_CAP_EXCEEDED"
+	ToolNotSupported      = "TOOL_NOT_SUPPORTED"
 	Allowed               = "ALLOWED"
 )
 
@@ -90,18 +122,13 @@ func parseAmountPaise(v any) (int64, error) {
 	case bool:
 		return 0, errors.New("amount must be a number, not a boolean")
 	case float64:
-		// Only reachable when a caller decoded without UseNumber.
-		if math.IsNaN(n) || math.IsInf(n, 0) {
-			return 0, errors.New("amount must be finite")
-		}
-		if n != math.Trunc(n) {
-			return 0, fmt.Errorf("amount %v has a fractional part; Razorpay amounts "+
-				"are integer paise", n)
-		}
-		if n > math.MaxInt64 || n < math.MinInt64 {
-			return 0, fmt.Errorf("amount %v is out of range", n)
-		}
-		return int64(n), nil
+		// Rejected outright, never coerced. A float64 here means the transport
+		// decoded without UseNumber, which silently turns 1e3 into 1000 and
+		// bypasses the exponent rule above -- verified behaviour of the previous
+		// revision. Failing closed also surfaces the transport bug instead of
+		// hiding it behind a value that happens to be integral.
+		return 0, fmt.Errorf("amount arrived as float64 (%v); the transport must "+
+			"decode with json.Decoder.UseNumber so paise are never rounded", n)
 	case int64:
 		return n, nil
 	case int:
@@ -135,17 +162,20 @@ func (r *rateLimiter) count(now time.Time) int {
 	return len(r.times)
 }
 
-// tryRecord checks and records under one lock, so concurrent callers cannot
-// both observe headroom that only one of them can have.
-func (r *rateLimiter) tryRecord(now time.Time) bool {
+// hasHeadroom and record are separate so the slot is consumed only once the
+// call is actually going to the child. Both run under the Guard mutex, so no
+// other request can slip between them.
+func (r *rateLimiter) hasHeadroom(now time.Time) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.evictLocked(now)
-	if len(r.times) >= r.max {
-		return false
-	}
+	return len(r.times) < r.max
+}
+
+func (r *rateLimiter) record(now time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.times = append(r.times, now)
-	return true
 }
 
 // Guard is session-scoped authorization state, bound to the process lifetime.
@@ -157,16 +187,54 @@ type Guard struct {
 	rate    *rateLimiter
 }
 
-func New(m *mandate.Mandate) *Guard {
+// New builds a Guard with in-memory state only. Use NewWithStore for anything
+// that moves money: in-memory state does not survive a restart.
+func New(m *mandate.Mandate) *Guard { return NewWithStore(m, nil) }
+
+// NewWithStore builds a Guard whose reservations are durable.
+func NewWithStore(m *mandate.Mandate, store lifecycle.Persister) *Guard {
+	return NewWithLedger(m, lifecycle.NewLedger(m.Limits.MaxCumulativePaise, store))
+}
+
+// NewWithLedger composes a Guard over a caller-owned Ledger.
+//
+// This is how main wires the operator console: it builds the Ledger, hands it
+// to both this Guard and lifecycle.NewConsole, and keeps the operator token to
+// itself. The relay receives only the Guard, which has no way to reach the
+// Ledger or the resolution path.
+func NewWithLedger(m *mandate.Mandate, l *lifecycle.Ledger) *Guard {
 	return &Guard{
 		mandate: m,
-		ledger:  lifecycle.NewLedger(m.Limits.MaxCumulativePaise),
+		ledger:  l,
 		rate:    &rateLimiter{max: m.Limits.MaxCallsPerMinute},
 	}
 }
 
 func (g *Guard) Mandate() *mandate.Mandate { return g.mandate }
-func (g *Guard) Ledger() *lifecycle.Ledger { return g.ledger }
+
+// Restore rebuilds durable state at startup, before any traffic is accepted.
+func (g *Guard) Restore(states map[string]string, amounts map[string]int64) {
+	g.ledger.Restore(states, amounts)
+}
+
+// --- narrow relay interface ---------------------------------------------
+//
+// The relay gets exactly these three outcome transitions plus read-only views.
+// It cannot reach resolveInDoubt, which is reserved for lifecycle.Console. The
+// previous revision exposed the whole Ledger through a Ledger() accessor, which
+// made "operator-only" a convention rather than a boundary.
+
+func (g *Guard) Commit(actionID string) error { return g.ledger.Commit(actionID) }
+func (g *Guard) ReleaseConfirmedRejection(actionID string) error {
+	return g.ledger.ReleaseConfirmedRejection(actionID)
+}
+func (g *Guard) MarkInDoubt(actionID string) error { return g.ledger.MarkInDoubt(actionID) }
+
+func (g *Guard) State(actionID string) lifecycle.State { return g.ledger.State(actionID) }
+func (g *Guard) Encumbered() int64                     { return g.ledger.Encumbered() }
+func (g *Guard) Remaining() int64                      { return g.ledger.Remaining() }
+func (g *Guard) Committed() int64                      { return g.ledger.Committed() }
+func (g *Guard) InDoubtActions() []string              { return g.ledger.InDoubtActions() }
 
 func deny(tool, rule, reason, actionID string) Decision {
 	return Decision{Allowed: false, Rule: rule, Reason: reason, Tool: tool, MatchedActionID: actionID}
@@ -184,7 +252,16 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 			g.mandate.ExpiresAt.Format(time.RFC3339), now.Format(time.RFC3339)), "")
 	}
 
-	// 2. tool allowlist -- default-deny, unknown tools included
+	// 2. build-level surface. Checked BEFORE the mandate, because a mandate can
+	// only narrow this set. A dangerous tool listed in a mandate is a mandate
+	// authoring error, and the guard must not honour it.
+	if _, ok := supportedTools[tool]; !ok {
+		return deny(tool, ToolNotSupported, fmt.Sprintf(
+			"%s is outside the tool surface this guard supports (%v); a mandate "+
+				"cannot widen it", tool, SupportedTools()), "")
+	}
+
+	// 3. mandate allowlist -- default-deny, unknown tools included
 	if !g.mandate.PermitsTool(tool) {
 		return deny(tool, ToolNotAllowed, fmt.Sprintf(
 			"%s is not in allowed_tools %v", tool, g.mandate.AllowedTools), "")
@@ -249,24 +326,36 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	}
 	action := pick(available)
 
-	// 5. rate limit
-	if !g.rate.tryRecord(now) {
+	// 6. rate limit -- HEADROOM CHECK ONLY. The slot is recorded further down,
+	// after the reservation succeeds. Consuming it here would let a request that
+	// never reaches the child still burn rate capacity, causing avoidable false
+	// blocks on the merchant's own legitimate traffic.
+	if !g.rate.hasHeadroom(now) {
 		return deny(tool, RateLimitExceeded, fmt.Sprintf(
 			"%d calls already in the last 60s, limit is %d",
 			g.rate.count(now), g.mandate.Limits.MaxCallsPerMinute), action.ActionID)
 	}
 
-	// 6. atomic reserve -- action and budget together, before forwarding
-	if err := g.ledger.Reserve(action.ActionID, amountPaise); err != nil {
-		return deny(tool, CumulativeCapExceeded, err.Error(), action.ActionID)
-	}
-
-	// 7. receipt injection. Validated at mandate load; re-derived here.
+	// 7. receipt is derived BEFORE reserving, because the durable reservation
+	// records it and a reservation without a valid receipt must never exist.
 	receipt, err := mandate.ReceiptFor(g.mandate.MandateID, action.ActionID)
 	if err != nil {
-		_ = g.ledger.ReleaseConfirmedRejection(action.ActionID)
-		return deny(tool, MalformedArguments, fmt.Sprintf("receipt derivation failed: %v", err), action.ActionID)
+		return deny(tool, MalformedArguments,
+			fmt.Sprintf("receipt derivation failed: %v", err), action.ActionID)
 	}
+
+	// 8. atomic reserve -- action, budget and the durable row together, before
+	// anything is written to the child.
+	if err := g.ledger.Reserve(action.ActionID, receipt, amountPaise); err != nil {
+		rule := CumulativeCapExceeded
+		if errors.Is(err, lifecycle.ErrNotAvailable) {
+			rule = ActionConsumed
+		}
+		return deny(tool, rule, err.Error(), action.ActionID)
+	}
+
+	// Only now is the rate slot consumed: this call really is going to the child.
+	g.rate.record(now)
 
 	forwarded := make(map[string]any, len(args)+1)
 	for k, v := range args {
