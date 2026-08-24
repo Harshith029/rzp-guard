@@ -504,3 +504,30 @@ The panel question *"what did the detector infer that wasn't already encoded in 
 The measurement worth having is the one I cannot author: **how often a correctly-behaving agent is blocked because the mandate did not anticipate its legitimate path.** That is the false-positive cost the brief asks for, and only real traces produce it. Scoped into the plan as a new Phase 4; the conformance corpus stays as regression evidence.
 
 **Net effect of Round 4:** the headline metric claim is withdrawn, one template is deleted, one is rewritten after being shown to test nothing, the denominator is narrowed from 220 mixed calls to 175 refund calls, confidence intervals are abandoned as pseudoreplication, and the evaluation is rebuilt around real agent traces. Four rounds in, the single most valuable outcome of this loop is a deliverable that got smaller and a claim that got true.
+
+
+---
+
+## Round 8 — cmd orchestration + live gates — reviewer: ChatGPT — 2026-08-24
+
+**Four accepts, no rejects.** One was a P0 that made the repository unbuildable, and one was the weakest-claim callout again being right.
+
+### P8.1 — "The executable is not committed."
+**ACCEPT — P0.** `git check-ignore` confirmed the unanchored `rzp-guard` rule matched the `cmd/rzp-guard/` **directory**. A fresh clone had run.sh, README and Makefile and no command source. Root-anchored to `/rzp-guard`, `/rzp-guard.exe`; verified by actually cloning and building, not by inspection.
+
+### P8.2 — "The live-block control is printed, not enforced."
+**ACCEPT.** The lane exited 0 whenever the blocked call was merely absent, which also passes against a dead container. `cmd/gate-verify` now parses the captured JSON and asserts every condition. Verified negatively: with a wrong secret the gate exits 1 on `CONTROL: read response is a success, not a tool error`.
+
+### P8.3 — "Signal and child-exit handling do not terminate the process."
+**ACCEPT — and this was the weakest claim, correctly identified.** "Cleanup is guaranteed" described state, not lifecycle. Measured with stdin held open: pre-fix 30s, post-fix 0s, with cleanup firing immediately in both. My own process-recover run had masked it because its feeder eventually closed stdin — a test that cannot distinguish cleanup-began from process-exited. Both pumps now run under a supervisor; three build-tagged tests hold stdin open deliberately.
+
+### P8.4 — "Child failure is discarded."
+**ACCEPT.** `child.Wait()`'s error was ignored, so the CLI could exit zero after the container crashed. Now propagated unless the parent initiated shutdown.
+
+### P8.5 — "The production child surface is runtime-configurable."
+**ACCEPT.** `-toolsets` was a launch flag, so the child could be widened from the reviewed default. Not a bypass, but it invalidated the independent-fixed-boundary claim. Now a build-time const.
+
+### P8.6 — "The Makefile is stale."
+**ACCEPT.** It advertised `live` and `live-recover`, neither implemented, so `make live-recover` printed help and **succeeded**. Corrected, and `make help` executed inside the golang container — this host has no make, which is exactly why the staleness survived unnoticed. run.sh now exits non-zero on an unknown command.
+
+**Net effect of Round 8:** the repository went from not containing its own executable to being clone-and-run verified; the live control went from decorative to load-bearing; and the process lifecycle went from claimed to controlled.
