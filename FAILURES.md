@@ -275,7 +275,9 @@ $ cat /tmp/victim.txt
 rzpop_kq_PhCdER_SfId...
 ```
 
-**Fix:** deliver first, commit second, and undo the delivery if the commit fails. The file is created with `O_CREATE|O_EXCL` — an existing destination is never touched and a symlink cannot redirect the secret — then fsynced before the credential is committed.
+**Fix:** deliver first, commit second, and undo the delivery if the commit fails. The file is created with `O_CREATE|O_EXCL`, so an **existing final path** is never touched, then fsynced before the credential is committed.
+
+*(Correction to this entry, made when the claim was challenged: an earlier version said "a symlink cannot redirect the secret." That is too broad. `O_EXCL` protects the final path only — it does not establish that parent directories are free of symlinks or Windows reparse points. The code says the narrower thing; this record now matches it.)*
 
 **And the mode claim was not a control.** The code asked for `0600` and never checked. On Windows the file lands `0666`, measured:
 
@@ -314,3 +316,31 @@ Two related corrections landed with it:
 - **The durability gap was one layer deeper than the earlier fix.** The token file was fsynced, but not its parent directory — after a power loss the contents can be on disk while the entry naming them is not, which recreates the permanent lockout at the filesystem boundary. The parent directory is now synced where the platform allows it; Windows cannot, and the command says so rather than implying crash-safety it does not have.
 
 Also corrected a claim that was too broad: `O_EXCL` protects the **final path**, not the parent chain. It does not establish that parent directories are free of symlinks or reparse points, and the code now says exactly that.
+
+
+---
+
+## F13 — I detected the unsafe condition and then did the unsafe thing anyway
+
+`WriteTokenExclusive` correctly reported `durable=false` when the platform could not fsync a directory. `cmdInit` printed a warning and **committed the credential regardless**. A power loss in that window still produced the exact unrecoverable state the whole mechanism existed to prevent — the detection was real, the response was not.
+
+This is the same shape of error as F1.a (detect the amount, forward a different one) and the "concurrent" test in F3: build the check, then fail to act on it.
+
+**Fix:** commit only on proven delivery. Verified on the Windows target — both refused paths leave **zero** verifiers committed:
+
+```
+refused -out           verifiers committed: 0
+refused terminal       verifiers committed: 0
+```
+
+Mutation-verified: restoring warn-then-commit fails the test with *"a credential was committed despite refusing delivery — this state file would be permanently unrecoverable"*.
+
+**Consequence, accepted rather than worked around:** provisioning does not work on Windows at all now. `-out` fails the `0600` check; terminal output fails the durability check. That is the honest state of the product, and the README says so instead of offering a path that quietly risks a lockout.
+
+## F14 — Deleting a leaked secret is not the same as never creating it
+
+The previous fix deleted the gate's recovery token after use and asserted its absence. That proves the file is gone at the end — not that cloud sync never uploaded it during the window it existed, in a OneDrive-backed tree.
+
+**Fix:** `init-ephemeral` (test-hook only) derives a verifier from a token that is generated and immediately **discarded**. No usable recovery secret is ever created, so there is nothing to leak. The resulting state file is deliberately unrecoverable, which is correct for a throwaway fixture and wrong for anything else — hence the build tag.
+
+While moving this, Windows Application Control began persistently refusing to execute the `-tags testhook` guard binary (F9 again), including from a fresh output path, while shipped builds ran fine. `process-recover` needs no Docker child, so it now runs entirely inside the golang container — which is where everything else already runs.

@@ -65,6 +65,7 @@ cmd_build() {
 cmd_live_block() {
   cmd_build; need_keys
   mkdir -p "$EV"; rm -f "$EV"/block_* 2>/dev/null || true
+  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
   # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
   # state file, so the gate performs it explicitly rather than letting the
   # guard establish recovery authority implicitly.
@@ -73,14 +74,17 @@ cmd_live_block() {
   # evidence directory on a dev box, and on Windows the file cannot land 0600.
   # A real deployment provisions interactively onto a restricted directory.
   go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
+  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
+  # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
+  # state file, so the gate performs it explicitly.
+  #
+  # init-ephemeral derives a verifier from a token that is immediately
+  # DISCARDED, so no usable recovery secret is ever created. Writing a real
+  # token here and deleting it afterwards was not enough: this tree is
+  # OneDrive-backed, so sync software could upload it during the window, and
+  # asserting absence at the end proves nothing about whether it was copied.
   ./rzp-guard-operator-testhook.exe -mandate "$MANDATE" \
-      -state "$EV/block_state.db" init -out "$EV/block_operator_token" \
-      -allow-unprotected-out > /dev/null
-  # The gate never needs the token after provisioning. Leaving a real
-  # recovery credential in a scratch directory is a disclosure risk that
-  # gitignore does NOT cover: this tree lives under OneDrive, so an ignored
-  # file still syncs to the cloud. Two such tokens were found sitting here.
-  rm -f "$EV/block_operator_token"
+      -state "$EV/block_state.db" init-ephemeral > /dev/null
   printf '%s\n' \
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"live-gate","version":"1"}}}' \
     '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
@@ -106,42 +110,36 @@ cmd_live_block() {
 # Built with -tags testhook. The shipped binary has no arbitrary-child path, and
 # the stub is given NO Razorpay credentials.
 cmd_process_recover() {
-  cmd_build
-  go build -tags testhook -o rzp-guard-testhook.exe ./cmd/rzp-guard
-  mkdir -p "$EV"; rm -f "$EV"/recover_* 2>/dev/null || true
-  # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
-  # state file, so the gate performs it explicitly rather than letting the
-  # guard establish recovery authority implicitly.
+  # Runs entirely INSIDE the golang container.
   #
-  # -allow-unprotected-out is passed because this writes into a throwaway
-  # evidence directory on a dev box, and on Windows the file cannot land 0600.
-  # A real deployment provisions interactively onto a restricted directory.
-  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
-  ./rzp-guard-operator-testhook.exe -mandate "$MANDATE" \
-      -state "$EV/recover_state.db" init -out "$EV/recover_operator_token" \
-      -allow-unprotected-out > /dev/null
-  # The gate never needs the token after provisioning. Leaving a real
-  # recovery credential in a scratch directory is a disclosure risk that
-  # gitignore does NOT cover: this tree lives under OneDrive, so an ignored
-  # file still syncs to the cloud. Two such tokens were found sitting here.
-  rm -f "$EV/recover_operator_token"
-  ( printf '%s\n' \
-      '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYN00000000001","amount":50000}}}'
-    sleep 30 ) \
-  | RZP_GUARD_CHILD_CMD='head -c 120 > /dev/null; exit 0' \
-    RAZORPAY_KEY_ID=rzp_test_stub RAZORPAY_KEY_SECRET=stub \
-    ./rzp-guard-testhook.exe -mandate "$MANDATE" -state "$EV/recover_state.db" \
-      -child-tee "$EV/recover_child_stdin.jsonl" \
-      > "$EV/recover_stdout.jsonl" 2> "$EV/recover_stderr.txt"
+  # Two reasons, both measured. The gate needs no Docker child -- it uses a
+  # local non-responding stub -- so nothing here wants the host. And Windows
+  # Application Control persistently refuses to execute the -tags testhook
+  # guard binary on this host (FAILURES.md F9), while shipped builds run fine;
+  # a fresh output path did not help. The container sidesteps that and is
+  # already the canonical runner for everything else.
+  mkdir -p "$EV"; rm -f "$EV"/recover_* 2>/dev/null || true
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$GOIMAGE" sh -c '
+    set -e
+    go build -tags testhook -o /tmp/guard-th ./cmd/rzp-guard
+    go build -tags testhook -o /tmp/op-th ./cmd/rzp-guard-operator
+    go build -o /tmp/gate-verify ./cmd/gate-verify
+    EV=evidence/live
 
-  printf '%s\n' \
-    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYN00000000001","amount":50000}}}' \
-  | RZP_GUARD_CHILD_CMD='cat > /dev/null' \
-    RAZORPAY_KEY_ID=rzp_test_stub RAZORPAY_KEY_SECRET=stub \
-    ./rzp-guard-testhook.exe -mandate "$MANDATE" -state "$EV/recover_state.db" \
-      > "$EV/recover_restart.jsonl" 2>/dev/null
-  echo ""
-  ./gate-verify.exe recover "$EV"
+    # init-ephemeral derives a verifier from a token that is immediately
+    # DISCARDED, so no usable recovery secret is ever created. Writing a real
+    # token here and deleting it afterwards was not enough: this tree is
+    # OneDrive-backed, so sync software could upload it during the window.
+    /tmp/op-th -mandate examples/mandate.json -state "$EV/recover_state.db"         init-ephemeral > /dev/null
+
+    ( printf "%s\n" "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"pay_SYN00000000001\",\"amount\":50000}}}"
+      sleep 20 )     | RZP_GUARD_CHILD_CMD="head -c 120 > /dev/null; exit 0"       RAZORPAY_KEY_ID=rzp_test_stub RAZORPAY_KEY_SECRET=stub       /tmp/guard-th -mandate examples/mandate.json -state "$EV/recover_state.db"         -child-tee "$EV/recover_child_stdin.jsonl"         > "$EV/recover_stdout.jsonl" 2> "$EV/recover_stderr.txt" || true
+
+    printf "%s\n" "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"pay_SYN00000000001\",\"amount\":50000}}}"     | RZP_GUARD_CHILD_CMD="cat > /dev/null"       RAZORPAY_KEY_ID=rzp_test_stub RAZORPAY_KEY_SECRET=stub       /tmp/guard-th -mandate examples/mandate.json -state "$EV/recover_state.db"         > "$EV/recover_restart.jsonl" 2>/dev/null || true
+
+    echo
+    /tmp/gate-verify recover "$EV"
+  '
 }
 
 usage() {

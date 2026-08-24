@@ -37,11 +37,13 @@ import (
 
 const usage = `rzp-guard-operator — resolve refunds whose outcome is unknown
 
-  rzp-guard-operator -mandate M -state S init [-out NEW-FILE]
+  rzp-guard-operator -mandate M -state S init -out NEW-FILE
         DEPLOYMENT STEP, run once BEFORE the guard is ever started.
         Refuses to print to a non-terminal. -out must NOT already exist and the
         token is written and fsynced BEFORE the credential is committed, so a
-        failed delivery never locks recovery out.
+        failed delivery never locks recovery out. If delivery cannot be proven
+        durable (terminal output, or a platform that cannot fsync a directory)
+        the credential is NOT committed unless -accept-delivery-risk is given.
 
   rzp-guard-operator -mandate M -state S rotate -operator <who> -reason <text>
         replace it, authenticated with the CURRENT token, audited
@@ -87,7 +89,12 @@ func run() error {
 		out         = flag.String("out", "", "init/rotate: NEW file to write the token to (must not exist)")
 	)
 	allowUnprot := allowUnprotectedFlag()
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage+unprotectedHelp) }
+	acceptRisk := flag.Bool("accept-delivery-risk", false,
+		"UNSUPPORTED FOR DEPLOYMENT: commit the credential even though delivery "+
+			"cannot be proven durable (terminal output, or a platform that cannot "+
+			"fsync a directory). A crash or a lost terminal then leaves recovery "+
+			"permanently impossible.")
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage+unprotectedHelp+ephemeralHelp) }
 
 	// Go's flag package stops parsing at the first non-flag argument, so
 	// "resolve rfa_x -outcome landed" would leave -outcome unparsed and silently
@@ -142,7 +149,10 @@ func run() error {
 	// init is the only command that runs without a credential, because it is
 	// the one that creates it.
 	if args[0] == "init" {
-		return cmdInit(store, *out, *allowUnprot)
+		return cmdInit(store, *out, *allowUnprot, *acceptRisk)
+	}
+	if args[0] == "init-ephemeral" {
+		return initEphemeral(store)
 	}
 
 	// EVERY other command authenticates, including the read-only ones. list and
@@ -160,7 +170,7 @@ func run() error {
 
 	switch args[0] {
 	case "rotate":
-		return cmdRotate(store, grant, *reason, *out, *allowUnprot)
+		return cmdRotate(store, grant, *reason, *out, *allowUnprot, *acceptRisk)
 	case "list":
 		return cmdList(store, m, *asJSON)
 	case "audit":
@@ -196,14 +206,7 @@ func authenticate(store *storage.Store, subject, token string) (opauth.Grant, er
 // cmdInit generates the credential. It refuses if one already exists: a second
 // init must not be able to silently replace it, which is how the restart bypass
 // worked when the guard rewrote the credential on every start.
-func cmdInit(store *storage.Store, outPath string, allowUnprotected bool) error {
-	// "Shown once" is meaningless when CI logs, pipes and terminal recordings
-	// capture stdout, so a secret is never printed to a non-terminal.
-	if outPath == "" && !opauth.StdoutIsTerminal() {
-		return errors.New("refusing to print a new credential to a non-terminal " +
-			"(CI logs, pipes and terminal recording all capture it). Re-run " +
-			"interactively, or pass -out <new-file> to write it to a file")
-	}
+func cmdInit(store *storage.Store, outPath string, allowUnprotected, acceptRisk bool) error {
 	token, err := opauth.NewToken()
 	if err != nil {
 		return err
@@ -213,60 +216,71 @@ func cmdInit(store *storage.Store, outPath string, allowUnprotected bool) error 
 		return err
 	}
 
-	// ORDER IS THE WHOLE POINT. Deliver the token first, commit the verifier
-	// second, and undo the delivery if the commit fails.
+	// FAIL CLOSED ON UNPROVABLE DELIVERY.
 	//
-	// The previous order committed the verifier and then wrote the file. A
-	// failed write -- bad path, full disk, interrupted -- left a credential
-	// nobody held, and init cannot be re-run, so recovery for that state file
-	// was permanently impossible. Verified before the fix: a bad -out path
-	// produced exactly that dead end.
-	if outPath != "" {
-		durable, err := opauth.WriteTokenExclusive(outPath, token, allowUnprotected)
-		if err != nil {
-			return err
+	// A previous revision detected that delivery could not be made durable and
+	// then committed the credential anyway, after printing a warning. Warning
+	// after taking the unsafe action is not fail-closed: a power loss still
+	// produces a state file with a recovery authority nobody can exercise, which
+	// is the exact outcome this code exists to prevent.
+	//
+	// So: commit only when the token has been durably delivered, or when an
+	// operator has explicitly accepted the risk with -accept-delivery-risk.
+	if outPath == "" {
+		// Terminal output cannot be proven delivered. A disconnect, an unreadable
+		// scrollback, or a closed window after the commit leaves no token.
+		if !acceptRisk {
+			return errors.New("terminal delivery cannot be proven, so committing a " +
+				"credential after printing one is not supported for deployment: a " +
+				"disconnect or lost scrollback would leave recovery permanently " +
+				"impossible. Use -out on a platform that can fsync a directory, or " +
+				"pass -accept-delivery-risk to accept that outcome explicitly")
 		}
-		if !durable {
-			fmt.Fprintf(os.Stderr,
-				"rzp-guard-operator: WARNING - this platform cannot fsync a directory, "+
-					"so the token file's directory entry is not crash-durable. If the "+
-					"machine loses power in the next moment the credential may exist "+
-					"with no token, and recovery for this state file would be lost. "+
-					"Confirm %s is readable before relying on it.\n", outPath)
+		if !opauth.StdoutIsTerminal() {
+			return errors.New("refusing to print a credential to a non-terminal")
 		}
+		fmt.Fprintln(os.Stderr, "rzp-guard-operator: UNSUPPORTED FOR DEPLOYMENT -- "+
+			"committing a credential whose delivery cannot be proven.")
 		if err := store.InitOperatorVerifier(verifier); err != nil {
-			os.Remove(outPath) // the token is worthless; do not leave it lying around
 			return err
 		}
-		fmt.Printf("Operator credential created and written to %s.\n", outPath)
-		fmt.Println("Move it somewhere a human can reach during an incident, then delete it.")
+		fmt.Println("Operator credential created. Shown ONCE and not recoverable:")
+		fmt.Printf("\n    %s\n\n", token)
 		return nil
 	}
 
-	if err := store.InitOperatorVerifier(verifier); err != nil {
+	// Deliver first, commit second, and undo the delivery if the commit fails.
+	durable, err := opauth.WriteTokenExclusive(outPath, token, allowUnprotected)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintln(os.Stderr,
-		"rzp-guard-operator: NOTE - printing a credential to a terminal is a "+
-			"development convenience, NOT safe delivery. A disconnect, a recording, "+
-			"or a scrollback loss after the credential is committed leaves no "+
-			"human-held token. Prefer -out onto a protected directory, or an OS "+
-			"secret store.")
-	fmt.Println("Operator credential created. Shown ONCE and not recoverable:")
-	fmt.Printf("\n    %s\n\n", token)
-	fmt.Println("The guard never reads or writes this credential. Only this command does.")
+	if !durable && !acceptRisk {
+		os.Remove(outPath)
+		return fmt.Errorf("this platform cannot fsync a directory, so the token "+
+			"file's directory entry is not crash-durable and delivery cannot be "+
+			"proven. REFUSING to commit the credential: a power loss here would "+
+			"leave %s recoverable by nobody. Provision on a platform that supports "+
+			"directory fsync, use an OS secret store, or pass -accept-delivery-risk "+
+			"to accept that outcome explicitly", outPath)
+	}
+	if !durable {
+		fmt.Fprintln(os.Stderr, "rzp-guard-operator: UNSUPPORTED FOR DEPLOYMENT -- "+
+			"directory entry is not crash-durable on this platform.")
+	}
+	if err := store.InitOperatorVerifier(verifier); err != nil {
+		os.Remove(outPath)
+		return err
+	}
+	fmt.Printf("Operator credential created and written to %s.\n", outPath)
+	fmt.Println("Move it somewhere a human can reach during an incident, then delete it.")
 	return nil
 }
 
 // cmdRotate replaces the credential, authenticated by the CURRENT token.
 func cmdRotate(store *storage.Store, grant opauth.Grant, reason, outPath string,
-	allowUnprotected bool) error {
+	allowUnprotected, acceptRisk bool) error {
 	if err := checkAuditText(grant.Subject(), reason); err != nil {
 		return err
-	}
-	if outPath == "" && !opauth.StdoutIsTerminal() {
-		return errors.New("refusing to print a rotated credential to a non-terminal; " +
-			"re-run interactively or pass -out <new-file>")
 	}
 	next, err := opauth.NewToken()
 	if err != nil {
@@ -277,33 +291,44 @@ func cmdRotate(store *storage.Store, grant opauth.Grant, reason, outPath string,
 		return err
 	}
 
-	// Deliver first, rotate second. Rotating first and then failing to deliver
-	// would invalidate the OLD token while the new one reached nobody -- the
-	// same lockout as init, but worse, because it destroys a working credential.
-	if outPath != "" {
-		durable, err := opauth.WriteTokenExclusive(outPath, next, allowUnprotected)
-		if err != nil {
-			return err
+	// The same rule, and it matters more here: rotating on unprovable delivery
+	// destroys a WORKING credential as well as failing to hand over the new one.
+	if outPath == "" {
+		if !acceptRisk {
+			return errors.New("terminal delivery cannot be proven, so rotating would " +
+				"risk invalidating a working credential while the replacement reaches " +
+				"nobody. Use -out on a platform that can fsync a directory, or pass " +
+				"-accept-delivery-risk to accept that outcome explicitly")
 		}
-		if !durable {
-			fmt.Fprintf(os.Stderr,
-				"rzp-guard-operator: WARNING - directory entry not crash-durable on "+
-					"this platform; confirm %s is readable before continuing.\n", outPath)
+		if !opauth.StdoutIsTerminal() {
+			return errors.New("refusing to print a rotated credential to a non-terminal")
 		}
+		fmt.Fprintln(os.Stderr, "rzp-guard-operator: UNSUPPORTED FOR DEPLOYMENT -- "+
+			"rotating with delivery that cannot be proven.")
 		if err := store.RotateOperatorVerifier(verifier, grant.Subject(), reason); err != nil {
-			os.Remove(outPath) // rotation did not happen; the old token still works
 			return err
 		}
-		fmt.Printf("Operator credential rotated and audited; new token written to %s.\n", outPath)
-		fmt.Println("The previous token no longer authenticates.")
+		fmt.Println("Operator credential rotated and audited. New token, shown ONCE:")
+		fmt.Printf("\n    %s\n\n", next)
 		return nil
 	}
 
-	if err := store.RotateOperatorVerifier(verifier, grant.Subject(), reason); err != nil {
+	durable, err := opauth.WriteTokenExclusive(outPath, next, allowUnprotected)
+	if err != nil {
 		return err
 	}
-	fmt.Println("Operator credential rotated and audited. New token, shown ONCE:")
-	fmt.Printf("\n    %s\n\n", next)
+	if !durable && !acceptRisk {
+		os.Remove(outPath)
+		return errors.New("this platform cannot fsync a directory, so delivery of the " +
+			"new token cannot be proven. REFUSING to rotate: a crash here would " +
+			"invalidate the working credential while the replacement reached nobody")
+	}
+	if err := store.RotateOperatorVerifier(verifier, grant.Subject(), reason); err != nil {
+		os.Remove(outPath)
+		return err
+	}
+	fmt.Printf("Operator credential rotated and audited; new token written to %s.\n", outPath)
+	fmt.Println("The previous token no longer authenticates.")
 	return nil
 }
 

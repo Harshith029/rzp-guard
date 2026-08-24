@@ -334,9 +334,14 @@ func TestReadCommandsRequireTheCredential(t *testing.T) {
 	}
 }
 
-// init must not print a secret into a pipe: CI logs, terminal recordings and
-// shell history all capture stdout.
-func TestInitRefusesToPrintASecretToANonTerminal(t *testing.T) {
+// Terminal delivery cannot be proven, so init refuses to commit a credential
+// after printing one -- unless the operator explicitly accepts that outcome.
+//
+// An earlier revision detected the problem and then committed anyway after a
+// warning. Warning after taking the unsafe action is not fail-closed: a
+// disconnect or a lost scrollback leaves a state file whose recovery authority
+// nobody can exercise.
+func TestInitRefusesUnprovableDeliveryAndCommitsNothing(t *testing.T) {
 	bin := buildOperator(t)
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "fresh.db")
@@ -345,19 +350,34 @@ func TestInitRefusesToPrintASecretToANonTerminal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// CombinedOutput gives the child a pipe, not a terminal.
 	out, err := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath, "init")
 	if err == nil {
-		t.Fatalf("init printed a credential to a pipe:\n%s", out)
+		t.Fatalf("init committed a credential with unprovable delivery:\n%s", out)
 	}
-	if !strings.Contains(out, "non-terminal") {
+	if !strings.Contains(out, "cannot be proven") {
 		t.Fatalf("unexpected failure:\n%s", out)
 	}
 	if strings.Contains(out, "rzpop_") {
-		t.Fatalf("the token was emitted anyway:\n%s", out)
+		t.Fatalf("a token was emitted anyway:\n%s", out)
 	}
 
-	// -out writes it to a 0600 file instead.
+	// THE POINT: nothing was committed, so provisioning can still be done
+	// properly. A committed verifier here would be an unrecoverable state file.
+	st, err := storage.Open(dbPath, "mnd_operator_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, configured, err := st.OperatorVerifier()
+	st.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configured {
+		t.Fatal("a credential was committed despite refusing delivery -- this state " +
+			"file would be permanently unrecoverable")
+	}
+
+	// -out onto a platform that can fsync a directory is the supported path.
 	tokPath := filepath.Join(dir, "token")
 	out, err = runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath,
 		"init", "-out", tokPath)
@@ -373,12 +393,6 @@ func TestInitRefusesToPrintASecretToANonTerminal(t *testing.T) {
 	}
 }
 
-// A failed token delivery must never leave a committed credential nobody holds.
-//
-// The previous order committed the verifier and then wrote the file, so a bad
-// -out path produced a state file whose only valid token had gone nowhere --
-// and init cannot be re-run, so recovery for that merchant was permanently
-// impossible. Verified before the fix.
 func TestFailedTokenDeliveryLeavesInitRetryable(t *testing.T) {
 	bin := buildOperator(t)
 	dir := t.TempDir()

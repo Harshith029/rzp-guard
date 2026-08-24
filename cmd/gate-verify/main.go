@@ -167,10 +167,10 @@ func verifyBlock(dir string) {
 	//     tree is OneDrive-backed, so a gitignored file still syncs to the cloud;
 	//     two such tokens were found sitting in evidence/live before this check.
 	if _, err := os.Stat(dir + "/block_operator_token"); !os.IsNotExist(err) {
-		check(false, "provisioning token was deleted after use (found one at %s)",
+		check(false, "no recovery token was ever written into the repo tree (found %s)",
 			dir+"/block_operator_token")
 	} else {
-		check(true, "provisioning token was deleted after use")
+		check(true, "no recovery token was ever written into the repo tree")
 	}
 
 	// 3. THE CONTROL. Without this the gate passes against a dead container or
@@ -238,10 +238,10 @@ func verifyRecover(dir string) {
 	check(found, "after restart a fresh process still refuses the replay (ACTION_CONSUMED, IN_DOUBT)")
 
 	if _, err := os.Stat(dir + "/recover_operator_token"); !os.IsNotExist(err) {
-		check(false, "provisioning token was deleted after use (found one at %s)",
+		check(false, "no recovery token was ever written into the repo tree (found %s)",
 			dir+"/recover_operator_token")
 	} else {
-		check(true, "provisioning token was deleted after use")
+		check(true, "no recovery token was ever written into the repo tree")
 	}
 }
 

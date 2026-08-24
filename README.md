@@ -17,6 +17,8 @@ An authorization proxy that sits in front of Razorpay's **official, unmodified**
                            #       (local stub child; not the official container)
 ```
 
+`live-block` proves one thing: **the production guard blocks before the child's stdin**. It does not demonstrate safe credential provisioning — its fixture uses a test-hook `init-ephemeral` that discards the token, and provisioning on Windows is separately unproven.
+
 `live-block` needs Docker running and **test-mode** keys in `.env`. `RAZORPAY_KEY_ID` must start with `rzp_test`; the guard refuses to start otherwise.
 
 Only `live-block` drives the official container. `process-recover` is named honestly: it exercises the guard's cleanup wiring against a local stub, because against the real container Razorpay answers in well under a second and the reply wins the race against any kill — measured at 2s and 0.15s, not assumed.
@@ -115,7 +117,9 @@ The control matters: the container answered a legitimate read with a real Razorp
 3. **Recovery is an availability gap, not just an inconvenience.** Stop → check Razorpay → resolve → restart means a window with no guard and no forwarding service. There is **no measured recovery drill**: outage duration, what blocks new requests meanwhile, and how the correct state file and operator identity are selected are all unanswered. The CLI does not address them.
 4. **The threat model assumes a protected service account and state directory.** The guard's refusal to run unprovisioned closes the ordinary first-writer race, but it does not protect against someone who can create or modify the state directory *before* provisioning. **The operator token is not an independent security boundary** — it is a second factor on top of filesystem ownership. `-out` verifies the file actually landed at `0600` and **refuses otherwise, with no bypass in shipped builds** — Windows lands `0666`, measured, so `-out` simply does not work there. The escape hatch exists only under `-tags testhook`, for gates writing to throwaway directories.
 
-**Credential delivery is the weakest part of this design, stated plainly.** Printing to a terminal is a development convenience, not safe delivery: a disconnect or lost scrollback after the credential is committed leaves no human-held token. Writing to a file is safer but its directory entry is only crash-durable where the platform can `fsync` a directory — **not on Windows**, where the command warns explicitly. The robust answer is an OS secret store, and this does not have one.
+**Credential delivery is the weakest part of this design, and it now fails closed.** The credential is committed **only when delivery can be proven durable** — the token file written, fsynced, and its parent directory fsynced. Terminal output cannot be proven (a disconnect or lost scrollback leaves no token), and Windows cannot fsync a directory, so **both are refused unless `-accept-delivery-risk` is passed**, which prints an `UNSUPPORTED FOR DEPLOYMENT` banner.
+
+The practical consequence, stated rather than hidden: **provisioning is not supported on Windows.** `-out` fails the `0600` check and terminal output fails the durability check. The robust answer is an OS secret store, and this does not have one.
 5. **Recovery takes the guard offline.** The operator CLI needs the state file, and the guard holds an exclusive lock on it for its lifetime. So the procedure is stop → check Razorpay → resolve → restart, which means the protection layer is down while an ambiguous transaction is adjudicated. It is a **tested offline recovery procedure, not an operational workflow**: no run yet shows an operator resolving a real Test Mode refund whose status was checked in the Razorpay dashboard.
 6. **`process-recover` uses a stub child**, not the official container, for the reason above. Only `live-block` is live.
 7. **Cumulative caps are per state file.** Enforced by exclusive ownership rather than distributed coordination.
