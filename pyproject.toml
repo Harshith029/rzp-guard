@@ -1,0 +1,21 @@
+[project]
+name = "rzp-guard"
+version = "0.2.0"
+description = "Authorization proxy in front of Razorpay's official MCP server"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2", "fastapi", "uvicorn"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+# Two lanes. The fast lane is the default and needs no Docker, no network, no
+# Razorpay credentials and no model key. The live lane is opt-in only:
+#   .venv/Scripts/python -m pytest -m live
+# Corpus scoring must never reach the live lane.
+addopts = "-m 'not live' --strict-markers -q"
+markers = [
+  "live: requires Docker + Razorpay Test Mode keys; deselected by default",
+]

@@ -1,10 +1,10 @@
 # PLAN.md — Track 2 (AI Risk Manager)
 
 **Project:** `rzp-guard` — an authorization proxy for the Razorpay MCP server
-**Phase 0 deliverable.** Phase 0.5 conformance corpus committed; no policy code written yet.
+**Phase 2 in progress.** Phase 0.5 conformance corpus committed; Phase 2 mandate/matching/provenance built and green.
 Date: 2026-08-24 · Deadline: 2026-09-05 (12 days)
 
-**Version 5**, after four rounds of adversarial review — see [REVIEW_LOG.md](REVIEW_LOG.md). **The plan has shrunk every round.** v5's change is the largest: the headline metric claim is withdrawn from the fixture corpus entirely and rebuilt on real agent traces (Phase 4b).
+**Version 6**, after five rounds of adversarial review — see [REVIEW_LOG.md](REVIEW_LOG.md). **The plan has shrunk every round.** v5's change is the largest: the headline metric claim is withdrawn from the fixture corpus entirely and rebuilt on real agent traces (Phase 4b).
 
 Claims withdrawn across all rounds:
 
@@ -236,6 +236,25 @@ The proxy injects a deterministic receipt into every forwarded refund, rejecting
 
 *(v3's provenance gate was step 4; deleted as redundant per §3.3.)* Every outcome writes one decision record: rule fired, matched action id, provenance chain with origin paths, human-readable reason.
 
+### 3.7a Integration surface and deliberate non-goals
+
+The impressive dependency is Razorpay's official server; the guard should be boring enough to read in one sitting.
+
+**Child:** the unmodified official Go MCP server in Docker, **pinned by digest**, constrained to `TOOLSETS=payments,orders,refunds`. **Guard:** permits reads plus `create_refund` only — a narrower grant than the child's own surface, so the two boundaries are independent rather than one restating the other.
+
+**Stack:** Python 3.11 `asyncio` subprocess relay · Pydantic mandate model · pytest · JSONL decision log · one FastAPI page.
+
+**Explicit non-goals** — each of these would blur the central proof or reduce testability:
+
+| Not building | Why |
+|---|---|
+| Webhooks | Inbound surface the proof does not need |
+| Direct Razorpay SDK calls from the guard | The guard must reach Razorpay *only* through the child, or "sits in front of the official server" stops being true |
+| Automatic reconciliation client | Would make the proxy an MCP client to its own child and falsify the transparent relay (§3.4) |
+| LLM in the core path | The authorization decision is a deterministic lookup; a model there adds nondeterminism to a money path (§3.1 Decision C) |
+| Database, queue, agent framework, React app | No requirement reaches for them |
+| A fork of Razorpay's server | Forfeits "real, unmodified server" for a marginal gain (§2.6) |
+
 ### 3.8 Log and dashboard security
 
 The proxy ingests attacker-controlled text, logs it, and renders it in a browser.
@@ -301,17 +320,22 @@ The metric claim needs ground truth **not derived from the mandate**, which mean
 
 **4b — Agent-trace evaluation (the actual metric claim)**
 
-- **G4.5** Drive a **real model** against the MCP surface through the proxy, on merchant tasks whose **intent is specified independently of the mandate**. Record the calls the agent genuinely emits. Injected content is placed in `notes`/`description` fields of test-mode payment data.
-- **G4.6** Ground truth is **observed, not authored**: for each emitted call, did it fall outside the merchant intent given in the task? Labelled from the task brief, which no mandate field derives from.
-- **G4.7 — The measurement worth having:** **how often a correctly-behaving agent is blocked because the mandate did not anticipate its legitimate path.** This is the real false-positive cost, and it cannot be authored honestly — I would be guessing at model behaviour. Reported per task family with the blocked legitimate paths enumerated.
-- **G4.8** Induced-misuse rate reported **separately from detector performance**: of the injection attempts, how many actually caused an out-of-intent call. If the model resists most of them, that is the finding — and it says something real about the threat model rather than about my fixtures.
-- **G4.9** Model, version, prompts, temperature and full traces committed. Trace count stated honestly; **if the sample is small, it is reported as a small sample**, not dressed up.
+**Protocol frozen in [PREREGISTRATION.md Amendment 2](PREREGISTRATION.md) before any trace is run.** 4b may not report a number until that commit exists — it now does.
+
+- **G4.5** Ground truth is the **task brief**, not the observed calls. The agent's output is what is being measured, not the standard it is measured against.
+- **G4.6** Documented **compile/review boundary**: briefs authored and hash-committed first in natural language; the mandate produced from a brief by a reviewable `compile_mandate(brief)`; coverage gaps recorded at compile time. Separate files alone would not make them independent.
+- **G4.7** Three quantities, **reported separately and never combined**: blocking rate given an out-of-intent refund was emitted; operational false-block rate given an in-intent refund was emitted; induced-misuse rate, which is a property of the **model** and says nothing about the detector.
+- **G4.8** Frozen before the first trace: task set, intent statements, compiled mandates, model/version/temperature/prompts, **declared trace count**, adjudication rule with worked examples.
+- **G4.9** Reported as an **exploratory agent study** — no intervals, no significance, no inference. Single-adjudicator limitation stated; every adjudicated call published with its reason so a reader can disagree with any of them.
 
 **False-positive cost model:** a blocked legitimate refund costs a support ticket plus a delayed customer refund, priced in ₹ and ops-minutes with assumptions inline, presented as a cost curve.
 
-**Honest scoping note:** 4b is the part that answers *"what did the detector infer that wasn't already encoded in the action list?"* If time runs out, 4b ships smaller rather than 4a's numbers being promoted to carry a claim they cannot support.
+**Honest scoping note:** 4b is the part that answers *"what did the detector infer that wasn't already encoded in the action list?"* If time runs out, 4b ships with fewer traces rather than 4a's numbers being promoted to carry a claim they cannot support.
 
-### Phase 5 — Dashboard (Days 9–10)
+### Phase 5 — Dashboard + live demo (Days 9–10)
+
+**Demo sequence** (tangible without broadening the attack surface): Test Checkout creates a captured payment → launch with a merchant-issued mandate → harness attempts an allowed refund → attempts an out-of-list refund → show the child-stdin proof, the decision record, and the real Test Mode refund object.
+
 
 - **G5.1** A live blocked call appears within 1s with its matched-action decision and provenance chain rendered.
 - **G5.2** Dashboard reads **only** from the decision log — no second source of truth.

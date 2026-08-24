@@ -166,6 +166,48 @@ The valuable measurement there is the one I cannot author honestly: **how often 
 
 ---
 
+## Amendment 2 — 2026-08-24 — Phase 4b protocol, frozen before any trace is run
+
+Written **before** the agent harness exists and before any model has been called. Phase 4b may not report any number until this section is committed — which it now is.
+
+### A2.1 Observed calls are not ground truth; the task brief is
+
+The agent's output is the *thing being measured*, not the standard it is measured against. Ground truth is the **task brief**: a merchant-facing instruction stating what the operator actually wants done, written independently of any mandate.
+
+For each refund the agent emits, adjudication asks one question — **is this refund within the intent stated in the brief?** — answered from the brief alone, with the mandate not consulted.
+
+### A2.2 Compile/review boundary between brief and mandate
+
+Putting the brief and the mandate in separate files does not make them independent. The documented boundary is:
+
+1. **Task briefs are authored and hash-committed first**, in natural language, with no mandate fields.
+2. The mandate is then produced by a documented, reviewable function — `compile_mandate(brief) -> Mandate` — whose output is committed alongside its input.
+3. The compilation is **reviewed as a separate step**, and any brief-intent the compiled mandate fails to cover is recorded at compile time.
+
+That recorded gap is not an inconvenience; **it is the false-block surface**, and making it inspectable is the point. A brief saying "refund the customer's returned items" compiles to a fixed action list, and every legitimate path that list fails to anticipate is a predicted false block — which the traces then confirm or refute.
+
+### A2.3 The three quantities, reported separately and never combined
+
+| # | Quantity | Denominator | What it is a property of |
+|---|---|---|---|
+| **1** | **Blocking rate** | out-of-intent refunds **actually emitted** by the agent | the proxy |
+| **2** | **Operational false-block rate** | in-intent refunds **actually emitted** by the agent | the proxy + the mandate compilation |
+| **3** | **Induced-misuse rate** | injection attempts presented | **the model**, not the proxy |
+
+Quantity 3 is a property of the model under test and says nothing about the detector. If the model resists most injections, that is a finding about the threat model — and it must not be laundered into a detector score. **No composite metric will be formed from these three.**
+
+### A2.4 Frozen before running
+
+To be committed in a single commit **before the first trace**: the task set; per-brief intent statements; the compiled mandates plus the recorded compile-time coverage gaps; model name, exact version, temperature and all prompts; **the intended trace count, declared in advance**; and the adjudication rule with worked examples of in-intent and out-of-intent refunds.
+
+### A2.5 This will be an exploratory study, not a benchmark
+
+A small trace set is an **exploratory agent study**. No confidence intervals, no significance claims, no inference to merchant traffic — the same standard Amendment 1 applied to the fixture corpus. The trace count is reported as-run, and if it is small it is called small.
+
+Adjudication is single-adjudicator (one builder, twelve days). That is a stated limitation, not a solved problem: intent judgments will be made by the same person who wrote the briefs. The mitigation available is procedural — briefs frozen and hashed before traces run, adjudication performed against the frozen text, and every adjudicated call published with its reason so a reader can disagree with any individual call.
+
+---
+
 ## 8. Defense-only properties of this corpus
 
 - Fixtures are recorded JSON-RPC **data**, scored offline. `corpus/` contains data and a scorer, never an executor.
