@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/harshith/rzp-guard/internal/lifecycle"
 	"github.com/harshith/rzp-guard/internal/mandate"
+	"github.com/harshith/rzp-guard/internal/opauth"
 	"github.com/harshith/rzp-guard/internal/storage"
 )
 
@@ -25,11 +24,9 @@ const mandateDoc = `{
   "global": {"max_cumulative_paise": 200000, "max_calls_per_minute": 10}
 }`
 
-const realToken = "the-real-operator-token-32"
-
 // stuckState builds a state file holding one IN_DOUBT action, with the operator
-// token hash configured the way the guard configures it at launch.
-func stuckState(t *testing.T, configureToken bool) (dbPath, mandatePath string) {
+// operator credential configured the way  configures it.
+func stuckState(t *testing.T, configureToken bool) (dbPath, mandatePath, token string) {
 	t.Helper()
 	dir := t.TempDir()
 	dbPath = filepath.Join(dir, "state.db")
@@ -46,8 +43,15 @@ func stuckState(t *testing.T, configureToken bool) (dbPath, mandatePath string) 
 		t.Fatal(err)
 	}
 	if configureToken {
-		sum := sha256.Sum256([]byte(realToken))
-		if err := st.SetOperatorTokenHash(hex.EncodeToString(sum[:])); err != nil {
+		token, err = opauth.NewToken()
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, err := opauth.Verifier(token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.InitOperatorVerifier(v); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -65,7 +69,7 @@ func stuckState(t *testing.T, configureToken bool) (dbPath, mandatePath string) 
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
-	return dbPath, mandatePath
+	return dbPath, mandatePath, token
 }
 
 func buildOperator(t *testing.T) string {
@@ -108,11 +112,10 @@ func stateOf(t *testing.T, dbPath string) lifecycle.State {
 // the environment and then constructed the console with THAT SAME token, so the
 // comparison was against itself and any sufficiently long value was accepted. A
 // wrong token resolved a locked refund. The expected value now comes from the
-// hash the guard recorded at launch — a different source than the one being
-// checked.
+// verifier that  recorded — a different source than the one being checked.
 func TestWrongOperatorTokenIsRejectedAndChangesNothing(t *testing.T) {
 	bin := buildOperator(t)
-	dbPath, mandatePath := stuckState(t, true)
+	dbPath, mandatePath, _ := stuckState(t, true)
 
 	out, err := runOperator(t, bin, "wrong-token-but-long-enough",
 		"-mandate", mandatePath, "-state", dbPath,
@@ -131,7 +134,7 @@ func TestWrongOperatorTokenIsRejectedAndChangesNothing(t *testing.T) {
 
 func TestCorrectOperatorTokenResolvesAndAudits(t *testing.T) {
 	bin := buildOperator(t)
-	dbPath, mandatePath := stuckState(t, true)
+	dbPath, mandatePath, realToken := stuckState(t, true)
 
 	out, err := runOperator(t, bin, realToken,
 		"-mandate", mandatePath, "-state", dbPath,
@@ -158,7 +161,7 @@ func TestCorrectOperatorTokenResolvesAndAudits(t *testing.T) {
 // back to accepting whatever it was handed.
 func TestUnconfiguredStateFileRefusesResolution(t *testing.T) {
 	bin := buildOperator(t)
-	dbPath, mandatePath := stuckState(t, false)
+	dbPath, mandatePath, _ := stuckState(t, false)
 
 	out, err := runOperator(t, bin, "any-token-at-all-here-32",
 		"-mandate", mandatePath, "-state", dbPath,
@@ -167,7 +170,7 @@ func TestUnconfiguredStateFileRefusesResolution(t *testing.T) {
 	if err == nil {
 		t.Fatalf("resolution succeeded with no configured token:\n%s", out)
 	}
-	if !strings.Contains(out, "no operator token is configured") {
+	if !strings.Contains(out, "no operator credential exists") {
 		t.Fatalf("unexpected failure:\n%s", out)
 	}
 	if got := stateOf(t, dbPath); got != lifecycle.InDoubt {
@@ -180,7 +183,7 @@ func TestUnconfiguredStateFileRefusesResolution(t *testing.T) {
 // silently defaulted -outcome when it followed the subcommand.
 func TestFlagsAreParsedAfterTheSubcommand(t *testing.T) {
 	bin := buildOperator(t)
-	dbPath, mandatePath := stuckState(t, true)
+	dbPath, mandatePath, realToken := stuckState(t, true)
 
 	out, err := runOperator(t, bin, realToken,
 		"-mandate", mandatePath, "-state", dbPath,
@@ -191,5 +194,90 @@ func TestFlagsAreParsedAfterTheSubcommand(t *testing.T) {
 	}
 	if got := stateOf(t, dbPath); got != lifecycle.Available {
 		t.Fatalf("state = %s, want AVAILABLE for not-landed", got)
+	}
+}
+
+// The guard must have NO path that writes the operator credential.
+//
+// It previously recorded RZP_GUARD_OPERATOR_TOKEN on every start, so anyone able
+// to relaunch the process could install their own token and then resolve locked
+// refunds without knowing the real one. Demonstrated end to end before the fix:
+// the attacker was rejected, restarted the guard with their own token, and
+// resolved the action.
+func TestGuardCannotReplaceTheOperatorCredential(t *testing.T) {
+	bin := buildOperator(t)
+	dbPath, mandatePath, realToken := stuckState(t, true)
+
+	// A second init must be refused outright.
+	out, err := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath, "init")
+	if err == nil {
+		t.Fatalf("a second init replaced an existing credential:\n%s", out)
+	}
+	if !strings.Contains(out, "already exists") {
+		t.Fatalf("unexpected init failure:\n%s", out)
+	}
+
+	// And the original token still works, so nothing was overwritten.
+	out, err = runOperator(t, bin, realToken,
+		"-mandate", mandatePath, "-state", dbPath,
+		"resolve", "rfa_stuck_001", "-outcome", "landed",
+		"-operator", "ops", "-reason", "still the original credential")
+	if err != nil {
+		t.Fatalf("the original credential stopped working: %v\n%s", err, out)
+	}
+}
+
+// Rotation requires the CURRENT token and is audited.
+func TestRotationRequiresTheCurrentToken(t *testing.T) {
+	bin := buildOperator(t)
+	dbPath, mandatePath, realToken := stuckState(t, true)
+
+	out, err := runOperator(t, bin, "wrong-token-entirely-here",
+		"-mandate", mandatePath, "-state", dbPath,
+		"rotate", "-operator", "attacker", "-reason", "takeover")
+	if err == nil {
+		t.Fatalf("rotation succeeded without the current token:\n%s", out)
+	}
+
+	out, err = runOperator(t, bin, realToken,
+		"-mandate", mandatePath, "-state", dbPath,
+		"rotate", "-operator", "ops", "-reason", "scheduled rotation")
+	if err != nil {
+		t.Fatalf("rotation with the correct token failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "rzpop_") {
+		t.Fatalf("rotation did not emit a new token:\n%s", out)
+	}
+
+	audit, _ := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath, "audit")
+	if !strings.Contains(audit, "ROTATED") {
+		t.Fatalf("rotation was not audited:\n%s", audit)
+	}
+}
+
+// Audit text is bounded and must not carry control characters: the trail is read
+// by humans and may later be rendered.
+func TestAuditTextIsBoundedAndControlCharsRefused(t *testing.T) {
+	bin := buildOperator(t)
+	dbPath, mandatePath, realToken := stuckState(t, true)
+
+	out, err := runOperator(t, bin, realToken,
+		"-mandate", mandatePath, "-state", dbPath,
+		"resolve", "rfa_stuck_001", "-outcome", "landed",
+		"-operator", "ops", "-reason", "line one\nIN_DOUBT -> COMMITTED by someone else")
+	if err == nil {
+		t.Fatalf("a reason containing a newline was accepted:\n%s", out)
+	}
+	if !strings.Contains(out, "control character") {
+		t.Fatalf("unexpected failure:\n%s", out)
+	}
+
+	long := strings.Repeat("x", 600)
+	out, err = runOperator(t, bin, realToken,
+		"-mandate", mandatePath, "-state", dbPath,
+		"resolve", "rfa_stuck_001", "-outcome", "landed",
+		"-operator", "ops", "-reason", long)
+	if err == nil {
+		t.Fatalf("a 600-character reason was accepted:\n%s", out)
 	}
 }

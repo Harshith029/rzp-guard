@@ -14,8 +14,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -97,18 +95,12 @@ func run() error {
 	}
 	defer boot.Close()
 
-	// Configure operator auth from the guard's own environment. This is the
-	// TRUSTED source; the operator CLI later presents a token that must hash to
-	// this value. Without it, resolution is impossible rather than unauthenticated.
-	if tok := os.Getenv("RZP_GUARD_OPERATOR_TOKEN"); tok != "" {
-		if len(tok) < 16 {
-			return fmt.Errorf("RZP_GUARD_OPERATOR_TOKEN must be at least 16 characters")
-		}
-		sum := sha256.Sum256([]byte(tok))
-		if err := boot.Store.SetOperatorTokenHash(hex.EncodeToString(sum[:])); err != nil {
-			return err
-		}
-	}
+	// The guard deliberately has NO path that writes the operator credential.
+	// It used to record RZP_GUARD_OPERATOR_TOKEN on every start, which meant
+	// anyone able to relaunch the process could install their own token and then
+	// resolve locked refunds without knowing the real one. Credential setup and
+	// rotation live in rzp-guard-operator, and rotation requires the current
+	// token.
 
 	if len(boot.RecoveredInDoubt) > 0 {
 		fmt.Fprintf(os.Stderr,
@@ -212,6 +204,18 @@ func run() error {
 		_ = childIn.Close()
 		select {
 		case <-childDone:
+			// The child finished during the drain window. Nothing has cancelled
+			// it yet, so a non-zero status here is a GENUINE child failure --
+			// rejected credentials, a crash -- and must not be written off as a
+			// clean parent-initiated shutdown just because the agent went first.
+			select {
+			case childExit = <-waitErr:
+				haveChildExit = true
+				if childExit != nil {
+					parentInitiated = false
+				}
+			case <-time.After(2 * time.Second):
+			}
 		case <-time.After(drainGrace):
 			fmt.Fprintf(os.Stderr,
 				"rzp-guard: child still had work in flight after %s; locking it\n", drainGrace)

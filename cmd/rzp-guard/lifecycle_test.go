@@ -154,3 +154,45 @@ func TestChildFailurePropagatesNonZeroExit(t *testing.T) {
 		t.Fatal("guard exited zero after the child failed with status 3")
 	}
 }
+
+// A child that fails DURING the drain window must not be written off as a clean
+// parent-initiated shutdown.
+//
+// When the agent closes stdin first, the guard closes the child's stdin and
+// drains for replies still in flight. It classifies that route as
+// parent-initiated, which previously suppressed the child's exit status — so a
+// container whose credentials were rejected could exit non-zero in that window
+// and the CLI would still report success.
+func TestChildFailureDuringDrainIsNotSuppressed(t *testing.T) {
+	bin := buildTestHook(t)
+
+	// Agent stdin closes immediately (empty feed, pipe closed), then the child
+	// exits non-zero shortly after — inside the drain window.
+	cmd := exec.Command(bin,
+		"-mandate", writeMandate(t),
+		"-state", filepath.Join(t.TempDir(), "state.db"))
+	cmd.Env = append(os.Environ(),
+		"RZP_GUARD_CHILD_CMD=sleep 1; echo boom >&2; exit 3",
+		"RAZORPAY_KEY_ID=rzp_test_stub",
+		"RAZORPAY_KEY_SECRET=stub",
+	)
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd.Stdin = r
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	_ = r.Close()
+	_ = w.Close() // agent EOF straight away
+
+	err2, exited := waitWithin(t, cmd, 20*time.Second)
+	if !exited {
+		t.Fatal("guard did not exit")
+	}
+	if err2 == nil {
+		t.Fatal("child exited 3 during the drain window and the guard still " +
+			"reported a clean run")
+	}
+}

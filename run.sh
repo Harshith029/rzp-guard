@@ -32,8 +32,14 @@ cmd_vet()   { gorun go vet ./...; }
 # does NOT run them -- cmd/rzp-guard reports "no test files" in the default
 # lane. They were being counted in the advertised suite while being excluded
 # from it. This lane runs them explicitly and is reported separately.
-cmd_lifecycle() { gorun go test -tags testhook -v -run Terminates -run . ./cmd/rzp-guard/; }
-cmd_all()       { cmd_test; echo; cmd_lifecycle; }
+cmd_lifecycle()  { gorun go test -tags testhook -v ./cmd/rzp-guard/; }
+cmd_lifecycle_race() { gorun go test -tags testhook -race ./cmd/rzp-guard/; }
+cmd_all() {
+  cmd_test; echo
+  cmd_lifecycle; echo
+  echo "--- race (default lane) ---"; cmd_race; echo
+  echo "--- race (lifecycle lane, -tags testhook) ---"; cmd_lifecycle_race
+}
 
 cmd_build() {
   go build -o rzp-guard.exe ./cmd/rzp-guard
@@ -107,7 +113,8 @@ rzp-guard
   ./run.sh race              fast lane under the race detector
   ./run.sh lifecycle         process-lifecycle tests (-tags testhook; NOT in the
                              default lane, reported separately)
-  ./run.sh all               fast lane + lifecycle lane
+  ./run.sh lifecycle-race    lifecycle lane under the race detector
+  ./run.sh all               every lane: default, lifecycle, and BOTH race runs
   ./run.sh build             build ./rzp-guard.exe and ./gate-verify.exe
 
   ./run.sh live-block        LIVE: unauthorized refund never reaches the real
@@ -124,6 +131,7 @@ case "${1:-help}" in
   test) cmd_test ;;
   race) cmd_race ;;
   lifecycle) cmd_lifecycle ;;
+  lifecycle-race) cmd_lifecycle_race ;;
   all) cmd_all ;;
   vet) cmd_vet ;;
   build) cmd_build ;;

@@ -21,9 +21,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -34,10 +31,17 @@ import (
 
 	"github.com/harshith/rzp-guard/internal/lifecycle"
 	"github.com/harshith/rzp-guard/internal/mandate"
+	"github.com/harshith/rzp-guard/internal/opauth"
 	"github.com/harshith/rzp-guard/internal/storage"
 )
 
 const usage = `rzp-guard-operator — resolve refunds whose outcome is unknown
+
+  rzp-guard-operator -mandate M -state S init
+        generate the operator credential ONCE (prints the token; not recoverable)
+
+  rzp-guard-operator -mandate M -state S rotate -operator <who> -reason <text>
+        replace it, authenticated with the CURRENT token, audited
 
   rzp-guard-operator -mandate M -state S list
         show every action locked IN_DOUBT, with the receipt to look up
@@ -50,7 +54,8 @@ const usage = `rzp-guard-operator — resolve refunds whose outcome is unknown
         record a human's finding and unlock the action
 
 The guard must be STOPPED: it holds an exclusive lock on the state file.
-Set RZP_GUARD_OPERATOR_TOKEN (>= 16 chars) to authorise a resolve.
+Set RZP_GUARD_OPERATOR_TOKEN to the generated token to authorise resolve/rotate.
+The guard never reads or writes this credential; only this command does.
 
 'landed' means you found the refund in Razorpay. 'not-landed' means you
 confirmed it is absent AND that absence is trustworthy — a pending refund or a
@@ -126,6 +131,10 @@ func run() error {
 	defer store.Close()
 
 	switch args[0] {
+	case "init":
+		return cmdInit(store)
+	case "rotate":
+		return cmdRotate(store, *operator, *reason)
 	case "list":
 		return cmdList(store, m, *asJSON)
 	case "audit":
@@ -139,6 +148,95 @@ func run() error {
 		flag.Usage()
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+// authenticate verifies a presented token against the stored verifier.
+func authenticate(store *storage.Store, token string) error {
+	stored, configured, err := store.OperatorVerifier()
+	if err != nil {
+		return err
+	}
+	if !configured {
+		return errors.New("no operator credential exists for this state file. " +
+			"Run `rzp-guard-operator ... init` once to generate one")
+	}
+	return opauth.Verify(token, stored)
+}
+
+// cmdInit generates the credential. It refuses if one already exists: a second
+// init must not be able to silently replace it, which is how the restart bypass
+// worked when the guard rewrote the credential on every start.
+func cmdInit(store *storage.Store) error {
+	token, err := opauth.NewToken()
+	if err != nil {
+		return err
+	}
+	verifier, err := opauth.Verifier(token)
+	if err != nil {
+		return err
+	}
+	if err := store.InitOperatorVerifier(verifier); err != nil {
+		return err
+	}
+	fmt.Println("Operator credential created. This is shown ONCE and is not recoverable:")
+	fmt.Printf("\n    %s\n\n", token)
+	fmt.Println("Store it somewhere a human can reach during an incident, then:")
+	fmt.Println("    export RZP_GUARD_OPERATOR_TOKEN=<the value above>")
+	fmt.Println("\nThe guard never reads or writes this credential. Only this command does.")
+	return nil
+}
+
+// cmdRotate replaces the credential, authenticated by the CURRENT token.
+func cmdRotate(store *storage.Store, operator, reason string) error {
+	current := os.Getenv("RZP_GUARD_OPERATOR_TOKEN")
+	if current == "" {
+		return errors.New("RZP_GUARD_OPERATOR_TOKEN must hold the CURRENT token to rotate")
+	}
+	if err := authenticate(store, current); err != nil {
+		return err
+	}
+	if err := checkAuditText(operator, reason); err != nil {
+		return err
+	}
+	next, err := opauth.NewToken()
+	if err != nil {
+		return err
+	}
+	verifier, err := opauth.Verifier(next)
+	if err != nil {
+		return err
+	}
+	if err := store.RotateOperatorVerifier(verifier, operator, reason); err != nil {
+		return err
+	}
+	fmt.Println("Operator credential rotated and audited. New token, shown ONCE:")
+	fmt.Printf("\n    %s\n\n", next)
+	return nil
+}
+
+// checkAuditText bounds the free text that reaches the durable audit trail.
+//
+// It arrives from a local CLI, but "local" is not "trusted": the audit trail is
+// read by humans and may later be rendered. Control characters are refused and
+// length is capped, so the record cannot be spoofed with embedded newlines or
+// inflated without bound.
+func checkAuditText(operator, reason string) error {
+	if strings.TrimSpace(operator) == "" || strings.TrimSpace(reason) == "" {
+		return errors.New("-operator and -reason are required: an unaudited resolution " +
+			"of a possibly-completed refund is not an acceptable operation")
+	}
+	for label, v := range map[string]string{"-operator": operator, "-reason": reason} {
+		if len(v) > 512 {
+			return fmt.Errorf("%s is longer than 512 characters", label)
+		}
+		for _, r := range v {
+			if r < 0x20 || r == 0x7f {
+				return fmt.Errorf("%s contains a control character; the audit trail is "+
+					"read by humans and must not be spoofable with embedded newlines", label)
+			}
+		}
+	}
+	return nil
 }
 
 // paymentFor resolves an action id back to its payment through the mandate,
@@ -216,18 +314,8 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate,
 	// built the console with the same token it then checked, so the comparison
 	// was against itself and any sufficiently long token was accepted -- caught
 	// by its own end-to-end test, which resolved an action with a wrong token.
-	stored, configured, err := store.OperatorTokenHash()
-	if err != nil {
+	if err := authenticate(store, token); err != nil {
 		return err
-	}
-	if !configured {
-		return errors.New("no operator token is configured in this state file. " +
-			"Start the guard once with RZP_GUARD_OPERATOR_TOKEN set, so the expected " +
-			"value is recorded from a trusted source rather than from this command")
-	}
-	sum := sha256.Sum256([]byte(token))
-	if subtle.ConstantTimeCompare([]byte(hex.EncodeToString(sum[:])), []byte(stored)) != 1 {
-		return errors.New("operator token rejected")
 	}
 	var landed bool
 	switch outcome {
@@ -238,9 +326,8 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate,
 	default:
 		return errors.New(`-outcome must be "landed" or "not-landed"`)
 	}
-	if strings.TrimSpace(operator) == "" || strings.TrimSpace(reason) == "" {
-		return errors.New("-operator and -reason are required: an unaudited resolution " +
-			"of a possibly-completed refund is not an acceptable operation")
+	if err := checkAuditText(operator, reason); err != nil {
+		return err
 	}
 
 	// Rebuild the ledger from durable state and go through the SAME Console the

@@ -66,12 +66,17 @@ CREATE TABLE IF NOT EXISTS call_log (
 );
 CREATE INDEX IF NOT EXISTS call_log_window ON call_log (mandate_id, at_unix_nano);
 
--- SHA-256 of the operator token, written at guard launch. The expected value
--- must come from a different source than the value being checked.
-CREATE TABLE IF NOT EXISTS operator_auth (
-  id           INTEGER PRIMARY KEY CHECK (id = 1),
-  token_sha256 TEXT NOT NULL,
-  set_at       TEXT NOT NULL
+-- Salted Argon2id verifier for the operator token.
+--
+-- The GUARD NEVER WRITES THIS. Only "rzp-guard-operator init" (once) and
+-- "rotate" (authenticated with the current token) may. An earlier design had
+-- the guard rewrite the credential on every start, so anyone able to relaunch
+-- the process could install their own token and resolve locked refunds.
+CREATE TABLE IF NOT EXISTS operator_verifier (
+  id       INTEGER PRIMARY KEY CHECK (id = 1),
+  verifier TEXT NOT NULL,
+  set_at   TEXT NOT NULL,
+  rotations INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS audit (
@@ -397,36 +402,68 @@ func (s *Store) AuditTrail() ([]AuditRow, error) {
 	return out, rows.Err()
 }
 
-// SetOperatorTokenHash records the SHA-256 of the operator token, at guard
-// launch, in the state file.
-//
-// The expected value MUST come from a different source than the value being
-// checked. An earlier operator CLI read the token from the environment and then
-// constructed the console with that same token, so the comparison was against
-// itself and any token of sufficient length was accepted. Storing the hash at
-// guard launch makes the check real: whoever starts the guard sets it, and the
-// operator must present the matching secret later.
-func (s *Store) SetOperatorTokenHash(hash string) error {
-	_, err := s.db.Exec(
-		`INSERT INTO operator_auth (id, token_sha256, set_at) VALUES (1, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET token_sha256 = excluded.token_sha256,
-		                               set_at = excluded.set_at`,
-		hash, time.Now().UTC().Format(time.RFC3339Nano))
-	if err != nil {
-		return fmt.Errorf("storage: set operator token: %w", err)
-	}
-	return nil
-}
-
-// OperatorTokenHash returns the configured hash, or false if none was set.
-func (s *Store) OperatorTokenHash() (string, bool, error) {
-	var h string
-	err := s.db.QueryRow(`SELECT token_sha256 FROM operator_auth WHERE id = 1`).Scan(&h)
+// OperatorVerifier returns the stored verifier, or false if none is set.
+func (s *Store) OperatorVerifier() (string, bool, error) {
+	var v string
+	err := s.db.QueryRow(`SELECT verifier FROM operator_verifier WHERE id = 1`).Scan(&v)
 	if err == sql.ErrNoRows {
 		return "", false, nil
 	}
 	if err != nil {
-		return "", false, fmt.Errorf("storage: operator token: %w", err)
+		return "", false, fmt.Errorf("storage: operator verifier: %w", err)
 	}
-	return h, h != "", nil
+	return v, v != "", nil
+}
+
+// InitOperatorVerifier writes the verifier ONLY if none exists.
+//
+// The INSERT has no upsert clause on purpose: a second init cannot silently
+// replace an existing credential, which is exactly how the restart bypass
+// worked. Rotation is a separate, authenticated operation.
+func (s *Store) InitOperatorVerifier(verifier string) error {
+	res, err := s.db.Exec(
+		`INSERT OR IGNORE INTO operator_verifier (id, verifier, set_at, rotations)
+		 VALUES (1, ?, ?, 0)`,
+		verifier, time.Now().UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("storage: init operator verifier: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errors.New("an operator credential already exists for this state file; " +
+			"use `rotate` with the current token instead")
+	}
+	return nil
+}
+
+// RotateOperatorVerifier replaces the verifier and records the rotation. The
+// caller must already have verified the CURRENT token.
+func (s *Store) RotateOperatorVerifier(verifier, actor, reason string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	res, err := tx.Exec(
+		`UPDATE operator_verifier SET verifier = ?, set_at = ?, rotations = rotations + 1
+		 WHERE id = 1`, verifier, now)
+	if err != nil {
+		return fmt.Errorf("storage: rotate: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n != 1 {
+		return errors.New("no operator credential to rotate; run `init` first")
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO audit (at, actor, action_id, mandate_id, from_state, to_state,
+		                    refund_landed, reason)
+		 VALUES (?, ?, '(credential)', ?, 'OPERATOR_TOKEN', 'ROTATED', 0, ?)`,
+		now, actor, s.mandateID, reason); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

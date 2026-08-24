@@ -6,8 +6,10 @@ An authorization proxy that sits in front of Razorpay's **official, unmodified**
 > This is a **tested Go authorization core with a live-verified block path**. It is **not** a detector, and **no precision, recall or false-positive numbers exist**. Test counts measure authorization and transport conformance, nothing more. The automatic *success* path is an explicitly unverified compatibility guess (§Known limits).
 
 ```bash
-./run.sh test              # 77 unit tests: no Docker child, no keys, no network
+./run.sh test              # 84 tests: no Docker child, no keys, no network
 ./run.sh race              # same under the race detector
+./run.sh lifecycle         # 4 process-lifecycle tests (-tags testhook, separate lane)
+./run.sh all               # every lane, including BOTH race runs
 ./run.sh live-block        # LIVE: unauthorized refund never reaches the real
                            #       pinned container, with an ENFORCED alive-control
 ./run.sh process-recover   # child death → durable IN_DOUBT surviving restart
@@ -42,6 +44,8 @@ The loss class is deliberately one action: **unauthorized `create_refund`**. Mon
 
 The mandate is a **capability list of discrete refund actions**, not a policy range. An action authorizes one refund of one amount against one payment and is consumed when used — which is why two legitimate partial refunds of equal value both pass, and a replay does not.
 
+**Recovery has a human half.** An ambiguous refund locks its action and budget `IN_DOUBT`; nothing automatic clears it. `rzp-guard-operator` lists what is locked (with the **receipt** to search Razorpay for), records the human's finding, and writes a durable audit entry. The credential is generated with 256 bits of entropy, stored as a salted Argon2id verifier, and **the guard has no code path that writes it** — it is created once by `init` and replaced only by `rotate`, authenticated with the current token.
+
 **Durable and fail-closed.** Reservations are written to SQLite before anything is forwarded. A reservation still open at startup becomes `IN_DOUBT` and stays locked until an operator resolves it. Ownership is exclusive: a second guard process over the same state file is refused, verified by spawning a real second process.
 
 **The rule that governs everything:** release only on confirmed provider rejection. Once bytes reach the child, the only automatic outcomes are COMMIT and `IN_DOUBT`.
@@ -64,6 +68,8 @@ Where AI *did* help: a cross-model review loop ran every phase. [REVIEW_LOG.md](
 - **An authorization gap in my own guard.** `50000.9` was authorized against `50000`, reserved `50000`, and forwarded `50000.9`. The runtime schema declares `amount` as `type: number`, so the child would not have caught it.
 - **I claimed Razorpay's docs contradicted each other.** They do not. I had quoted two `WebFetch` summaries — which are model paraphrases — as if they were source text.
 - **Three documented ways to narrow the child's toolset, all broken** (F10). The env var cannot express a list, appended CLI args are silently swallowed by an `sh -c` entrypoint, and `--config` is rejected by the binary the entrypoint offers it to.
+- **My own operator CLI accepted a wrong token.** It read the token from the environment and then built the verifier check *with that same token*, comparing it against itself. Found by the CLI's own end-to-end test on first run.
+- **Restarting the guard replaced the operator credential.** The guard wrote the token hash on every start, so anyone who could relaunch the process could install their own token and resolve locked refunds. Demonstrated end to end, then fixed by removing all credential-writing from the guard.
 - **A corpus template that tested nothing.** It was named for a rate-limit breach, but every target failed action matching first, so the limiter was never reached.
 
 Every fix is **mutation-verified**: the protection is removed, the test is confirmed to fail, and the protection is restored.
@@ -104,8 +110,8 @@ The control matters: the container answered a legitimate read with a real Razorp
 
 1. **No detector metric exists.** No precision, recall or false-positive cost. The conformance corpus in `corpus/` cannot supply them: its labels are computed from the same predicate the policy matches on, so scoring against it measures conformance to the spec, not detection ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)). The real measurement needs agent traces with intent specified independently of the mandate, and it has not been run.
 2. **Automatic `COMMITTED` is an unverified compatibility path.** The expected refund-entity shape comes from Razorpay's documentation; no live success envelope has been captured, because that needs a real captured payment via Checkout. The failure mode is fail-closed — an unrecognised success shape yields `IN_DOUBT`, never a wrong COMMIT — but the success path itself is not demonstrated.
-3. **`process-recover` uses a stub child**, not the official container, for the reason above. Only `live-block` is live.
-4. **The operator console is a library boundary, not an interface.** Token-gated and durably audited, with no path to it from the relay, but no command or authenticated endpoint invokes it yet.
+3. **Recovery takes the guard offline.** The operator CLI needs the state file, and the guard holds an exclusive lock on it for its lifetime. So the procedure is stop → check Razorpay → resolve → restart, which means the protection layer is down while an ambiguous transaction is adjudicated. It is a **tested offline recovery procedure, not an operational workflow**: no run yet shows an operator resolving a real Test Mode refund whose status was checked in the Razorpay dashboard.
+4. **`process-recover` uses a stub child**, not the official container, for the reason above. Only `live-block` is live.
 5. **Cumulative caps are per state file.** Enforced by exclusive ownership rather than distributed coordination.
 6. **Provenance detects a narrow literal-flow subclass**, and is forensic only.
 
@@ -115,6 +121,8 @@ The control matters: the container answered a legitimate read with a real Razorp
 cmd/rzp-guard/      the executable: bootstrap → relay → pinned child container
                     (child fixed at the pinned digest; no runtime override)
 cmd/gate-verify/    enforces the live gates' assertions from captured JSON
+cmd/rzp-guard-operator/  init / rotate / list / audit / resolve for IN_DOUBT refunds
+internal/opauth     operator credential: generation, Argon2id verifier, verification
 internal/mandate    capability list, receipt derivation
 internal/policy     default-deny decision pipeline
 internal/lifecycle  action + budget state machine, operator console
