@@ -118,13 +118,21 @@ func (r *Relay) handleAgentLine(line []byte) error {
 			fmt.Sprintf("rzp-guard: could not parse JSON-RPC message: %v", err)))
 	}
 
-	// Duplicate-id refusal applies to EVERY id-bearing request, not just
+	// An agent RESPONSE to a server-initiated request is forwarded untouched and
+	// never tracked. Tracking it would leak its id forever, because the child
+	// does not reply to a reply.
+	if isResponse(msg) {
+		_, err := r.writeChild(line)
+		return err
+	}
+
+	// Duplicate-id refusal applies to every outbound REQUEST, not just
 	// tools/call. Otherwise an agent could send an authorized refund as id 8 and
 	// then tools/list as id 8: the read is forwarded, its reply resolves the
 	// refund's correlation entry, and the refund is forced into IN_DOUBT by a
 	// response that has nothing to do with it.
-	hasID := hasRequestID(msg.ID)
-	if hasID && r.isInFlight(string(msg.ID)) {
+	tracked := isRequest(msg)
+	if tracked && r.isInFlight(string(msg.ID)) {
 		return r.writeAgent(errorResponse(msg.ID, -32600,
 			fmt.Sprintf("rzp-guard: %v: id %s is still outstanding",
 				ErrDuplicateRequestID, msg.ID)))
@@ -132,19 +140,18 @@ func (r *Relay) handleAgentLine(line []byte) error {
 
 	if msg.Method != "tools/call" {
 		// Everything else -- initialize, tools/list, notifications, resources --
-		// is forwarded byte-for-byte, but an id-bearing request is still tracked
+		// is forwarded byte-for-byte, but an outbound request is still tracked
 		// so its id cannot be reused while outstanding.
-		if hasID {
+		if tracked {
 			r.mu.Lock()
 			r.inflight[string(msg.ID)] = pending{}
 			r.mu.Unlock()
 		}
-		n, err := r.writeChild(line)
-		if err != nil && hasID {
+		_, err := r.writeChild(line)
+		if err != nil && tracked {
 			r.mu.Lock()
 			delete(r.inflight, string(msg.ID))
 			r.mu.Unlock()
-			_ = n
 		}
 		return err
 	}
@@ -163,7 +170,7 @@ func (r *Relay) handleAgentLine(line []byte) error {
 	// reservation would sit RESERVED forever in a running process, and
 	// CloseInflight could not promote it for operator resolution. An
 	// un-answerable refund is not a refund anyone can be accountable for.
-	if tp.Name == policy.RefundTool && !hasID {
+	if tp.Name == policy.RefundTool && !tracked {
 		return r.writeAgent(errorResponse(nil, -32600,
 			"rzp-guard: create_refund requires a non-null JSON-RPC id; a refund "+
 				"sent as a notification has no reply lifecycle and could never be "+
@@ -178,7 +185,7 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		return r.writeAgent(toolDenied(msg.ID, d))
 	}
 
-	if hasID {
+	if tracked {
 		p := pending{actionID: d.MatchedActionID, isRefund: d.MatchedActionID != ""}
 		if p.isRefund {
 			p.paymentID, _ = d.Forwarded["payment_id"].(string)
@@ -225,11 +232,36 @@ func (r *Relay) handleAgentLine(line []byte) error {
 	return nil
 }
 
-// hasRequestID reports whether this message is a request that expects a reply.
-// A missing id and an explicit JSON null are both notifications.
+// hasRequestID reports whether an id is present and not JSON null.
+// A missing id and an explicit null are both notifications.
 func hasRequestID(raw json.RawMessage) bool {
 	trimmed := bytes.TrimSpace(raw)
 	return len(trimmed) > 0 && !bytes.Equal(trimmed, []byte("null"))
+}
+
+// JSON-RPC is bidirectional: MCP allows the server to send requests to the
+// client (sampling, roots), so both streams carry a mix of requests, responses
+// and notifications. Correlation state must key off REQUESTS only.
+//
+// An earlier revision keyed off "has an id", which conflated the two. A
+// response envelope travelling agent->child was tracked as a new outstanding
+// request whose id could never be released, because the child does not reply to
+// a reply. In the other direction a child-initiated REQUEST was fed to resolve()
+// and could settle an unrelated refund.
+
+// isRequest reports whether a message asks for a reply: a method plus an id.
+func isRequest(m rpcMessage) bool { return m.Method != "" && hasRequestID(m.ID) }
+
+// isResponse reports whether a message answers an earlier request: an id and no
+// method.
+//
+// A result or error is deliberately NOT required. A child message carrying an id
+// and no method is a response even when malformed, and it must still settle the
+// reservation -- as IN_DOUBT, via the missing-result branch in resolve. Requiring
+// a well-formed body would leave the action RESERVED in a running process until
+// session end, which is the same stuck-forever failure that id-less refunds have.
+func isResponse(m rpcMessage) bool {
+	return m.Method == "" && hasRequestID(m.ID)
 }
 
 func (r *Relay) isInFlight(id string) bool {
@@ -287,7 +319,10 @@ func (r *Relay) PumpChild(childOut io.Reader) error {
 		var msg rpcMessage
 		dec := json.NewDecoder(bytes.NewReader(out))
 		dec.UseNumber()
-		if err := dec.Decode(&msg); err == nil && len(msg.ID) > 0 {
+		// Only a RESPONSE settles a reservation. A child-initiated request also
+		// carries an id, and feeding it to resolve() could settle an unrelated
+		// refund whose id happened to match.
+		if err := dec.Decode(&msg); err == nil && isResponse(msg) {
 			r.resolve(string(msg.ID), msg)
 		}
 		if err := r.writeAgent(out); err != nil {

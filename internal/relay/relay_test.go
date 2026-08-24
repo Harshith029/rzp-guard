@@ -657,3 +657,64 @@ func TestCommitRequiresAProviderAssignedRefundID(t *testing.T) {
 			"evidence that one was created", got)
 	}
 }
+
+// JSON-RPC is bidirectional. MCP lets the server send requests to the client
+// (sampling, roots), so an agent may send a RESPONSE: an id, no method. An
+// earlier revision keyed correlation off "has an id" and tracked that response
+// as a new outstanding request whose id could never be released, because the
+// child does not reply to a reply.
+func TestAgentResponseToServerRequestDoesNotLeakItsID(t *testing.T) {
+	g := newGuard(t, `[]`)
+	r, child, agent := newRelay(t, g)
+
+	// 1. Child initiates a request toward the agent.
+	childReq := `{"jsonrpc":"2.0","id":99,"method":"sampling/createMessage","params":{}}`
+	if err := r.PumpChild(strings.NewReader(childReq + "\n")); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(agent.String(), "sampling/createMessage") {
+		t.Fatalf("child request was not forwarded to the agent: %s", agent.String())
+	}
+
+	// 2. Agent answers it. This is a response, not a request.
+	feed(t, r, `{"jsonrpc":"2.0","id":99,"result":{"role":"assistant"}}`)
+
+	// 3. The same id must now be usable for a genuine request.
+	feed(t, r, `{"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}}`)
+
+	if strings.Contains(agent.String(), "duplicate in-flight JSON-RPC id") {
+		t.Fatalf("id 99 leaked after an agent response: %s", agent.String())
+	}
+	lines := child.Lines()
+	if len(lines) != 2 {
+		t.Fatalf("child got %d lines, want 2 (the response, then tools/list): %v",
+			len(lines), lines)
+	}
+	if !strings.Contains(lines[1], "tools/list") {
+		t.Fatalf("tools/list was not forwarded: %v", lines)
+	}
+}
+
+// A child-initiated REQUEST also carries an id. It must not settle a refund
+// whose id happens to match.
+func TestChildRequestDoesNotResolveAnOutstandingRefund(t *testing.T) {
+	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+	r, _, _ := newRelay(t, g)
+
+	feed(t, r, `{"jsonrpc":"2.0","id":42,"method":"tools/call","params":`+
+		`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`)
+	if g.State("rfa_001") != lifecycle.Reserved {
+		t.Fatalf("setup: state = %s", g.State("rfa_001"))
+	}
+
+	// Child sends a REQUEST that happens to reuse id 42.
+	childReq := `{"jsonrpc":"2.0","id":42,"method":"roots/list","params":{}}`
+	if err := r.PumpChild(strings.NewReader(childReq + "\n")); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := g.State("rfa_001"); got != lifecycle.Reserved {
+		t.Fatalf("state = %s, want RESERVED: a child-initiated request settled a "+
+			"refund reservation", got)
+	}
+}
