@@ -31,11 +31,6 @@ import (
 	"github.com/harshith/rzp-guard/internal/relay"
 )
 
-// DefaultToolsets narrows the CHILD's own surface. rzp-guard narrows further
-// still, to reads plus create_refund, so the two boundaries are independent
-// rather than one restating the other.
-const DefaultToolsets = "payments,orders,refunds"
-
 // envWithoutRazorpayKeys returns the environment with the Razorpay secrets
 // removed, so a child is only ever given credentials explicitly.
 func envWithoutRazorpayKeys() []string {
@@ -61,7 +56,6 @@ func run() error {
 	var (
 		mandatePath = flag.String("mandate", "", "path to the merchant-issued mandate (required)")
 		statePath   = flag.String("state", "rzp-guard.db", "durable state file")
-		toolsets    = flag.String("toolsets", DefaultToolsets, "toolsets enabled on the child")
 		childTee    = flag.String("child-tee", "", "record every byte written to child stdin (evidence)")
 		decisionLog = flag.String("decision-log", "", "append-only JSONL decision log")
 	)
@@ -107,7 +101,7 @@ func run() error {
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	child, err := newChild(ctx, *toolsets, keyID, keySecret)
+	child, err := newChild(ctx, keyID, keySecret)
 	if err != nil {
 		return err
 	}
@@ -162,33 +156,58 @@ func run() error {
 	}
 	defer cleanup("shutdown")
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// Child stdout EOF means the server is gone: nothing further can answer
-		// an outstanding refund.
-		if err := r.PumpChild(childOut); err != nil {
+	// Each pump runs in its own goroutine and reports why it ended. The
+	// supervisor below returns on whichever boundary fires FIRST.
+	//
+	// A previous revision ran PumpAgent on the main goroutine. Cleanup fired
+	// correctly on child death or SIGTERM, but main stayed blocked reading agent
+	// stdin, so a dead child with an open agent stream left a hung proxy --
+	// measured at 25s with a 25s-held stdin, and it would have been unbounded
+	// with a real client. State cleanup beginning is not the same as the process
+	// lifecycle being controlled.
+	agentDone := make(chan error, 1)
+	go func() { agentDone <- r.PumpAgent(os.Stdin) }()
+
+	childDone := make(chan error, 1)
+	go func() { childDone <- r.PumpChild(childOut) }()
+
+	// parentInitiated records that WE ended the session, so a child exit that
+	// follows from our own shutdown is not reported as a child failure.
+	parentInitiated := false
+
+	select {
+	case err := <-agentDone:
+		parentInitiated = true
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "rzp-guard: agent pump: %v\n", err)
+		}
+		cleanup("agent stdin closed")
+	case err := <-childDone:
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "rzp-guard: child pump: %v\n", err)
 		}
 		cleanup("child stdout closed")
-	}()
-
-	go func() {
-		<-ctx.Done()
+	case <-ctx.Done():
+		parentInitiated = true
 		cleanup("interrupted")
-	}()
-
-	// Agent stdin EOF ends the session.
-	if err := r.PumpAgent(os.Stdin); err != nil {
-		fmt.Fprintf(os.Stderr, "rzp-guard: agent pump: %v\n", err)
 	}
-	cleanup("agent stdin closed")
 
-	wg.Wait()
-	// Child exit is the last route; the deferred cleanup already ran, so this
-	// only reaps the process.
-	_ = child.Wait()
+	// Reap the child, but never block on it: after a signal or a dead child the
+	// process must leave promptly whether or not docker is still winding down.
+	waitErr := make(chan error, 1)
+	go func() { waitErr <- child.Wait() }()
+	select {
+	case err := <-waitErr:
+		// A child that failed on its own -- a crashed container, rejected
+		// credentials -- must not be reported as a clean run. Discarding this
+		// error let the CLI exit zero after the pinned container refused to
+		// start, which only run.sh's verifier would have caught.
+		if err != nil && !parentInitiated {
+			return fmt.Errorf("child MCP server exited: %w", err)
+		}
+	case <-time.After(5 * time.Second):
+		fmt.Fprintln(os.Stderr, "rzp-guard: child did not exit within 5s; leaving anyway")
+	}
 	return nil
 }
 

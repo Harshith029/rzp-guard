@@ -116,5 +116,6 @@ case "${1:-help}" in
   build) cmd_build ;;
   live-block) cmd_live_block ;;
   process-recover) cmd_process_recover ;;
-  *) usage ;;
+  help) usage ;;
+  *) usage; exit 1 ;;
 esac

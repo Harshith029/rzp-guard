@@ -36,7 +36,7 @@ The loss class is deliberately one action: **unauthorized `create_refund`**. Mon
 
 | Boundary | Surface |
 |---|---|
-| Child container, `--toolsets payments,orders,refunds` | 41 → **20** tools |
+| Child container, toolsets **fixed at build time** | 41 → **20** tools |
 | `rzp-guard` build-level allowlist (a mandate cannot widen it) | **9** tools |
 | The merchant's mandate for a session | typically **3** |
 
@@ -45,6 +45,8 @@ The mandate is a **capability list of discrete refund actions**, not a policy ra
 **Durable and fail-closed.** Reservations are written to SQLite before anything is forwarded. A reservation still open at startup becomes `IN_DOUBT` and stays locked until an operator resolves it. Ownership is exclusive: a second guard process over the same state file is refused, verified by spawning a real second process.
 
 **The rule that governs everything:** release only on confirmed provider rejection. Once bytes reach the child, the only automatic outcomes are COMMIT and `IN_DOUBT`.
+
+**The process lifecycle is controlled, not just the state.** Cleanup marking refunds `IN_DOUBT` is not the same as the process leaving. Child exit, agent stdin EOF and termination signals each end the run through a supervisor; a child that fails on its own propagates a non-zero exit. Tested with stdin deliberately **held open**, which is the only shape that distinguishes the two — the pre-fix binary survived 30s past its own shutdown under exactly this test.
 
 ## AI judgment
 

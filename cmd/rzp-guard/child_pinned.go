@@ -23,11 +23,18 @@ const PinnedImage = "razorpay/mcp@sha256:435109006d6247103899938cf7b1747ba8be1c1
 // configuration routes are broken in this image; see FAILURES.md F10. The
 // override also keeps the keys in the environment rather than the container's
 // argv, where the stock entrypoint places them.
-func newChild(ctx context.Context, toolsets, keyID, keySecret string) (*exec.Cmd, error) {
+// Toolsets is FIXED in the production build. It was a launch flag, which meant
+// the child's surface could be widened away from the reviewed default at
+// startup -- not a bypass, since the guard still denies dangerous calls, but it
+// invalidated the claim that the child configuration is an independent fixed
+// boundary. Changing it now requires an edit and a rebuild, which is reviewable.
+const Toolsets = "payments,orders,refunds"
+
+func newChild(ctx context.Context, keyID, keySecret string) (*exec.Cmd, error) {
 	c := exec.CommandContext(ctx, "docker", "run", "--rm", "-i",
 		"--entrypoint", "./razorpay-mcp-server",
 		"-e", "RAZORPAY_KEY_ID", "-e", "RAZORPAY_KEY_SECRET", PinnedImage,
-		"stdio", "--toolsets", toolsets)
+		"stdio", "--toolsets", Toolsets)
 	c.Env = append(envWithoutRazorpayKeys(),
 		"RAZORPAY_KEY_ID="+keyID,
 		"RAZORPAY_KEY_SECRET="+keySecret,

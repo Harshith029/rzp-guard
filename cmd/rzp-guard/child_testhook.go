@@ -22,7 +22,7 @@ const PinnedImage = "(test-hook build: no container)"
 //
 // The stub is deliberately given NO Razorpay credentials. It does not talk to
 // Razorpay and has no business holding keys.
-func newChild(ctx context.Context, toolsets, keyID, keySecret string) (*exec.Cmd, error) {
+func newChild(ctx context.Context, keyID, keySecret string) (*exec.Cmd, error) {
 	cmdline := os.Getenv("RZP_GUARD_CHILD_CMD")
 	if cmdline == "" {
 		return nil, fmt.Errorf("testhook build requires RZP_GUARD_CHILD_CMD")
