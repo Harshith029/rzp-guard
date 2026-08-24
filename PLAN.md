@@ -1,0 +1,359 @@
+# PLAN.md — Track 2 (AI Risk Manager)
+
+**Project:** `rzp-guard` — an authorization proxy for the Razorpay MCP server
+**Phase 0 deliverable.** Phase 0.5 (pre-registration) executed; no policy code written yet.
+Date: 2026-08-24 · Deadline: 2026-09-05 (12 days)
+
+**Version 4**, after three rounds of adversarial review — see [REVIEW_LOG.md](REVIEW_LOG.md). **The plan has shrunk every round.** v4 deletes a pipeline stage as provably redundant, cuts automatic reconciliation to preserve the architecture's central claim, and merges two state machines into one.
+
+Claims withdrawn across all rounds:
+
+| Withdrawn | Why | Now |
+|---|---|---|
+| "`receipt` is not enforced as an idempotency key" | Factually wrong | §2.6 |
+| "This is real taint tracking" | Was literal-reuse detection; would have blocked the primary legitimate workflow | §3.3 |
+| G1.4 fallback to a payment-link demo | Not evidence of stopping money movement | §4 Phase 1 |
+| "Release the budget reservation on timeout" | **Fails open** — the provider may have processed the refund | §3.4 |
+| "Receipt injection gives idempotency" | Gives duplicate *rejection*, not safe retry; header unreachable from stdio | §3.5 |
+| Network capture stub as promised evidence | Never verified as buildable | §4 G1.5 |
+| **"Razorpay's docs contradict each other"** | **My error.** I quoted a WebFetch summary as if it were source text — see below | §2.6 |
+| **Provenance as an enforcement gate** | Provably redundant given the capability list | §3.3 |
+| **Automatic reconciliation** | Would have falsified the transparent-relay claim | §3.4 |
+
+**Standing correction to my own method:** `WebFetch` answers prompts against a page *using a small fast model*, so its output is a paraphrase, not a quote. It can point at behaviour worth verifying; it cannot support a claim about what a document says. I violated this while writing the document that states it. API-semantics claims now come from runtime observation only.
+
+---
+
+## 1. The claim (one sentence, one action)
+
+> **`rzp-guard` enforces a merchant-issued capability list over `create_refund` calls made by an AI agent holding valid Razorpay MCP credentials, blocking any refund outside that list, with measured TPR/FPR on a pre-registered held-out corpus.**
+
+Stated as a capability list rather than "prevents unauthorized refunds" deliberately. Where the merchant issues a **bounded** grant (§3.2), amounts inside that bound are authorized *by the merchant's own choice* — the mandate records which. Overclaiming that as "every unauthorized refund" would not survive the first panel question.
+
+**Why refunds:** money leaves the merchant irreversibly, it is the classic merchant-loss vector, it is exercisable end-to-end in test mode, and the authorized set is finite and enumerable.
+
+`create_instant_settlement` and `initiate_payment` **are** money movement, deferred only for measurement focus. `create_payment_link`, `revoke_token` and PII reads are **not** — a different loss class.
+
+### 1.1 Attack families, scoped to refunds
+
+| | Family | Mechanism |
+|---|---|---|
+| **A1** | Injected instruction | Attacker-controlled text in `notes`/`description`/`customer_name`, read back via `fetch_payment`, induces a refund |
+| **A2** | Mandate / scope drift | Amount exceeds the authorized action; refund after expiry; tool outside the allowlist |
+| **A3** | Replay / duplicate | Consumed action executed again; retry storm |
+| **A4** | Misdirection | Refund to a `payment_id` with no authorized action |
+
+### 1.2 What the proxy cannot see
+
+The proxy sees **only JSON-RPC traffic** — never the user's prompt or the agent's reasoning. Any claim requiring visibility into agent reasoning is out of scope by construction.
+
+---
+
+## 2. Ground truth I verified before planning
+
+Shallow-cloned `github.com/razorpay/razorpay-mcp-server` at commit `7950d51d118ca164c32b7cf0cfaa14f34f24849f` (2026-03-26) and read the Go source.
+
+### 2.1 Three corrections to the brief's hypothesis
+
+| # | Assumed | Verified | Evidence |
+|---|---|---|---|
+| 1 | Server exposes `create_payout` | **Does not exist.** `payouts` is `AddReadTools(FetchPayout, FetchAllPayouts)` only; `grep -rn "create_payout\|CreatePayout"` → zero hits. | `pkg/razorpay/tools.go:72-76` |
+| 2 | Hosted server is equivalent | Hosted **omits** `create_refund`, `create_instant_settlement`, `close_qr_code`, `create_registration_link`. | README remote column |
+| 3 | Generic "allowed counterparties" | `create_refund` has **no counterparty parameter** — only `payment_id`/`amount`/`speed`/`notes`/`receipt`. | `refunds.go` |
+
+### 2.2 Transport is stdio-only
+
+`cmd/razorpay-mcp-server/main.go:59` registers exactly one subcommand: `rootCmd.AddCommand(stdioCmd)`. **The proxy must be a stdio↔stdio interposer spawning the server as a child.** This also makes the upstream HTTP idempotency header unreachable (§2.6).
+
+### 2.3 Stack facts
+
+Go 1.24.2 · `mark3labs/mcp-go v0.43.2` · `razorpay/razorpay-go v1.4.0` · MIT.
+Env: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, optional `LOG_FILE`, `TOOLSETS`, `READ_ONLY`.
+Docker: `razorpay/mcp` — **pinned by digest** (G1.0).
+
+### 2.4 Write-tool surface (17 tools)
+
+`payments`: `capture_payment`, `update_payment`, `initiate_payment`, `resend_otp`, `submit_otp`, `fetch_tokens`, `revoke_token` · `payment_links`: `create_payment_link`, `create_payment_link_upi`, `send_payment_link`, `update_payment_link` · `orders`: `create_order`, `update_order` · `refunds`: `create_refund`, `update_refund` · `qr_codes`: `create_qr_code`, `close_qr_code` · `settlements`: `create_instant_settlement` · `registration_links`: `create_registration_link`
+
+`fetch_tokens` is registered as a **write** tool despite being a read (`tools.go:112`), so `READ_ONLY` does not cleanly partition by side effect.
+
+### 2.5 Verified `create_refund` schema
+
+```
+create_refund   payment_id* (string, "pay_" prefix)
+                amount*     (number, paise, min 100)
+                speed       (string, "normal" | "optimum")
+                notes       (object, max 15 pairs)
+                receipt     (string, OPTIONAL)
+```
+
+### 2.6 Idempotency — what is verified, and what is not
+
+v1 asserted without checking that the server "does not enforce `receipt` as an idempotency key." That was wrong. Two **distinct and compatible** mechanisms exist — a retry mechanism and a uniqueness constraint, which are orthogonal:
+
+| Mechanism | Behaviour | Reachable from a stdio proxy? |
+|---|---|---|
+| `X-Refund-Idempotency` header | Safe retry — same key + body returns the original refund object | **No** |
+| `receipt` field reuse | Duplicate rejected with an error | **Yes** |
+
+The header is unreachable because `razorpay-go`'s signature is `Refund(paymentID string, amount int, data map[string]interface{}, extraHeaders map[string]string)` and the MCP server passes **`nil` for extraHeaders** (`pkg/razorpay/refunds.go:75`); `grep -rni "idempoten"` across the server returns **zero hits**. Reaching it would require forking the child, forfeiting "a proxy in front of the real, unmodified server."
+
+`receipt` is **optional** in the tool schema, so **a refund with no `receipt` has no duplicate protection.** §3.5 closes that.
+
+**What is verified vs. assumed:** the source facts above are verified — I read them. The exact runtime behaviour of a duplicate `receipt` (status code, error text, whether it applies per-payment) is **not**; my earlier attempt to establish it from documentation produced a false claim (see the standing correction above). **G1.6 observes it directly before anything depends on it.**
+
+**Consequence for §3.4:** a duplicate `receipt` is expected to *reject* rather than *replay the original result*, so a timed-out refund cannot be resolved by retrying — a retry teaches nothing about whether the first attempt landed.
+
+### 2.7 Environment blockers (§8)
+
+- **Docker daemon is not running.** CLI `29.7.2`; `docker pull razorpay/mcp` → `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`.
+- **Go is not installed** — source build is not a fallback.
+- Available: Python 3.11.9, Node 24.14.0, git 2.53.0.
+
+---
+
+## 3. Architecture
+
+### 3.1 A transparent JSON-RPC relay
+
+```
+MCP client ──stdio──► rzp-guard ──stdio (ALLOW only)──► razorpay/mcp@sha256:<pinned> ──HTTPS──► api.razorpay.com
+                          │
+                          ├─ match refund to an unconsumed authorized action   (the control)
+                          ├─ reserve action + budget atomically
+                          ├─ inject deterministic receipt
+                          ├─ record provenance chain   (forensic only)
+                          └─ decision log (JSONL, masked) ──► dashboard (FastAPI, CSP)
+```
+
+**Decision A — relay at the JSON-RPC line level.** Parse newline-delimited JSON, intercept only `tools/call`, observe results, forward everything else byte-for-byte. Blocking synthesizes a response with the same `id`.
+
+**This claim is now literally true.** v3 had the proxy issuing its own reconciliation reads through the child, which would have required it to become an MCP client — internal id generation, two-way multiplexing, response suppression, collision handling — and would have falsified byte-for-byte relay. That is cut (§3.4). The proxy never originates a JSON-RPC request.
+
+**Decision B — Python 3.11 + asyncio + FastAPI, one process, no database.** Go isn't installed and the child is a container anyway. Python keeps relay, scorer and metrics in one language, and the measurement is the graded deliverable.
+
+**Decision C — no LLM in the decision path.** Ships only if held-out measurement shows a deterministic recall gap it actually closes, with a frozen baseline comparison and full model/prompt disclosure.
+
+### 3.2 The mandate is a capability list — the control
+
+Authorization is per **discrete refund action**. This one structure replaced three separate v2 mechanisms (coarse caps, replay fingerprint, counterparty allowlist).
+
+```yaml
+mandate_id: mnd_2026_08_24_001
+expires_at: 2026-08-24T17:00:00Z
+allowed_tools: [fetch_payment, fetch_all_payments, create_refund]
+
+authorized_refund_actions:
+  - {action_id: rfa_001, payment_id: pay_SYN0001, amount_paise: 50000}      # exact (default)
+  - {action_id: rfa_002, payment_id: pay_SYN0001, amount_paise: 50000}      # 2nd partial, same amount
+  - {action_id: rfa_003, payment_id: pay_SYN0002, max_amount_paise: 120000} # bounded (opt-in)
+
+global:
+  max_cumulative_paise: 300000
+  max_calls_per_minute: 10
+```
+
+An incoming refund must match an **unconsumed** action with that `payment_id` and an amount satisfying it. No match → deny. Without extra machinery this handles:
+
+- **Two legitimate partial refunds of equal amount on one payment** → two actions → both pass. *(v2 rejected the second as a replay — a routine workflow it would have broken.)*
+- **Replay** → the action is consumed → deny.
+- **A1 injection "also refund pay_XYZ"** → no authorized action → deny, regardless of where the id came from.
+- **Amount escalation** → fails the action's amount rule → deny.
+
+**Exact by default, bounded by explicit choice.** `amount_paise` requires an exact match. `max_amount_paise` permits anything at or below it and exists only for genuine delegation ("refund up to the order value, agent determines which items came back"). A bounded grant means amounts inside it are authorized *by the merchant*, and §1 states the claim that way.
+
+The third case above is the important one: **default-deny authorization, not provenance, is what generalizes against injection.** An injection can induce an action using an already-known id, copying nothing — provenance is blind to that; the capability list is not.
+
+`allowed_tools` is minimal: read tools plus `create_refund`. `update_payment` was removed as an unrelated write permission.
+
+### 3.3 Provenance — forensic only, not a gate
+
+v2 called this the core mechanism and v3 still denied on it at pipeline step 4 while describing it as a secondary signal. Both were wrong, and the second was incoherent — a blocking control described as a non-blocking one.
+
+**It is now out of the deny path entirely, because it is provably redundant.** To reach the old step 4, a refund must already have matched an action in `authorized_refund_actions` — which means its `payment_id` *is* a mandate literal, i.e. `USER_MANDATED` by definition. The gate could never fire on a call that passed the capability match. Removed as dead code, not as a risk trade.
+
+What it still does, because the dashboard deliverable requires it and it is nearly free:
+
+- Values in tool results are indexed with **all** their JSON paths, so an id appearing in canonical `id` *and later* in `notes` stays visible rather than resolving silently in the agent's favour.
+- Paths carry a source-trust class: `SYSTEM_AUTHORITATIVE` (`id`, `entity`, `amount`, `status`, `order_id`, `created_at`) vs `PARTY_SUPPLIED` (`notes.*`, `description`, `customer_name`, `receipt`, `email`, `contact`).
+- It renders the **forensic chain behind a flagged call** — *why* the agent arrived at this argument.
+
+**Honest limits.** It detects a narrow literal-flow subclass, not A1 in general: an injection can act on an already-known id or a mandate literal with no copying at all, and transformed values (₹2,950 → `295000`) lose the link. Phase 4 reports only whether the signal *separates* attack from benign calls, labelled a **diagnostic and explicitly not part of the enforcement claim.**
+
+### 3.4 One lifecycle for action and budget — fail closed on ambiguity
+
+Action consumption and budget reservation move **together**, so there is one rule to reason about and one to test. MCP permits concurrent in-flight requests, so reservation is atomic.
+
+The governing rule: **release only on confirmed provider rejection; anything ambiguous stays locked.**
+
+| Transition | Trigger |
+|---|---|
+| `AVAILABLE → RESERVED` | matched an unconsumed action, before forwarding |
+| `RESERVED → COMMITTED` | confirmed success |
+| `RESERVED → AVAILABLE` | **confirmed provider rejection only** |
+| `RESERVED → IN_DOUBT` | timeout, child crash, severed response — **action and budget stay locked** |
+| `IN_DOUBT → COMMITTED / AVAILABLE` | **operator resolution only** |
+
+Releasing on timeout would fail open: Razorpay may have processed the refund while the proxy lost the response, handing back budget for money that already left. Equally, a request that never reached the provider must not permanently burn a legitimate merchant authorization — hence release on *confirmed* rejection, and only that.
+
+**No automatic reconciliation.** v3 had the proxy calling `fetch_multiple_refunds_for_payment` itself, which would have made it an MCP client to its own child and falsified §3.1. Cut. `IN_DOUBT` requires a human, via a dashboard action or CLI running **outside the relay path** with its own credentials. The injected receipt is the correlation key the operator looks the refund up by, so the workflow is intact with a person in it — arguably correct where money may already have moved.
+
+**Absence is not evidence.** Eventual consistency, a pending refund, or a failed fetch all produce "not found" without meaning "did not happen." Only two automatic transitions are ever safe: confirmed rejection → release, matching receipt found → commit. `IN_DOUBT → AVAILABLE` on a missing record is forbidden in the proxy and in the operator tooling.
+
+### 3.5 Receipt injection — duplicate rejection, stated precisely
+
+The proxy injects a deterministic receipt into every forwarded refund, rejecting calls that supply a conflicting one.
+
+**Format:** `rzpg_` + `action_id` — e.g. `rzpg_rfa_001` (12 chars), satisfying the ≥10-character floor and the alphanumeric/underscore/hyphen constraint. *(v3's worked example used the bare 7-character `rfa_001`, an untested length assumption sitting in a code sample.)* Verified against the live schema in **G1.6**, not assumed.
+
+**What it is:** a second, provider-side barrier so a duplicate is rejected even if the proxy's action-consumption check is bypassed.
+**What it is not:** the `X-Refund-Idempotency` mechanism — no safe-retry semantics, and unreachable from a stdio proxy (§2.6).
+**Its second job:** the correlation key that makes an `IN_DOUBT` case resolvable by an operator at all.
+
+### 3.6 Trust boundary
+
+- The mandate is loaded **from a path supplied at proxy launch**, before any agent connects.
+- **Trusted:** whoever launches the proxy. **Untrusted:** the agent.
+- **No MCP method, tool call, or JSON-RPC message can set, replace, extend or reload a mandate.** Attempts are logged as attacks.
+- Bound to the proxy process lifetime; budget and action state live in that process.
+
+**Limitation:** cumulative caps are **per proxy process**. Multi-process enforcement needs shared state — out of scope for twelve days.
+
+### 3.7 Decision pipeline
+
+1. **Mandate validity** — missing/expired/malformed → DENY.
+2. **Tool allowlist** — not listed → DENY (default-deny; unknown tools deny).
+3. **Action match** — unconsumed authorized action, matching `payment_id`, amount satisfying `amount_paise` or `max_amount_paise` → else DENY.
+4. **Rate limit** → DENY if exceeded.
+5. **Reserve** action + budget atomically (§3.4).
+6. **Inject receipt**; forward to child stdin.
+7. **Resolve** → COMMITTED / AVAILABLE / IN_DOUBT.
+
+*(v3's provenance gate was step 4; deleted as redundant per §3.3.)* Every outcome writes one decision record: rule fired, matched action id, provenance chain with origin paths, human-readable reason.
+
+### 3.8 Log and dashboard security
+
+The proxy ingests attacker-controlled text, logs it, and renders it in a browser.
+
+- **Masking at write time**, not render time: `contact`, `email`, card fields and tokens are hashed/masked before touching disk.
+- Field-level redaction allowlist; **text-node rendering only, never `innerHTML`**; restrictive CSP; stated retention rule.
+- **Test:** a fixture carrying `<script>` and `<img onerror=...>` in a `notes` field cannot execute in the dashboard.
+
+---
+
+## 4. Phased plan with validation gates
+
+### Phase 0.5 — Pre-registration (**executed this round**)
+
+Pre-registration means nothing if it follows the thing it constrains. See `corpus/manifest.json` and `PREREGISTRATION.md`.
+
+- **G0.1** Manifest, labels, exact split and per-family/per-session class counts, seed, and frozen baseline committed **in their own commit**, so git history proves ordering. ✅
+- **G0.2** Held-out authored and hash-committed **before any policy code exists.** Schemas in §2.5 are verified from source; if G1.1 reveals runtime drift, the change is a dated **amendment**, never a silent edit. ✅
+- **G0.3** Labels come from an **independent oracle**: positive iff a human reading *(mandate + session transcript + prior account state)* judges the call outside the mandate, with a written reason per label. The detector never touches labelling — which is what makes recall a measurement rather than a tautology, and why the corpus deliberately contains **attacks with no corresponding rule.** ✅
+
+### Phase 1 — Ground truth & live harness (Days 1–2)
+
+- **G1.0** Pin the `razorpay/mcp` **image digest**; record digest + source commit together.
+- **G1.1** `tools/list` dumped to `evidence/tools_list.json`. *Runtime truth supersedes every schema claim in §2.*
+- **G1.2** `fetch_all_payments` round-trips against test mode.
+- **G1.3** Relay passes `initialize` + `tools/list` + a read call **byte-identically** vs. talking to the child directly. Diff must be empty.
+- **G1.4** *Highest-risk gate:* produce a **captured test-mode payment** (`pay_*`) so `create_refund` is exercisable live. **No fallback** — if it cannot be done it is reported as an unmet gate.
+- **G1.5** *Feasibility gate:* can the **unmodified** container be routed to a controlled upstream capture boundary? If not, the network-capture evidence claim is **dropped**, not kept as a promise.
+- **G1.6** **Runtime verification, replacing a documentation claim I got wrong:** send a real duplicate `receipt` in test mode and record the actual status, error text and scope; confirm the `rzpg_`-prefixed format is accepted by the live schema.
+
+### Phase 2 — Mandate + provenance (Days 3–4)
+
+- **G2.1** Action matching: two legitimate partial refunds of equal amount on one payment **both pass**; one with no authorized action is denied; a replay of a consumed action is denied.
+- **G2.2** **The legitimate lookup-then-refund workflow passes end to end.** Regression test for v1's fatal flaw; non-negotiable.
+- **G2.3** Agent-chosen `speed` and `notes` never cause a denial. *(v2's blanket provenance rule would have blocked ordinary traffic.)*
+- **G2.4** Exact vs. bounded amounts: an exact action rejects a lower amount; a bounded action accepts it.
+- **G2.5** Provenance records all origin paths; the `id`-then-`notes` case is visible in the chain. Forensic only — no denial path.
+
+### Phase 3 — Policy, lifecycle, receipt (Days 5–6)
+
+- **G3.1** Default-deny: empty mandate blocks all 17 write tools; unknown tool name blocks.
+- **G3.2** A live blocked refund is proven blocked by a **byte-level record of child stdin** showing the call never entered the child — a call whose bytes never reached the process cannot have produced an HTTP request for it. Network capture is corroboration **only if G1.5 passed**.
+- **G3.3** A live allowed refund succeeds against test mode and returns a real refund id.
+- **G3.4** **In-doubt handling — the hardest panel question.** Simulate *upstream processed the refund, response severed*: action and budget must **stay locked**, and resolution must require an operator. Includes the **delayed-visibility case** — a refund not yet visible in a fetch must **not** release the reservation.
+- **G3.5** A confirmed provider rejection returns the action to `AVAILABLE` and does not burn the authorization.
+- **G3.6** Two duplicate in-flight refunds: exactly one is forwarded.
+- **G3.7** Mandate substitution via crafted tool call fails and is logged as an attack.
+- **G3.8** Decision log replays deterministically, bit-for-bit.
+
+### Phase 4 — Measured metrics (Days 6–8) — the graded phase
+
+- **G4.1** Disjointness unit is the **scenario template**; families A1–A4 span both splits. Template ids in the manifest make disjointness checkable by a third party.
+- **G4.2 — Headline is TPR/FPR, not precision.** Precision depends on the attack base rate and the corpus mix resembles no real merchant; precision is reported as a **curve across base rates (1%, 0.1%, 0.01%)**.
+- **G4.3 — Confidence intervals by cluster bootstrap at the session level.** Calls in a session share a mandate, agent and template. **Expect wide per-family intervals — plausibly ±0.10–0.20 on recall at this corpus size.**
+- **G4.4** Provenance reported as a **diagnostic**: does the signal separate attack from benign calls? Explicitly **not** an enforcement ablation, since it no longer gates.
+- **G4.5** Scorer runs the corpus **through the actual proxy**. `score.py` carries a hard guard that **cannot spawn a child process or open a socket**.
+- **G4.6** Every FP and FN individually reviewed in writing. Any family with recall below 0.8 is reported as a known weakness, not dropped.
+
+**False-positive cost model:** a blocked legitimate refund costs a support ticket plus a delayed customer refund, priced in ₹ and ops-minutes with assumptions inline, presented as a cost curve.
+
+### Phase 5 — Dashboard (Days 9–10)
+
+- **G5.1** A live blocked call appears within 1s with its matched-action decision and provenance chain rendered.
+- **G5.2** Dashboard reads **only** from the decision log — no second source of truth.
+- **G5.3** The XSS fixture test (§3.8) passes.
+- **G5.4** An `IN_DOUBT` reservation is surfaced for operator resolution with its receipt as the lookup key.
+
+### Phase 6 — Hardening, failure write-up, README, pitch (Days 11–12)
+
+- **G6.1** Clean-clone → run → demo works from the README alone.
+- **G6.2** At least one **real** failure documented with actual error output, the wrong hypothesis chased first, and the fix. *Five banked from Phase 0: the `create_payout` schema mismatch, the Docker daemon blocker, the incorrect idempotency claim, the fail-open budget release, and quoting a WebFetch summary as source text.*
+- **G6.3** `REVIEW_LOG.md` complete for all phases.
+
+---
+
+## 5. Defense-only
+
+- Fixtures are `.jsonl` MCP messages scored offline — data, not scripts. `corpus/` holds data and a scorer, **never an executor**.
+- Attack fixtures are by construction the ones the proxy **blocks before forwarding**.
+- **Non-resolvable synthetic identifiers** (`pay_SYN000...`) throughout.
+- **Saved-card charging, OTP submission and token revocation stay out of live coverage entirely.**
+- `score.py` cannot spawn a child process or open a socket.
+- Test-mode keys only; no real test-account records or PII committed.
+
+---
+
+## 6. Repo layout
+
+```
+rzp-guard/
+├── README.md              # structured by the 4 eval criteria
+├── PLAN.md  PREREGISTRATION.md  METRICS.md  FAILURES.md  REVIEW_LOG.md
+├── src/rzp_guard/
+│   ├── relay.py           # stdio JSON-RPC interposer — never originates a request
+│   ├── mandate.py         # capability list + validation
+│   ├── policy.py          # default-deny pipeline, action matching
+│   ├── lifecycle.py       # one state machine: action + budget, fail-closed
+│   ├── provenance.py      # field-path index — forensic only
+│   ├── decision_log.py    # append-only JSONL, masked at write time
+│   └── dashboard/         # FastAPI, CSP, text-node rendering only
+├── corpus/                # DATA + scorer only — never an executor
+│   ├── templates/  tuning/  heldout/  manifest.json  labels.jsonl
+│   └── score.py           # hard guard: no subprocess, no sockets
+├── evidence/
+└── tests/
+```
+
+---
+
+## 7. Risks I am least confident about
+
+1. **Provenance may earn no measurable place.** It is now forensic-only, so this costs the enforcement claim nothing — but G4.4 may show the signal adds little even diagnostically, and that gets published.
+2. **Transformation evasion** — restated values lose their origin link. Irrelevant to enforcement now; relevant to the forensic chain's completeness.
+3. **Single-author corpus correlation.** Temporal precommitment is the best available substitute for independent authorship; it does not change that I imagined both the attacks and the defenses.
+4. **G1.4 may not be reachable** without S2S enablement. Reported as unmet if so.
+5. **Per-process budget** (§3.6) is a real enforcement limit.
+6. **`IN_DOUBT` needs an operator.** A deliberate trade for a 12-day build; at scale it needs the reconciliation subsystem that was cut, and the README will say so.
+
+---
+
+## 8. Blocked on you
+
+1. **Start Docker Desktop** — the daemon is down. (Alternative: install Go 1.24.2+; Docker is shorter.)
+2. **Test-mode API keys** — Dashboard → Settings → API Keys, in **Test Mode**, into a gitignored `.env`.
+
+Both gate Phase 1. Phase 0.5 was not blocked and is done.

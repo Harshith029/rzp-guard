@@ -1,0 +1,420 @@
+# REVIEW_LOG.md
+
+Cross-model review log. Every external critique is treated as a claim to verify, not an instruction to follow. Accepts require a reason the suggestion is *correct against the real system*; rejects are explicit.
+
+---
+
+## Round 1 — Phase 0 (PLAN.md v1) — reviewer: ChatGPT — 2026-08-24
+
+Overall: high-quality critique. Ten points plus a preamble. **Eight full accepts, three partial accepts with stated disagreement, one factual claim that proved me wrong on verification.** The result is PLAN.md v2, which is a materially different design — not a cosmetic patch.
+
+---
+
+### P0 — "Methodology plan, not evidence. Freeze counts/seed/manifest/CIs before tuning. ≥300 calls is a target; calls within a session are correlated. 60/40 makes precision synthetic."
+
+**Verdict: ACCEPT (all three sub-points).**
+
+- *Pre-registration* — correct and cheap. Costs nothing now, and is the only thing that makes the eventual numbers falsifiable. v2 adds gate **G4.0**: split manifest, per-family/per-tool class counts, seed, and the frozen policy version are committed **before** any tuning, in their own commit, so git history proves the ordering.
+- *Session correlation* — correct statistics, and I had it wrong by omission. Tool calls inside one session share a mandate, an agent, and a scenario template, so they are not independent samples. Treating 300 calls as n=300 would overstate precision badly. v2 computes confidence intervals by **cluster bootstrap resampling at the session level**, not the call level.
+- *Base rate* — the sharpest of the three. Precision is a function of the attack base rate, and 40% attack traffic is nothing like a real merchant's. TPR and FPR are base-rate invariant; precision is not. v2 reports **TPR/FPR as the headline** and presents precision as a **curve across assumed base rates** (1%, 0.1%, 0.01%), with the assumption stated at each point.
+
+**Consequence I am flagging now rather than discovering later:** with ~60 sessions split across four families, per-family cluster-bootstrap CIs will be wide — plausibly ±0.10–0.20 on recall. I would rather publish a wide interval that is honest than a point estimate that implies precision I do not have.
+
+---
+
+### P1 — "Split description is internally inconsistent: 'split by scenario family' conflicts with 'all four families in both splits'."
+
+**Verdict: ACCEPT.** Straightforwardly correct — I used "family" to mean two different things in adjacent sentences, and the looser reading would have let held-out leak the exact templates used for tuning.
+
+v2 defines the disjoint unit precisely: **the scenario template** (the generator recipe: source field + mutation pattern + call shape) is disjoint across splits. **Attack families A1–A4 deliberately span both splits**, because each family needs to be measurable on held-out. Template IDs are recorded in the manifest so the disjointness is checkable by a third party, not asserted by me.
+
+---
+
+### P2 — "Evaluation risks being circular. 'Should block' needs an independent oracle. Hold out unseen authorship or precommit held-out before threshold selection."
+
+**Verdict: ACCEPT the core. PARTIAL REJECT on 'unseen authorship'.**
+
+The circularity is the single biggest threat to this project's credibility and my v1 mitigation was too weak. Accepted fix, and it is a real one: **labels are derived from the mandate document, not from the policy engine.** A call is labelled positive iff a human reading *(mandate + session transcript + prior account state)* judges it outside the mandate — with a one-line written reason attached to every label. The detector never touches labelling.
+
+The load-bearing consequence: this makes it possible for the corpus to contain **attacks I have written no rule for**, which is what turns recall into a real measurement instead of a tautology. v2 commits to deliberately authoring held-out scenarios with no corresponding policy rule, and treats the resulting false negatives as the honest finding they are.
+
+**Rejected:** independent authorship. One builder, twelve days — a second author does not exist, and pretending otherwise would be worse than naming the gap. Substituted with the strongest available proxy: **temporal precommitment** — the held-out corpus is authored and hash-committed *before any policy code is written*, so it cannot be retrofitted to the rules. Residual limitation (single-author correlation in scenario imagination) is stated in the metrics report rather than papered over.
+
+---
+
+### P3 — "Scope too broad. Make `create_refund` the evaluated claim. A `create_payment_link` fallback is not evidence you stopped money movement."
+
+**Verdict: ACCEPT the narrowing. REJECT one premise it rests on.**
+
+Accepted, and this is the most valuable structural point in the review. The brief asks for **one class of loss**; v1 sprawled across six. v2 makes the headline claim exactly one sentence: *unauthorized `create_refund`.* Everything else becomes secondary coverage with separately reported numbers, explicitly outside the headline.
+
+The line **"a `create_payment_link` fallback is not evidence that you stopped unauthorized money movement"** is correct and caught a real dishonesty risk in my G1.4 fallback — I had quietly written an escape hatch that would have substituted a weaker claim while keeping the strong framing. v2 removes it: if the live refund path can't be exercised, that gets **reported as an unmet gate**, not swapped for an easier one.
+
+**Rejected premise:** the review lists settlements and saved-card charges among things that "are not money movement." That is not right. `create_instant_settlement` moves merchant balance to a bank account irreversibly and incurs a fee; `initiate_payment` charges a stored card. Both are unambiguously money movement — `create_payment_link`, `revoke_token`, and PII reads are the ones that aren't. The narrowing is correct, but for the reason *"one coherent evaluated claim beats six half-measured ones"*, not because those tools are harmless. Getting this right matters because it determines what goes back in scope after the deadline.
+
+**Reframed families** (all four survive, scoped to refunds — a tighter story than v1):
+A1 injected instruction in payment data → unauthorized refund · A2 refund amount/scope drift · A3 duplicate/replayed refund · A4 refund misdirection to an unauthorized payment.
+
+---
+
+### P4 — "The core provenance claim is overstated. 'Every literal from any tool result' is literal-reuse detection, not taint tracking. It will block normal lookup-then-refund workflows."
+
+**Verdict: ACCEPT — and this is the biggest change in v2.**
+
+Correct, and the failure it names is fatal to v1 as designed. Traced concretely: the normal support workflow is `fetch_payment(pay_ABC)` → `create_refund(pay_ABC)`. Under v1's rule, `pay_ABC` appeared in a tool result, so it is `TOOL_DERIVED`, so a refund using it is blocked. **v1 would have blocked the single most common legitimate refund flow while claiming to be a fraud control.** That is not a tuning problem, it is a wrong mechanism.
+
+The proposed fix — track **JSON field paths and source sensitivity, not merely values** — is right, and it is a better design than what I had:
+
+- Every observed value is indexed with the **JSON path** it appeared at, not just its literal content.
+- Paths carry a trust class: **`SYSTEM_AUTHORITATIVE`** (Razorpay-generated — `id`, `entity`, `amount`, `status`, `order_id`, `created_at`) vs **`PARTY_SUPPLIED`** (attacker- or customer-influenceable free text — `notes.*`, `description`, `customer_name`, `receipt`, `email`, `contact`).
+- Taint means *"this value's earliest origin is a `PARTY_SUPPLIED` path"* — not *"this value was seen before."*
+
+This separates the two cases that v1 conflated: refunding a `payment_id` read from the canonical `id` field is **allowed** (legitimate lookup-then-refund), while refunding a `payment_id` that first appeared inside `notes.customer_message` is **blocked** — and that is precisely the A1 attack. It also answers the panel question *"what legitimate workflow does your policy still permit?"* with a concrete answer instead of a hope.
+
+**Accepted the naming criticism too.** "Taint tracking" implies dataflow analysis I am not performing. v2 calls it **field-path provenance with source-trust classification**, which is what it actually is.
+
+**What this does NOT fix, stated plainly:** transformed, encoded, or recomputed values still evade origin matching. The redesign fixes the false-positive catastrophe; it does not fix the false-negative surface. Those remain measured and reported, not claimed away.
+
+---
+
+### P5 — "The mandate has no trustworthy issuance or binding model."
+
+**Verdict: ACCEPT.** Correct — v1 said "config file" and left the trust boundary implied, which is exactly the kind of gap that turns into an unanswerable panel question.
+
+v2 states it explicitly: **the mandate is loaded from a path supplied at proxy launch (CLI/env), before any agent connects.** The trusted party is whoever launches the proxy process (the merchant/operator). The agent is untrusted. There is no MCP method, tool call, or JSON-RPC message that can set, replace, extend, or reload a mandate — the proxy exposes no such surface, and attempts are logged as attacks. The mandate is bound to the proxy process lifetime, and cumulative budget lives in that process.
+
+Tests added per the suggestion: **mandate substitution attempt via crafted tool call**, and **concurrent-session isolation**.
+
+Limitation stated rather than hidden: cumulative caps are **per proxy process**. Two proxies launched against one mandate would each track their own budget; correct multi-process enforcement needs shared state and is out of scope for twelve days. The headline claim is scoped to what is actually enforced.
+
+---
+
+### P6 — "Cumulative caps and replay need transactional semantics. Don't claim `receipt` is non-idempotent from wrapper code alone; verify the API contract."
+
+**Verdict: ACCEPT on concurrency. ACCEPT on idempotency — and verification proved my PLAN.md claim WRONG.**
+
+*Concurrency:* correct and it is a real bug class. MCP permits multiple in-flight requests by JSON-RPC id, so two concurrent refunds can both pass a cumulative check before either result returns — a trivially exploitable TOCTOU on the exact control that is supposed to cap losses. v2 **reserves budget atomically before forwarding**, commits on success, and releases on error/timeout/child failure, with an explicit test for duplicate in-flight calls.
+
+*Idempotency — the reviewer was right to challenge an unverified assertion, and it cost me the claim.* PLAN.md v1 stated "the server does not enforce `receipt` as an idempotency key." I had inferred that from wrapper code without checking the API contract. Verified:
+
+1. Razorpay **does** treat `receipt` as an idempotency key per payment — reusing one returns `Duplicate receipt found for this refund request`. **My v1 claim was wrong.**
+2. Razorpay also supports a dedicated **`X-Refund-Idempotency`** header (min 10 chars, alphanumeric/underscore/hyphen; 409 on a concurrent duplicate).
+3. `razorpay-go`'s signature is `Refund(paymentID string, amount int, data map[string]interface{}, extraHeaders map[string]string)`, and the MCP server calls it with **`nil` for extraHeaders** (`pkg/razorpay/refunds.go:75`). `grep -rni "idempoten"` across the whole server returns **zero hits**.
+4. `receipt` is **optional** in the `create_refund` tool schema.
+
+Net: the MCP server never sends the idempotency header, and the only protection that remains is a field the agent may simply omit. **A refund issued without a `receipt` has no duplicate protection at all.**
+
+This turned a corrected error into the sharpest defensive contribution in the project: v2 has the proxy **enforce a deterministic, mandate-derived `receipt` on every refund it forwards**, converting an optional field into a mandatory idempotency key at the boundary. That is a concrete, verifiable improvement over the unproxied server, and it exists only because this point was challenged. Per-tool fingerprint justification accepted; for refunds it is now `(payment_id, amount)` plus the enforced receipt.
+
+---
+
+### P7 — "G3.2's evidence is insufficient. A child-server log is not proof no HTTP request occurred. Pin the image digest."
+
+**Verdict: ACCEPT.** Correct — I was proposing to prove a negative with the wrong instrument, and a panelist would have taken that apart.
+
+v2 proves blocking at **two independent boundaries**: (a) a byte-level record of everything written to the child's stdin, showing the blocked call was **never handed to the child at all** — which is stronger than a log line, since a call that never entered the process cannot produce egress; and (b) corroboration at a **controlled network boundary**, with the child running against a capture stub so any egress attempt is recorded independently of the child's own logging.
+
+Digest pinning accepted without reservation: `razorpay/mcp` is a mutable tag and could drift from the source SHA I read. v2 pins the **image digest**, and records the runtime `tools/list` output against both the digest and the source commit.
+
+---
+
+### P8 — "The dashboard and JSONL log are a sensitive-data and injection surface."
+
+**Verdict: ACCEPT, fully.** This is the point I am least comfortable having needed. v1 designed a security tool that ingests attacker-controlled text, writes it verbatim to an append-only log, and renders it in a browser — a stored-XSS pipeline with a compliance problem attached, inside a project whose entire premise is that untrusted content reaches privileged systems.
+
+v2 adds: field-level redaction allowlist; masking/hashing of `contact`, `email`, card fields and tokens at **write** time (not render time, so the log itself is never the liability); HTML escaping via text nodes only, never `innerHTML`; a restrictive CSP on the dashboard; a stated retention rule; and a **test that a fixture carrying `<script>` and `<img onerror=...>` in a `notes` field cannot execute in the dashboard.**
+
+---
+
+### P9 — "The defense-only guarantee is not structural enough."
+
+**Verdict: ACCEPT the mitigations. REJECT the risk characterization.**
+
+**Rejected:** the framing that JSON-RPC fixtures constitute "callable sequences" that meaningfully arm an attacker. A fixture is `{"method":"tools/call","params":{"name":"create_refund","arguments":{...}}}` — it only does anything when executed with *the actor's own Razorpay credentials against their own account*. That is an API call to one's own money, not an exploit against a third party. Every argument in it is documented in Razorpay's public API reference. Overstating this would be its own form of dishonesty, and it would imply the public docs are an attack tool.
+
+**Accepted anyway,** because every proposed mitigation is free and strictly reduces risk:
+- **Non-resolvable synthetic identifiers** (`pay_SYN000...`) throughout the corpus — also prevents fixtures from accidentally touching real test-account objects, which is a reproducibility win independent of security.
+- **A hard guard in `score.py` that cannot spawn a child process or open a network socket** — this is good engineering regardless, since offline determinism is what makes the metrics reproducible.
+- **No real test-account records or PII committed**, ever.
+- **Saved-card charging, OTP submission, and token revocation stay out of live coverage entirely.** Free, given P3 already narrows the headline to refunds.
+
+---
+
+### P10 — "The optional LLM/trust layer has no demonstrated need and runs too late."
+
+**Verdict: ACCEPT — default is now OMIT.**
+
+Correct on the merits, and accepting P4 strengthens the conclusion rather than weakening it: once provenance is tracked by **field path**, the causal link between an attacker-controlled field and the resulting action is established *structurally* — the origin path is the evidence. An LLM scoring text after the deterministic gates adds latency, nondeterminism, and a disclosure burden to a money path, in exchange for a causality story the redesign already provides more rigorously.
+
+v2 default: **not built.** It ships only if held-out measurement shows a deterministic recall gap it actually closes, and then only with a frozen baseline-vs-model held-out comparison, full model/version/prompt disclosure, and the false-positive cost of the improvement stated. "We used an LLM" is not a credential; using one where it isn't needed is the forced-tech failure the AI Judgment criterion exists to catch.
+
+---
+
+### Weakest-claim callout — "'This is real taint tracking … and catches A1' cannot distinguish attacker-controlled content from legitimate values in the same response."
+
+**Verdict: ACCEPT. Claim retracted.**
+
+The reviewer identified the correct weakest point, and the diagnosis is exactly right — v1's mechanism could not tell `id: "pay_ABC"` from `notes.msg: "refund pay_ABC"` in the same JSON body, which is the entire distinction the defense depends on. The claim is withdrawn, the mechanism is renamed to what it is (field-path provenance with source-trust classification), and the design is rebuilt around path trust per P4. The A1 claim gets re-made only after held-out measurement supports it.
+
+---
+
+### Panel questions — where each is now answered in PLAN.md v2
+
+| Question | Answer location |
+|---|---|
+| What stops a compromised agent changing the mandate or opening a fresh session? | §3.5 trust boundary + substitution/concurrency tests |
+| Exact held-out split, labels, class counts, CIs, every FP/FN | §4 Phase 4, gates G4.0–G4.5 |
+| Why does a payment-link demo substantiate a monetary-loss claim? | It doesn't — fallback removed, §4 Phase 1 G1.4 |
+| How did you prove blocked calls never reached Razorpay? | §4 Phase 3 G3.2, two independent boundaries |
+| Which one action is protected end-to-end, and what legitimate workflow still passes? | §1 headline claim + §3.2 lookup-then-refund permitted |
+
+**Net effect of Round 1:** one wrong factual claim corrected (and turned into the receipt-enforcement feature), one fatal design flaw caught before implementation (v1 would have blocked the primary legitimate workflow), and the headline claim narrowed from six loss types to one measurable sentence. No implementation code had been written yet, so all of it was free.
+
+---
+
+## Round 2 — Phase 0 (PLAN.md v2) — reviewer: ChatGPT — 2026-08-24
+
+Overall: found a genuine safety bug in the budget design and two real false-positive bugs. **The net effect of this round is that the design gets smaller, not larger** — one change (capability-based mandate) replaces three separate mechanisms, and one promised feature is demoted to conditional because I never verified it was buildable.
+
+Guiding constraint for this round, per the builder: *make the things that ship actually work; do not accrete features to look thorough.* Several suggestions below pointed toward more machinery. Where the honest fix was to cut or to narrow a claim instead, I cut.
+
+---
+
+### P2.0 — "Do not release the cumulative budget on timeout. Keep an `UNKNOWN` reservation and reconcile."
+
+**Verdict: ACCEPT. This was a real safety bug and the most important point in either round.**
+
+v2 §3.6 said "commit on success, release on error/timeout/child failure," and G3.4 called releasing on timeout *correct*. It is not. It is the classic in-doubt case: Razorpay may have **processed the refund** while the proxy lost the response. Releasing the reservation then hands the budget back for money that already left, so the next refund can exceed the cap — the control silently fails open at exactly the moment it matters.
+
+v3 replaces the two-state model with four states, and the rule is **release only on *confirmed* failure**:
+
+| Transition | Trigger |
+|---|---|
+| `RESERVED → COMMITTED` | confirmed success |
+| `RESERVED → RELEASED` | **confirmed** rejection (a definite API error) |
+| `RESERVED → IN_DOUBT` | timeout, child crash, severed response — **budget stays held** |
+| `IN_DOUBT → COMMITTED / RELEASED` | reconciliation resolves it |
+
+Reconciliation is concrete and uses a tool that already exists (§2.4): call `fetch_multiple_refunds_for_payment(payment_id)` and match on the **injected receipt**, which I verified *is* returned in the refund entity (fields: `id`, `entity`, `amount`, `currency`, `payment_id`, `created_at`, `batch_id`, `notes`, `receipt`, `acquirer_data`, `status`, `speed_requested`, `speed_processed`). If reconciliation itself fails, the proxy **fails closed** and requires operator resolution rather than guessing.
+
+This also gives the receipt injection a second job it wasn't designed for: it is the correlation key that makes the in-doubt state resolvable at all. Test added exactly as specified: *upstream processed refund, response severed.*
+
+---
+
+### P2.1 — "Receipt injection is not the HTTP idempotency mechanism. Describe it precisely."
+
+**Verdict: ACCEPT.** I conflated two different behaviours. Verified against both Razorpay pages:
+
+- **`X-Refund-Idempotency`**: safe retry — same key + same body returns the **original refund object**; `409` while the first is still in flight.
+- **`receipt` reuse**: **HTTP 400**, `"Duplicate receipt found for this refund request."` — a *rejection*, not a safe retry.
+
+And the reviewer is right that **the stdio proxy cannot inject the HTTP header at all.** The child builds the HTTP request internally and passes `nil` for `extraHeaders` (`refunds.go:75`). Reaching that header would require forking the child or MITMing its TLS.
+
+**Rejected:** forking the child to add the header. The entire premise is a proxy *in front of the real, unmodified `razorpay-mcp-server`*; forking it would forfeit that and is not worth a marginal semantic upgrade.
+
+The two facts compose in a way that matters: because duplicate `receipt` yields **rejection rather than replay of the original result**, I *cannot* resolve an in-doubt refund by retrying — retry returns a 400 that says nothing about whether the first one landed. That is precisely why P2.0's reconciliation-by-fetch is mandatory rather than optional. The two points reinforce each other, and v3 states the feature as what it is: **duplicate rejection at the provider, not idempotent retry.**
+
+**Flagged for empirical verification (new gate G1.6):** Razorpay's own docs contradict each other here. `create-normal` says `receipt` is "treated as an idempotency key" and 400s on duplicates; `normal-refunds-idempotent` says `receipt` provides no duplicate-detection semantics. I am not going to pick a page — Phase 1 sends a real duplicate `receipt` in test mode and records the actual response.
+
+---
+
+### P2.2 — "`(mandate_id, payment_id, amount)` is not a sufficient refund-action identity."
+
+**Verdict: ACCEPT — and this fix collapses three problems into one.**
+
+The bug is concrete and would have shipped: two legitimate partial refunds of the same amount on one payment (two items returned separately at the same price — utterly routine) produce the same receipt and the same replay fingerprint, so **the second legitimate refund is rejected as a replay.** v2 silently defined all same-amount partial refunds as duplicates.
+
+Of the two offered options, I took (a) — the mandate authorizes **discrete refund actions** — and rejected (b) "accept the false positives." Option (b) treats a known design defect as a measurement artifact, which is the wrong instinct when the fix is smaller than the workaround.
+
+The mandate becomes a **capability list**, not a coarse policy:
+
+```yaml
+authorized_refund_actions:
+  - {action_id: rfa_001, payment_id: pay_SYN0001, max_amount_paise: 50000, single_use: true}
+  - {action_id: rfa_002, payment_id: pay_SYN0001, max_amount_paise: 50000, single_use: true}
+```
+
+An incoming refund matches an **unconsumed** action with that `payment_id` and `amount ≤ max`; no match means deny. Receipt derives from `action_id`, so it is unique per authorized action. Two legitimate partial refunds are two actions and both pass; a replay finds its action already consumed and is denied.
+
+This single change fixes P2.2, answers P2.4, and materially improves P2.3 — one mechanism replacing three, which is the opposite of feature accretion.
+
+---
+
+### P2.3 — "Field-path provenance still does not establish that injection caused the action."
+
+**Verdict: ACCEPT the critique. REJECT the implied remedy of building more detection.**
+
+The critique is correct on both sub-cases. If an id appears in canonical `id` *and later* in `notes`, my "earliest origin" rule labels it `SYSTEM_DERIVED` even if the agent acted on the note. More fundamentally, an injection can induce an action using an **already-known id or a mandate literal** — no value gets copied from party-supplied text at all, so there is nothing for provenance to see. Field-path provenance detects a narrow literal-flow subclass, not A1 in general.
+
+**Where I diverge from the framing:** the review treats this as provenance needing to work for A1. I don't think provenance was ever the right primary control for A1. The general defense against "injection induces an unauthorized refund" is **default-deny authorization against a capability list** — an injection saying *"also refund pay_XYZ"* fails because no authorized action exists for `pay_XYZ`, regardless of where the id came from or whether anything was copied. The mandate generalizes to injections provenance is blind to.
+
+So v3 **demotes provenance from the core mechanism to a measured secondary signal**, and the capability mandate carries the headline. Consequences:
+
+- Provenance records **all** origin paths for a value, not just the earliest, so the `id`-then-`notes` case is visible rather than silently resolved in the agent's favour.
+- It contributes a **risk signal**, not a hard block; the hard block comes from the mandate.
+- Phase 4 reports **policy-only baseline vs. policy + provenance** on held-out. If provenance adds nothing measurable, I say so and it becomes a dashboard/forensics feature. That is a real possible outcome and it gets published either way.
+- Held-out A1 cases **without verbatim value copying** are included, exactly as asked.
+
+Declining to bolt on an injection-causality detector here is deliberate. The honest options were "narrow the claim" or "add unproven machinery," and unproven machinery on a money path is the failure mode this project exists to criticise.
+
+---
+
+### P2.4 — "'Razorpay-generated' is not authorization."
+
+**Verdict: ACCEPT.** Correct — `id`/`amount`/`status` are provider metadata and say nothing about what the merchant currently authorizes. v2's mandate granted any listed payment id for any amount under a cap, which is a coarse policy wearing the word "authorization."
+
+Resolved by the same capability-list change (P2.2): authorization is now per **action** — specific payment, bounded amount, single-use identity, mandate expiry. The headline claim "prevents unauthorized refunds" is now backed by an action-scoped grant rather than a capability range.
+
+---
+
+### P2.5 — "The policy must be argument-specific."
+
+**Verdict: ACCEPT.** Another real false-positive bug. v2's blanket `deny_provenance: [PARTY_DERIVED, AGENT_ORIGINATED]` applies to *every* argument, so a perfectly normal agent-chosen `speed: "normal"` is `AGENT_ORIGINATED` and the refund is denied. The detector would have blocked ordinary traffic on a field that carries no risk.
+
+v3 specifies provenance **per field**: `payment_id` must be `USER_MANDATED` or `SYSTEM_DERIVED`; `amount` is bounded by the matched action's maximum and carries no provenance requirement; `speed` and `notes` are unconstrained; `receipt` is overwritten by the proxy regardless. Those ordinary flows go into the false-positive corpus as specified.
+
+---
+
+### P2.6 — "Temporal precommitment is not scheduled early enough."
+
+**Verdict: ACCEPT.** Internally inconsistent in v2 and the reviewer caught it: G4.0 sat on Days 6–8 but its whole purpose is to exist *before* policy code, which lands Days 5–6. As written, "pre-registered held-out" was an intention.
+
+v3 moves the corpus manifest, labels, exact split/class counts and frozen baseline to an **immediate Phase 0.5 commit, before Phase 1 and before any policy code.** Authoring it now is possible because the schemas in §2.5 are verified from source; if G1.1 reveals runtime drift, the adjustment is recorded as a dated **amendment** rather than a silent edit — which is how pre-registration is supposed to handle it.
+
+---
+
+### P2.7 — "The capture-stub proof is an unverified architectural assumption."
+
+**Verdict: ACCEPT.** Fair hit, and it is the same error I was criticising elsewhere: I promised evidence from a mechanism I had never built. Capturing the child's egress means either DNS override plus TLS interception (requires injecting a CA into the container — i.e. modifying it, which forfeits "unmodified real server") or hoping `razorpay-go` honours `HTTPS_PROXY`. I have verified neither.
+
+v3 makes the network capture a **Phase 1 feasibility gate (G1.5)** rather than a promised deliverable. Primary evidence for G3.2 is the **child-stdin byte record** — a call whose bytes never entered the child process cannot have produced an HTTP request for that call, which is sound on its own. Network capture is retained only as corroboration **if** G1.5 passes; if it fails, the claim is dropped and the README says what evidence actually exists.
+
+---
+
+### P2.8 — "Remove `update_payment` from the live agent mandate."
+
+**Verdict: ACCEPT, immediately.** Correct and free. The refund detector needs read tools plus `create_refund`; an unrelated write permission weakens the least-privilege story for no demonstrated value. Removed. Exactly the kind of cut this round should produce.
+
+---
+
+### P2.9 — "The defense-only standard is stricter than 'not an exploit against a third party.'"
+
+**Verdict: ACCEPT the conclusion. Logging that I still hold the technical position, because the reason for changing matters.**
+
+I maintain the analysis is technically right: a fixture that only acts on the runner's own account with the runner's own credentials is an API call to one's own money, and every argument in it is in Razorpay's public reference. Nothing in Round 2 refuted that.
+
+But the reviewer is right on the decision, for a reason that isn't about correctness: **Track 2 disqualifies offense-capable work automatically.** The downside of publishing a boundary argument is disqualification; the upside is being technically correct in a document nobody grades for that. That asymmetry settles it regardless of who is right on the merits.
+
+So v3 **removes the argumentative passage** and keeps every mitigation — non-resolvable synthetic ids, mock-only scoring, exclusion of payment/OTP/token tooling. I am changing what I publish, not what I concluded, and the distinction is recorded here rather than smoothed over.
+
+---
+
+### Panel question — "When the provider may have processed a refund but your proxy timed out, how do you preserve the spend cap?"
+
+v2 answered this **incorrectly** (released the reservation). v3: the reservation moves to `IN_DOUBT` and the budget **stays held**; the proxy reconciles via `fetch_multiple_refunds_for_payment` matched on the injected receipt; unresolvable cases fail closed to operator resolution. Covered by gate **G3.4**.
+
+**Net effect of Round 2:** one fail-open safety bug fixed, two false-positive bugs that would have blocked routine merchant workflows fixed, one unverifiable evidence claim demoted to a feasibility gate, one permission dropped, and the core mechanism **demoted** rather than defended. Three mechanisms collapsed into one capability list. The plan is shorter than v2.
+
+---
+
+## Round 3 — Phase 0 (PLAN.md v3) — reviewer: ChatGPT — 2026-08-24
+
+**Eight points, eight accepts, and one of them is a methodology failure on my part rather than a design flaw.** Net effect is again subtractive: automatic reconciliation cut, one pipeline stage deleted as redundant, two state machines merged into one.
+
+---
+
+### P3.1 — "'The Razorpay docs contradict each other' is not established."
+
+**Verdict: ACCEPT. This was my error, and the process failure is worse than the claim.**
+
+The two behaviours compose perfectly well: `X-Refund-Idempotency` is a *retry mechanism* (same key + body returns the original result); `receipt` is a *uniqueness constraint* (duplicate → 400). A retry mechanism and a uniqueness constraint are orthogonal. There was never a contradiction to find.
+
+**How I generated a false claim:** `WebFetch` converts a page to markdown and answers a prompt against it *using a small fast model*. What came back — "the receipt field does not provide retry protection or duplicate detection semantics" — was a **summarizer's paraphrase**, not Razorpay's verbatim text. I treated a model-generated summary as a primary-source quote, compared it against another summary, and escalated the difference into "the vendor's own docs disagree."
+
+This is precisely the failure this project's hard constraints exist to prevent, committed while writing the document that states them. Recorded as such rather than quietly patched.
+
+**Standing correction to my own method:** WebFetch output is a paraphrase and cannot support a claim about *what a document says*. It can point at behaviour worth verifying; it cannot be quoted. Claims about API semantics now come from runtime observation only.
+
+G1.6 is kept and **reframed**: not "resolve a doc contradiction" but "verify duplicate-`receipt` behaviour at runtime before depending on it."
+
+---
+
+### P3.2 — "Provenance is still an enforcement gate, not a secondary signal."
+
+**Verdict: ACCEPT — and the resolution is better than either option offered.**
+
+The incoherence is real and I should have caught it: §3.3 said "the hard block comes from the capability list" while pipeline step 4 denied any refund whose `payment_id` wasn't `USER_MANDATED` or `SYSTEM_DERIVED`. Describing a blocking control as a non-blocking signal is spin, regardless of intent.
+
+The review offered two options — drop it from the deny path, or own it as a blocking control and evaluate it. **Neither is needed, because the gate turns out to be dead code.** Tracing it: to reach step 4, a refund must already have matched an unconsumed action in `authorized_refund_actions`, which means its `payment_id` **is a mandate literal** — therefore `USER_MANDATED` by definition. Step 4 can never fire on a call that passed step 3.
+
+So it is removed as **redundant**, not as risky. One fewer pipeline stage, one fewer false-positive surface, and the description and the implementation now agree.
+
+Consequence for measurement, accepted honestly: with provenance out of the deny path there is no blocking ablation to run, so v3's G4.4 as written is void. Provenance keeps a real job — it is the **forensic chain** behind a flagged call, which the dashboard deliverable explicitly requires — and Phase 4 now reports only whether the signal *separates* attack from benign calls, labelled as a diagnostic and explicitly **not part of the enforcement claim**.
+
+---
+
+### P3.3 — "Automatic reconciliation breaks the transparent relay." *(named weakest claim)*
+
+**Verdict: ACCEPT. Cut it.**
+
+Correct, and it is the same class of error as P2.7 — promising a mechanism I had not costed. For the proxy to call `fetch_multiple_refunds_for_payment` on its own it must become an MCP **client** to its child: generate internal JSON-RPC ids that cannot collide with the agent's, multiplex and demultiplex two request streams, suppress its own responses from the agent, and handle id collisions. That is a subsystem, and it directly falsifies "forwards everything byte-for-byte" — the architectural claim Decision A rests on.
+
+For a 12-day build the correct trade is obvious: **`IN_DOUBT` holds budget and action and requires operator resolution.** Automatic reconciliation is deferred, not hand-waved.
+
+This costs less than it appears. The injected receipt still serves as the **correlation key** — the operator looks the refund up by receipt through a path outside the relay (dashboard action or CLI, with its own credentials), so the resolution workflow is intact and simply has a human in it. Given that the in-doubt case is exactly where money may already have moved, a human in that loop is arguably the right design rather than a concession.
+
+The transparent-relay claim survives because the thing that would have broken it is gone.
+
+---
+
+### P3.4 — "A missing receipt in a fetched list is not proof the refund failed."
+
+**Verdict: ACCEPT.** Correct — eventual consistency, a still-pending refund, or a failed fetch all produce "not found" without meaning "did not happen." Auto-releasing on absence would reintroduce the exact fail-open bug Round 2 caught, one layer down.
+
+Largely folded in by cutting automatic reconciliation (P3.3), but the principle now binds the **operator tooling** too: absence of a matching receipt is never sufficient to release. Only two automatic transitions are safe — **confirmed provider rejection → release**, and **matching receipt found → commit**. Everything else stays in doubt.
+
+Delayed-visibility case added to G3.4.
+
+---
+
+### P3.5 — "Action consumption is underspecified."
+
+**Verdict: ACCEPT, and it merges two state machines into one.**
+
+Real gap: v3 consumed the action at pipeline step 6 but the state table described only budget, leaving the child-side-validation-failure case undefined. Permanently consuming an action after a request that never reached the provider burns a legitimate merchant authorization for nothing; releasing after a possibly-delivered request permits replay.
+
+Resolved by making **budget reservation and action consumption a single lifecycle** — the two resources always move together, so there is one rule to reason about and one to test:
+
+`AVAILABLE → RESERVED` (on match, before forwarding) · `RESERVED → COMMITTED` (confirmed success) · `RESERVED → AVAILABLE` (**confirmed provider rejection only** — same evidence standard as budget release) · `RESERVED → IN_DOUBT` (anything else; stays locked until an operator resolves it).
+
+Fail-closed after any potentially-delivered request, as specified.
+
+---
+
+### P3.6 — "These are bounded capabilities, not exact refund authorizations."
+
+**Verdict: ACCEPT.** Correct: `amount ≤ max_amount_paise` lets the agent choose any lower amount, so a merchant intending "refund ₹500 for order X" would see a ₹1 refund pass. That is a capability range wearing the word "authorization" — the same criticism as P2.4, one level finer.
+
+v4 makes an action carry **either** `amount_paise` (exact) **or** `max_amount_paise` (bounded), with **exact as the default**. Bounded is opt-in for cases where the merchant genuinely delegates the figure (e.g. "refund up to the order value, agent determines which items came back"), and the mandate records which was chosen.
+
+The claim is restated to match: the proxy enforces a **merchant-issued capability list**; where the merchant deliberately issued a bounded grant, amounts inside that bound are authorized *by the merchant's own choice*, and the mandate shows it.
+
+---
+
+### P3.7 — "Phase 0.5 needs to happen now, not remain a plan item."
+
+**Verdict: ACCEPT — executing.** Correct that a pre-registration which exists only as a plan item is not pre-registration. Until the manifest, labels, class/session counts, template split and frozen baseline exist as a commit, there is no held-out corpus and no metric claim worth reviewing.
+
+Executed this round rather than scheduled. Local commits only — no remote, no push.
+
+---
+
+### P3.8 — "The receipt example conflicts with the stated format requirement."
+
+**Verdict: ACCEPT.** `rfa_001` is 7 characters against a stated ≥10 minimum — an untested length assumption sitting in a worked example, which is how this kind of bug reaches production.
+
+v4 specifies the generated format explicitly: **`rzpg_` + `action_id`** (e.g. `rzpg_rfa_001`, 12 chars), satisfying the length floor and the alphanumeric/underscore/hyphen constraint. Verified against the live schema in **G1.6** rather than assumed — the same gate that now checks duplicate behaviour.
+
+---
+
+**Net effect of Round 3:** one false claim about vendor documentation retracted along with the method that produced it; one pipeline stage deleted as provably redundant; automatic reconciliation cut to preserve the architecture's central claim; two state machines merged into one fail-closed lifecycle; exact amounts made the default; and pre-registration moved from plan to commit. The plan shrinks for the third consecutive round.
