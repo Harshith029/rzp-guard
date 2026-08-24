@@ -28,10 +28,18 @@ cmd_test()  { gorun go test ./...; }
 cmd_race()  { gorun go test -race ./...; }
 cmd_vet()   { gorun go vet ./...; }
 
+# Process-lifecycle tests live behind -tags testhook, so plain "go test ./..."
+# does NOT run them -- cmd/rzp-guard reports "no test files" in the default
+# lane. They were being counted in the advertised suite while being excluded
+# from it. This lane runs them explicitly and is reported separately.
+cmd_lifecycle() { gorun go test -tags testhook -v -run Terminates -run . ./cmd/rzp-guard/; }
+cmd_all()       { cmd_test; echo; cmd_lifecycle; }
+
 cmd_build() {
   go build -o rzp-guard.exe ./cmd/rzp-guard
   go build -o gate-verify.exe ./cmd/gate-verify
-  echo "built ./rzp-guard.exe and ./gate-verify.exe"
+  go build -o rzp-guard-operator.exe ./cmd/rzp-guard-operator
+  echo "built ./rzp-guard.exe ./gate-verify.exe ./rzp-guard-operator.exe"
 }
 
 # THE central proof: a call the mandate does not authorize never crosses into
@@ -97,6 +105,9 @@ rzp-guard
 
   ./run.sh test              fast lane: all unit tests (no Docker child, no keys, no network)
   ./run.sh race              fast lane under the race detector
+  ./run.sh lifecycle         process-lifecycle tests (-tags testhook; NOT in the
+                             default lane, reported separately)
+  ./run.sh all               fast lane + lifecycle lane
   ./run.sh build             build ./rzp-guard.exe and ./gate-verify.exe
 
   ./run.sh live-block        LIVE: unauthorized refund never reaches the real
@@ -112,6 +123,8 @@ EOF
 case "${1:-help}" in
   test) cmd_test ;;
   race) cmd_race ;;
+  lifecycle) cmd_lifecycle ;;
+  all) cmd_all ;;
   vet) cmd_vet ;;
   build) cmd_build ;;
   live-block) cmd_live_block ;;

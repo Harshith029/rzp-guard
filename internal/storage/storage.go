@@ -66,6 +66,14 @@ CREATE TABLE IF NOT EXISTS call_log (
 );
 CREATE INDEX IF NOT EXISTS call_log_window ON call_log (mandate_id, at_unix_nano);
 
+-- SHA-256 of the operator token, written at guard launch. The expected value
+-- must come from a different source than the value being checked.
+CREATE TABLE IF NOT EXISTS operator_auth (
+  id           INTEGER PRIMARY KEY CHECK (id = 1),
+  token_sha256 TEXT NOT NULL,
+  set_at       TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   at            TEXT NOT NULL,
@@ -319,4 +327,106 @@ func (s *Store) AuditCount() (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM audit WHERE mandate_id = ?`, s.mandateID).Scan(&n)
 	return n, err
+}
+
+// ActionRow is a durable action as an operator sees it.
+type ActionRow struct {
+	ActionID    string
+	PaymentID   string
+	Receipt     string
+	State       string
+	AmountPaise int64
+	UpdatedAt   string
+}
+
+// ActionsInState lists actions in a given state, for the operator console.
+//
+// payment_id is not stored on action_state (the mandate holds it), so the
+// operator tool resolves it from the mandate it is given. Receipt is the field
+// an operator actually needs: it is the correlation key to look the refund up
+// in the Razorpay dashboard.
+func (s *Store) ActionsInState(state string) ([]ActionRow, error) {
+	rows, err := s.db.Query(
+		`SELECT action_id, receipt, state, amount_paise, updated_at
+		 FROM action_state WHERE mandate_id = ? AND state = ? ORDER BY updated_at`,
+		s.mandateID, state)
+	if err != nil {
+		return nil, fmt.Errorf("storage: list %s: %w", state, err)
+	}
+	defer rows.Close()
+	var out []ActionRow
+	for rows.Next() {
+		var a ActionRow
+		if err := rows.Scan(&a.ActionID, &a.Receipt, &a.State, &a.AmountPaise, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// AuditRow is one operator-initiated transition.
+type AuditRow struct {
+	At           string
+	Actor        string
+	ActionID     string
+	From, To     string
+	RefundLanded bool
+	Reason       string
+}
+
+// AuditTrail returns every operator resolution, oldest first.
+func (s *Store) AuditTrail() ([]AuditRow, error) {
+	rows, err := s.db.Query(
+		`SELECT at, actor, action_id, from_state, to_state, refund_landed, reason
+		 FROM audit WHERE mandate_id = ? ORDER BY id`, s.mandateID)
+	if err != nil {
+		return nil, fmt.Errorf("storage: audit: %w", err)
+	}
+	defer rows.Close()
+	var out []AuditRow
+	for rows.Next() {
+		var a AuditRow
+		var landed int
+		if err := rows.Scan(&a.At, &a.Actor, &a.ActionID, &a.From, &a.To, &landed, &a.Reason); err != nil {
+			return nil, err
+		}
+		a.RefundLanded = landed == 1
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// SetOperatorTokenHash records the SHA-256 of the operator token, at guard
+// launch, in the state file.
+//
+// The expected value MUST come from a different source than the value being
+// checked. An earlier operator CLI read the token from the environment and then
+// constructed the console with that same token, so the comparison was against
+// itself and any token of sufficient length was accepted. Storing the hash at
+// guard launch makes the check real: whoever starts the guard sets it, and the
+// operator must present the matching secret later.
+func (s *Store) SetOperatorTokenHash(hash string) error {
+	_, err := s.db.Exec(
+		`INSERT INTO operator_auth (id, token_sha256, set_at) VALUES (1, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET token_sha256 = excluded.token_sha256,
+		                               set_at = excluded.set_at`,
+		hash, time.Now().UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("storage: set operator token: %w", err)
+	}
+	return nil
+}
+
+// OperatorTokenHash returns the configured hash, or false if none was set.
+func (s *Store) OperatorTokenHash() (string, bool, error) {
+	var h string
+	err := s.db.QueryRow(`SELECT token_sha256 FROM operator_auth WHERE id = 1`).Scan(&h)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("storage: operator token: %w", err)
+	}
+	return h, h != "", nil
 }

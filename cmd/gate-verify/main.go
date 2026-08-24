@@ -120,18 +120,35 @@ func verifyBlock(dir string) {
 	fmt.Println("Live block gate")
 
 	// 1. The blocked call never crossed the boundary.
-	forwardedRefund := 0
-	forwardedCalls := 0
+	var forwarded []rpc
+	moneyMoving := 0
 	for _, m := range tee {
-		if m.Method == "tools/call" {
-			forwardedCalls++
-			if m.Params.Name == "create_refund" {
-				forwardedRefund++
-			}
+		if m.Method != "tools/call" {
+			continue
+		}
+		forwarded = append(forwarded, m)
+		switch m.Params.Name {
+		case "create_refund", "create_instant_settlement", "initiate_payment",
+			"capture_payment", "create_payment_link", "create_payment_link_upi",
+			"payment_link_upi_create", "create_registration_link", "revoke_token":
+			moneyMoving++
 		}
 	}
-	check(forwardedRefund == 0,
-		"unauthorized create_refund never written to child stdin (found %d)", forwardedRefund)
+	check(moneyMoving == 0,
+		"NO money-moving tools/call of any kind reached child stdin (found %d)", moneyMoving)
+
+	// Bind the control to the EXACT request, not to "at least one call". A
+	// weaker proxy could be satisfied by some other forwarded call while the
+	// intended control never happened.
+	check(len(forwarded) == 1,
+		"exactly one tools/call was forwarded (found %d)", len(forwarded))
+	if len(forwarded) == 1 {
+		check(forwarded[0].Params.Name == "fetch_all_payments",
+			"the forwarded call is the expected control read fetch_all_payments (got %q)",
+			forwarded[0].Params.Name)
+		check(id(forwarded[0]) == "4",
+			"the forwarded control read carries id 4 (got %s)", id(forwarded[0]))
+	}
 
 	// 2. The guard answered the blocked id with a readable denial.
 	blocked, ok := find(out, "3")
@@ -165,9 +182,8 @@ func verifyBlock(dir string) {
 				"CONTROL: response carries an \"entity\" field, so it came from the API "+
 					"rather than being synthesised by the guard")
 		}
-		check(forwardedCalls >= 1,
-			"CONTROL: at least one tools/call was genuinely forwarded to the child (%d)",
-			forwardedCalls)
+		check(len(forwarded) == 1 && id(forwarded[0]) == "4",
+			"CONTROL: the response on id 4 corresponds to the exact call forwarded")
 	}
 }
 

@@ -25,3 +25,5 @@ venv/
 /gate-verify.exe
 /rzp-guard-testhook
 /rzp-guard-testhook.exe
+/rzp-guard-operator
+/rzp-guard-operator.exe
