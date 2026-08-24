@@ -187,21 +187,28 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 	return nil
 }
 
-// SetState records a terminal or recovered state.
-func (s *Store) SetState(actionID, state string) error {
+// SetState performs an EXPECTED-STATE transition.
+//
+// Filtering on the previous state is what makes this a transition rather than
+// an overwrite. Matching on (mandate, action) alone would let a stale caller
+// move a COMMITTED action back to AVAILABLE, and RowsAffected == 1 would
+// cheerfully report success -- it proves the row exists, not that the intended
+// transition is the one that happened.
+func (s *Store) SetState(actionID, from, to string) error {
 	res, err := s.db.Exec(
-		`UPDATE action_state SET state = ?, updated_at = ? WHERE mandate_id = ? AND action_id = ?`,
-		state, time.Now().UTC().Format(time.RFC3339Nano), s.mandateID, actionID)
+		`UPDATE action_state SET state = ?, updated_at = ?
+		 WHERE mandate_id = ? AND action_id = ? AND state = ?`,
+		to, time.Now().UTC().Format(time.RFC3339Nano), s.mandateID, actionID, from)
 	if err != nil {
-		return fmt.Errorf("storage: set state %s=%s: %w", actionID, state, err)
+		return fmt.Errorf("storage: set state %s %s->%s: %w", actionID, from, to, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("storage: set state %s: rows affected: %w", actionID, err)
 	}
 	if n != 1 {
-		return fmt.Errorf("storage: set state %s=%s: %w (%d rows)",
-			actionID, state, ErrNoRowChanged, n)
+		return fmt.Errorf("storage: set state %s %s->%s: %w (%d rows; the action was "+
+			"not in the expected state)", actionID, from, to, ErrNoRowChanged, n)
 	}
 	return nil
 }

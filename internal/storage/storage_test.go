@@ -62,7 +62,7 @@ func TestReserveFailsWhenTheRowIsNotAvailable(t *testing.T) {
 		t.Fatal("re-reserving a RESERVED action reported success with zero rows changed")
 	}
 
-	if err := st.SetState("rfa_001", "COMMITTED"); err != nil {
+	if err := st.SetState("rfa_001", "RESERVED", "COMMITTED"); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.Reserve("rfa_001", "rzpg_aaaaaaaaaaaa", 1000); err == nil {
@@ -80,8 +80,39 @@ func TestSetStateFailsForAnUnknownAction(t *testing.T) {
 	}
 	defer st.Close()
 
-	if err := st.SetState("rfa_does_not_exist", "COMMITTED"); err == nil {
+	if err := st.SetState("rfa_does_not_exist", "RESERVED", "COMMITTED"); err == nil {
 		t.Fatal("SetState on a non-existent row reported success")
+	}
+}
+
+// A transition must assert the state it is moving FROM. Matching on
+// (mandate, action) alone would let a stale caller move a COMMITTED action back
+// to AVAILABLE, and RowsAffected == 1 would report success: it proves the row
+// exists, not that the intended transition happened.
+func TestStaleTransitionCannotReleaseACommittedAction(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "guard.db")
+	st, err := Open(db, "mnd_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	if err := st.Reserve("rfa_001", "rzpg_bbbbbbbbbbbb", 5000); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetState("rfa_001", "RESERVED", "COMMITTED"); err != nil {
+		t.Fatal(err)
+	}
+	// A late duplicate reply tries the transition it thinks is pending.
+	if err := st.SetState("rfa_001", "RESERVED", "AVAILABLE"); err == nil {
+		t.Fatal("a stale RESERVED->AVAILABLE transition released a COMMITTED action")
+	}
+	snap, err := st.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.States["rfa_001"] != "COMMITTED" {
+		t.Fatalf("state = %s, want COMMITTED", snap.States["rfa_001"])
 	}
 }
 

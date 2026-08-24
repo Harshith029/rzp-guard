@@ -41,7 +41,7 @@ var (
 // reaches the child, so a crash mid-flight leaves a recoverable row.
 type Persister interface {
 	Reserve(actionID, receipt string, amountPaise int64) error
-	SetState(actionID, state string) error
+	SetState(actionID, from, to string) error
 }
 
 // ResolveStore performs the operator's decision and its audit record atomically.
@@ -203,7 +203,7 @@ func (l *Ledger) transition(actionID string, want, next State, mutate func(*entr
 		return fmt.Errorf("%w: cannot move %s from %s to %s", ErrBadTransition, actionID, e.state, next)
 	}
 	if l.store != nil {
-		if err := l.store.SetState(actionID, string(next)); err != nil {
+		if err := l.store.SetState(actionID, string(want), string(next)); err != nil {
 			return fmt.Errorf("durable state write failed: %w", err)
 		}
 	}

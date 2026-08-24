@@ -95,11 +95,15 @@ func TestDangerousToolInMandateNeverReachesTheChild(t *testing.T) {
 	}
 	r, child, agent := newRelay(t, policy.New(m))
 
+	// Deliberately DATA-FREE. The allowlist is immutable regardless of
+	// arguments, so proving it needs no realistic money-movement payload -- and
+	// a public hiring repo under an automatic-disqualification rule should not
+	// carry one unnecessarily.
 	feed(t, r,
 		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":`+
-			`{"name":"initiate_payment","arguments":{"amount":500000,"token":"tok_x"}}}`,
+			`{"name":"initiate_payment","arguments":{}}}`,
 		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":`+
-			`{"name":"create_instant_settlement","arguments":{"amount":900000}}}`)
+			`{"name":"create_instant_settlement","arguments":{}}}`)
 
 	if got := child.String(); got != "" {
 		t.Fatalf("child received bytes for tools outside the build surface:\n%s", got)
@@ -222,21 +226,56 @@ func TestChildReplyResolvesTheReservation(t *testing.T) {
 	}
 }
 
-func TestToolErrorReplyReleasesTheAuthorization(t *testing.T) {
-	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
-	r, _, _ := newRelay(t, g)
-
-	feed(t, r, `{"jsonrpc":"2.0","id":12,"method":"tools/call","params":`+
-		`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`)
-
-	reply := `{"jsonrpc":"2.0","id":12,"result":{"content":[{"type":"text",` +
-		`"text":"creating refund failed: BAD_REQUEST"}],"isError":true}}`
-	if err := r.PumpChild(strings.NewReader(reply + "\n")); err != nil {
-		t.Fatal(err)
+// ONCE BYTES HAVE LEFT, NOTHING AUTO-RELEASES.
+//
+// A previous revision released the authorization on any JSON-RPC error or any
+// isError result, assuming an error proves the request was rejected before
+// execution. That was never verified and is not safe: the child can fail after
+// dispatching the HTTP request, or while formatting a response to a refund
+// Razorpay actually processed. Both shapes now hold the action AND the budget.
+func TestErrorRepliesHoldTheActionAndBudgetInDoubt(t *testing.T) {
+	cases := []struct {
+		name  string
+		reply string
+	}{
+		{
+			"mcp tool error",
+			`{"jsonrpc":"2.0","id":12,"result":{"content":[{"type":"text",` +
+				`"text":"creating refund failed"}],"isError":true}}`,
+		},
+		{
+			"jsonrpc error",
+			`{"jsonrpc":"2.0","id":12,"error":{"code":-32603,"message":"internal error"}}`,
+		},
+		{
+			"empty result",
+			`{"jsonrpc":"2.0","id":12}`,
+		},
 	}
-	if g.State("rfa_001") != lifecycle.Available {
-		t.Fatalf("state = %s, want AVAILABLE: a confirmed rejection must not burn "+
-			"a legitimate authorization", g.State("rfa_001"))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := newGuard(t,
+				`[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+			r, _, _ := newRelay(t, g)
+
+			feed(t, r, `{"jsonrpc":"2.0","id":12,"method":"tools/call","params":`+
+				`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`)
+			if err := r.PumpChild(strings.NewReader(tc.reply + "\n")); err != nil {
+				t.Fatal(err)
+			}
+
+			if got := g.State("rfa_001"); got != lifecycle.InDoubt {
+				t.Fatalf("state = %s, want IN_DOUBT: this reply shape cannot prove "+
+					"Razorpay did not process the refund", got)
+			}
+			if enc := g.Encumbered(); enc != 20000 {
+				t.Fatalf("encumbered = %d, want 20000: budget must stay held", enc)
+			}
+			if retry := g.Decide(policy.RefundTool, map[string]any{
+				"payment_id": "pay_SYN0001", "amount": int64(20000)}, now); retry.Allowed {
+				t.Fatal("the action was reusable after an ambiguous reply")
+			}
+		})
 	}
 }
 

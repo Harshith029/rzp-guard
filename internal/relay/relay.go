@@ -202,9 +202,20 @@ func (r *Relay) PumpChild(childOut io.Reader) error {
 
 // resolve moves a reservation to its outcome.
 //
-// Only a well-formed reply commits or releases. Anything ambiguous is left
-// RESERVED and swept into IN_DOUBT by CloseInflight, because the provider may
-// have processed the refund.
+// ONCE BYTES HAVE REACHED THE CHILD, THE ONLY AUTOMATIC OUTCOMES ARE COMMIT AND
+// IN_DOUBT. There is deliberately no auto-release here.
+//
+// A previous revision released the authorization on any JSON-RPC error or any
+// isError result, on the assumption that an error means the request was
+// rejected before execution. That assumption was never verified and is not
+// safe: the child can fail after dispatching the HTTP request, or while
+// formatting a response to a refund Razorpay actually processed. Either shape
+// can represent a processed-but-unreported refund, so both hold the action and
+// the budget.
+//
+// Releasing after forwarding requires a typed rejection demonstrated in Test
+// Mode to occur strictly before provider execution. Until gate G1.6 establishes
+// that, every non-success is ambiguous.
 func (r *Relay) resolve(id string, msg rpcMessage) {
 	r.mu.Lock()
 	actionID, ok := r.inflight[id]
@@ -215,14 +226,8 @@ func (r *Relay) resolve(id string, msg rpcMessage) {
 	if !ok {
 		return
 	}
-	if len(msg.Error) > 0 {
-		// A JSON-RPC error means the request was rejected before execution.
-		_ = r.guard.ReleaseConfirmedRejection(actionID)
-		return
-	}
-	if isToolError(msg.Result) {
-		// The tool ran and the provider refused it: a confirmed rejection.
-		_ = r.guard.ReleaseConfirmedRejection(actionID)
+	if len(msg.Error) > 0 || isToolError(msg.Result) || len(msg.Result) == 0 {
+		_ = r.guard.MarkInDoubt(actionID)
 		return
 	}
 	_ = r.guard.Commit(actionID)
