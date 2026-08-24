@@ -147,7 +147,7 @@ func TestCorrectOperatorTokenResolvesAndAudits(t *testing.T) {
 		t.Fatalf("state = %s, want COMMITTED", got)
 	}
 
-	audit, err := runOperator(t, bin, realToken, "-mandate", mandatePath, "-state", dbPath, "audit")
+	audit, err := runOperator(t, bin, realToken, "-mandate", mandatePath, "-state", dbPath, "-operator", "ops@merchant", "audit")
 	if err != nil {
 		t.Fatalf("audit failed: %v\n%s", err, audit)
 	}
@@ -209,7 +209,7 @@ func TestGuardCannotReplaceTheOperatorCredential(t *testing.T) {
 	dbPath, mandatePath, realToken := stuckState(t, true)
 
 	// A second init must be refused outright.
-	out, err := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath, "init")
+	out, err := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath, "init", "-out", filepath.Join(t.TempDir(), "tok"))
 	if err == nil {
 		t.Fatalf("a second init replaced an existing credential:\n%s", out)
 	}
@@ -231,32 +231,49 @@ func TestGuardCannotReplaceTheOperatorCredential(t *testing.T) {
 func TestRotationRequiresTheCurrentToken(t *testing.T) {
 	bin := buildOperator(t)
 	dbPath, mandatePath, realToken := stuckState(t, true)
+	newTokPath := filepath.Join(t.TempDir(), "newtok")
 
 	out, err := runOperator(t, bin, "wrong-token-entirely-here",
 		"-mandate", mandatePath, "-state", dbPath,
-		"rotate", "-operator", "attacker", "-reason", "takeover")
+		"-operator", "attacker", "rotate", "-reason", "takeover")
 	if err == nil {
-		t.Fatalf("rotation succeeded without the current token:\n%s", out)
+		t.Fatalf("rotation succeeded without the current token:%s", out)
 	}
 
 	out, err = runOperator(t, bin, realToken,
 		"-mandate", mandatePath, "-state", dbPath,
-		"rotate", "-operator", "ops", "-reason", "scheduled rotation")
+		"-operator", "ops", "rotate", "-reason", "scheduled rotation",
+		"-out", newTokPath)
 	if err != nil {
-		t.Fatalf("rotation with the correct token failed: %v\n%s", err, out)
+		t.Fatalf("rotation with the correct token failed: %v %s", err, out)
 	}
-	if !strings.Contains(out, "rzpop_") {
-		t.Fatalf("rotation did not emit a new token:\n%s", out)
+	if strings.Contains(out, "rzpop_") {
+		t.Fatalf("rotation printed the new secret to a pipe: %s", out)
 	}
 
-	audit, _ := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath, "audit")
+	// The OLD token must stop working, and the new one must start.
+	if _, err := runOperator(t, bin, realToken, "-mandate", mandatePath,
+		"-state", dbPath, "-operator", "ops", "audit"); err == nil {
+		t.Fatal("the pre-rotation token still authenticates")
+	}
+	nb, err := os.ReadFile(newTokPath)
+	if err != nil {
+		t.Fatalf("new token file missing: %v", err)
+	}
+	newToken := strings.TrimSpace(string(nb))
+	if !strings.HasPrefix(newToken, "rzpop_") {
+		t.Fatalf("new token malformed: %q", newToken)
+	}
+	audit, err := runOperator(t, bin, newToken, "-mandate", mandatePath,
+		"-state", dbPath, "-operator", "ops", "audit")
+	if err != nil {
+		t.Fatalf("audit with the new token failed: %v %s", err, audit)
+	}
 	if !strings.Contains(audit, "ROTATED") {
-		t.Fatalf("rotation was not audited:\n%s", audit)
+		t.Fatalf("rotation was not audited: %s", audit)
 	}
 }
 
-// Audit text is bounded and must not carry control characters: the trail is read
-// by humans and may later be rendered.
 func TestAuditTextIsBoundedAndControlCharsRefused(t *testing.T) {
 	bin := buildOperator(t)
 	dbPath, mandatePath, realToken := stuckState(t, true)
@@ -279,5 +296,79 @@ func TestAuditTextIsBoundedAndControlCharsRefused(t *testing.T) {
 		"-operator", "ops", "-reason", long)
 	if err == nil {
 		t.Fatalf("a 600-character reason was accepted:\n%s", out)
+	}
+}
+
+// list and audit disclose payment ids, receipts, amounts and audit reasons.
+// They are recovery evidence, not public data: an earlier version gated only
+// mutation, leaving all of it readable by any local caller.
+func TestReadCommandsRequireTheCredential(t *testing.T) {
+	bin := buildOperator(t)
+	dbPath, mandatePath, realToken := stuckState(t, true)
+
+	for _, cmd := range []string{"list", "audit"} {
+		out, err := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath,
+			"-operator", "someone", cmd)
+		if err == nil {
+			t.Fatalf("%s ran without a credential:\n%s", cmd, out)
+		}
+		if strings.Contains(out, "pay_SYN") || strings.Contains(out, "rzpg_") {
+			t.Fatalf("%s leaked recovery evidence before authenticating:\n%s", cmd, out)
+		}
+
+		out, err = runOperator(t, bin, "wrong-token-entirely-here",
+			"-mandate", mandatePath, "-state", dbPath, "-operator", "someone", cmd)
+		if err == nil {
+			t.Fatalf("%s ran with a wrong credential:\n%s", cmd, out)
+		}
+	}
+
+	// The correct credential still works.
+	out, err := runOperator(t, bin, realToken, "-mandate", mandatePath, "-state", dbPath,
+		"-operator", "ops", "list")
+	if err != nil {
+		t.Fatalf("list with the correct credential failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "rfa_stuck_001") {
+		t.Fatalf("authenticated list showed nothing:\n%s", out)
+	}
+}
+
+// init must not print a secret into a pipe: CI logs, terminal recordings and
+// shell history all capture stdout.
+func TestInitRefusesToPrintASecretToANonTerminal(t *testing.T) {
+	bin := buildOperator(t)
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "fresh.db")
+	mandatePath := filepath.Join(dir, "mandate.json")
+	if err := os.WriteFile(mandatePath, []byte(mandateDoc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// CombinedOutput gives the child a pipe, not a terminal.
+	out, err := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath, "init")
+	if err == nil {
+		t.Fatalf("init printed a credential to a pipe:\n%s", out)
+	}
+	if !strings.Contains(out, "non-terminal") {
+		t.Fatalf("unexpected failure:\n%s", out)
+	}
+	if strings.Contains(out, "rzpop_") {
+		t.Fatalf("the token was emitted anyway:\n%s", out)
+	}
+
+	// -out writes it to a 0600 file instead.
+	tokPath := filepath.Join(dir, "token")
+	out, err = runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath,
+		"init", "-out", tokPath)
+	if err != nil {
+		t.Fatalf("init -out failed: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "rzpop_") {
+		t.Fatalf("the token leaked to stdout despite -out:\n%s", out)
+	}
+	b, err := os.ReadFile(tokPath)
+	if err != nil || !strings.HasPrefix(string(b), "rzpop_") {
+		t.Fatalf("token file missing or malformed: %v %q", err, string(b))
 	}
 }

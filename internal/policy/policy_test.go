@@ -12,6 +12,7 @@ import (
 
 	"github.com/harshith/rzp-guard/internal/lifecycle"
 	"github.com/harshith/rzp-guard/internal/mandate"
+	"github.com/harshith/rzp-guard/internal/opauth"
 	"github.com/harshith/rzp-guard/internal/storage"
 )
 
@@ -589,7 +590,14 @@ func TestReceiptUniquenessIsEnforcedByTheDatabase(t *testing.T) {
 
 // ------------------------------------------------- operator boundary
 
-func TestOperatorResolutionIsTokenGatedAndDurablyAudited(t *testing.T) {
+// Resolution requires an unforgeable opauth.Grant, and the audit record lands
+// in the same transaction.
+//
+// lifecycle no longer performs any credential comparison. It used to take a
+// token at construction and compare a caller-supplied token against it -- both
+// sides came from the caller, so the check was vacuous. Authentication now
+// happens once, in opauth, and the resolver demands its result.
+func TestResolutionRequiresAGrantAndIsDurablyAudited(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "guard.db")
 	m := mustMandate(t,
 		`[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
@@ -599,49 +607,49 @@ func TestOperatorResolutionIsTokenGatedAndDurablyAudited(t *testing.T) {
 	}
 	defer st.Close()
 
-	// Explicit composition: main owns the ledger and the token; the relay gets
-	// only the Guard, which exposes no path to resolution.
 	led := lifecycle.NewLedger(m.Limits.MaxCumulativePaise, st)
 	g := NewWithLedger(m, led)
-	const token = "operator-token-32-chars-minimum!"
 
-	if _, err := lifecycle.NewConsole(led, "short", st); err == nil {
-		t.Fatal("a weak operator token was accepted")
-	}
-	if _, err := lifecycle.NewConsole(led, token, nil); err == nil {
-		t.Fatal("a console without a durable audit store was accepted")
-	}
-	console, err := lifecycle.NewConsole(led, token, st)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	d := g.Decide(RefundTool, jsonArgs(t,
-		`{"payment_id":"pay_SYN0001","amount":20000}`), now)
+	d := g.Decide(RefundTool, jsonArgs(t, `{"payment_id":"pay_SYN0001","amount":20000}`), now)
 	if err := g.MarkInDoubt(d.MatchedActionID); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := console.Resolve("wrong-token-wrong-token", "ops@merchant", "rfa_001",
-		true, "checked"); err == nil {
-		t.Fatal("resolution succeeded with the wrong token")
+	// A zero-value Grant cannot be minted outside opauth and must be refused.
+	if err := lifecycle.ResolveInDoubt(opauth.Grant{}, led, st, "rfa_001", true,
+		"forged"); err == nil {
+		t.Fatal("an unauthenticated zero-value Grant resolved the action")
 	}
 	if g.State("rfa_001") != lifecycle.InDoubt {
-		t.Fatal("a rejected resolution changed state")
+		t.Fatal("a refused resolution changed state")
 	}
 	if n, _ := st.AuditCount(); n != 0 {
-		t.Fatalf("rejected resolution wrote %d audit rows", n)
+		t.Fatalf("refused resolution wrote %d audit rows", n)
 	}
 
-	if err := console.Resolve(token, "ops@merchant", "rfa_001", true,
-		"found receipt in Razorpay Test Mode dashboard"); err != nil {
+	token, err := opauth.NewToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := opauth.Verifier(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := opauth.Authenticate("ops@merchant", "wrong-token", verifier); err == nil {
+		t.Fatal("a wrong token produced a Grant")
+	}
+	grant, err := opauth.Authenticate("ops@merchant", token, verifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lifecycle.ResolveInDoubt(grant, led, st, "rfa_001", true,
+		"found receipt in Razorpay Test Mode"); err != nil {
 		t.Fatal(err)
 	}
 	if g.State("rfa_001") != lifecycle.Committed {
 		t.Fatalf("state = %s, want COMMITTED", g.State("rfa_001"))
 	}
-	n, err := st.AuditCount()
-	if err != nil || n != 1 {
+	if n, err := st.AuditCount(); err != nil || n != 1 {
 		t.Fatalf("audit rows = %d (err=%v), want exactly 1", n, err)
 	}
 }

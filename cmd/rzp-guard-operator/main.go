@@ -37,8 +37,9 @@ import (
 
 const usage = `rzp-guard-operator — resolve refunds whose outcome is unknown
 
-  rzp-guard-operator -mandate M -state S init
-        generate the operator credential ONCE (prints the token; not recoverable)
+  rzp-guard-operator -mandate M -state S init [-out FILE]
+        DEPLOYMENT STEP, run once BEFORE the guard is ever started.
+        Refuses to print to a non-terminal; use -out for a 0600 file.
 
   rzp-guard-operator -mandate M -state S rotate -operator <who> -reason <text>
         replace it, authenticated with the CURRENT token, audited
@@ -52,6 +53,10 @@ const usage = `rzp-guard-operator — resolve refunds whose outcome is unknown
   rzp-guard-operator -mandate M -state S resolve <action_id> \
         -outcome landed|not-landed -operator <who> -reason <text>
         record a human's finding and unlock the action
+
+ALL commands except init require RZP_GUARD_OPERATOR_TOKEN and -operator,
+including list and audit: they disclose payment ids, receipts, amounts and
+audit reasons.
 
 The guard must be STOPPED: it holds an exclusive lock on the state file.
 Set RZP_GUARD_OPERATOR_TOKEN to the generated token to authorise resolve/rotate.
@@ -77,6 +82,7 @@ func run() error {
 		operator    = flag.String("operator", "", "who is resolving (resolve only)")
 		reason      = flag.String("reason", "", "what you checked and found (resolve only)")
 		asJSON      = flag.Bool("json", false, "machine-readable output")
+		out         = flag.String("out", "", "init/rotate: file to write the new token to (mode 0600)")
 	)
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
@@ -130,11 +136,28 @@ func run() error {
 	}
 	defer store.Close()
 
+	// init is the only command that runs without a credential, because it is
+	// the one that creates it.
+	if args[0] == "init" {
+		return cmdInit(store, *out)
+	}
+
+	// EVERY other command authenticates, including the read-only ones. list and
+	// audit disclose payment ids, receipts, amounts, operator names and audit
+	// reasons -- recovery evidence, not public data. Gating only mutation left
+	// all of it readable by any local caller.
+	token := os.Getenv("RZP_GUARD_OPERATOR_TOKEN")
+	if token == "" {
+		return errors.New("RZP_GUARD_OPERATOR_TOKEN is not set")
+	}
+	grant, err := authenticate(store, *operator, token)
+	if err != nil {
+		return err
+	}
+
 	switch args[0] {
-	case "init":
-		return cmdInit(store)
 	case "rotate":
-		return cmdRotate(store, *operator, *reason)
+		return cmdRotate(store, grant, *reason, *out)
 	case "list":
 		return cmdList(store, m, *asJSON)
 	case "audit":
@@ -143,30 +166,52 @@ func run() error {
 		if len(args) < 2 {
 			return errors.New("resolve needs an action_id")
 		}
-		return cmdResolve(store, m, args[1], *outcome, *operator, *reason)
+		return cmdResolve(store, m, grant, args[1], *outcome, *reason)
 	default:
 		flag.Usage()
 		return fmt.Errorf("unknown command %q", args[0])
 	}
 }
 
-// authenticate verifies a presented token against the stored verifier.
-func authenticate(store *storage.Store, token string) error {
+// authenticate verifies a presented token and returns an unforgeable Grant.
+func authenticate(store *storage.Store, subject, token string) (opauth.Grant, error) {
 	stored, configured, err := store.OperatorVerifier()
 	if err != nil {
-		return err
+		return opauth.Grant{}, err
 	}
 	if !configured {
-		return errors.New("no operator credential exists for this state file. " +
-			"Run `rzp-guard-operator ... init` once to generate one")
+		return opauth.Grant{}, errors.New("no operator credential exists for this " +
+			"state file. Run init once, as a deployment step, before the guard is started")
 	}
-	return opauth.Verify(token, stored)
+	if subject == "" {
+		return opauth.Grant{}, errors.New("-operator is required: every authenticated " +
+			"action is attributed in the audit trail")
+	}
+	return opauth.Authenticate(subject, token, stored)
+}
+
+// stdoutIsTerminal reports whether stdout is an interactive character device.
+func stdoutIsTerminal() bool {
+	fi, err := os.Stdout.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
 // cmdInit generates the credential. It refuses if one already exists: a second
 // init must not be able to silently replace it, which is how the restart bypass
 // worked when the guard rewrote the credential on every start.
-func cmdInit(store *storage.Store) error {
+func cmdInit(store *storage.Store, outPath string) error {
+	// NOTE ON 0600: Windows does not honour Unix permission bits, so the mode
+	// below is advisory there and the file lands 0644. On Windows the operator
+	// must rely on directory ACLs. Measured, not assumed - stat reported 644.
+	//
+	// "Shown once" means nothing if stdout is a pipe: CI logs, terminal
+	// recordings and shell history all capture it. Refuse to print a secret to
+	// anything that is not an interactive terminal, and offer a 0600 file.
+	if outPath == "" && !stdoutIsTerminal() {
+		return errors.New("refusing to print a new credential to a non-terminal " +
+			"(CI logs, pipes and terminal recording all capture it). Re-run " +
+			"interactively, or pass -out <path> to write a 0600 file")
+	}
 	token, err := opauth.NewToken()
 	if err != nil {
 		return err
@@ -178,25 +223,28 @@ func cmdInit(store *storage.Store) error {
 	if err := store.InitOperatorVerifier(verifier); err != nil {
 		return err
 	}
-	fmt.Println("Operator credential created. This is shown ONCE and is not recoverable:")
+	if outPath != "" {
+		if err := os.WriteFile(outPath, []byte(token+"\n"), 0o600); err != nil {
+			return fmt.Errorf("write token: %w", err)
+		}
+		fmt.Printf("Operator credential created and written to %s (mode 0600).\n", outPath)
+		fmt.Println("Move it somewhere a human can reach during an incident, then delete it.")
+		return nil
+	}
+	fmt.Println("Operator credential created. Shown ONCE and not recoverable:")
 	fmt.Printf("\n    %s\n\n", token)
-	fmt.Println("Store it somewhere a human can reach during an incident, then:")
-	fmt.Println("    export RZP_GUARD_OPERATOR_TOKEN=<the value above>")
-	fmt.Println("\nThe guard never reads or writes this credential. Only this command does.")
+	fmt.Println("The guard never reads or writes this credential. Only this command does.")
 	return nil
 }
 
 // cmdRotate replaces the credential, authenticated by the CURRENT token.
-func cmdRotate(store *storage.Store, operator, reason string) error {
-	current := os.Getenv("RZP_GUARD_OPERATOR_TOKEN")
-	if current == "" {
-		return errors.New("RZP_GUARD_OPERATOR_TOKEN must hold the CURRENT token to rotate")
-	}
-	if err := authenticate(store, current); err != nil {
+func cmdRotate(store *storage.Store, grant opauth.Grant, reason, outPath string) error {
+	if err := checkAuditText(grant.Subject(), reason); err != nil {
 		return err
 	}
-	if err := checkAuditText(operator, reason); err != nil {
-		return err
+	if outPath == "" && !stdoutIsTerminal() {
+		return errors.New("refusing to print a rotated credential to a non-terminal; " +
+			"re-run interactively or pass -out <path>")
 	}
 	next, err := opauth.NewToken()
 	if err != nil {
@@ -206,8 +254,15 @@ func cmdRotate(store *storage.Store, operator, reason string) error {
 	if err != nil {
 		return err
 	}
-	if err := store.RotateOperatorVerifier(verifier, operator, reason); err != nil {
+	if err := store.RotateOperatorVerifier(verifier, grant.Subject(), reason); err != nil {
 		return err
+	}
+	if outPath != "" {
+		if err := os.WriteFile(outPath, []byte(next+"\n"), 0o600); err != nil {
+			return fmt.Errorf("write token: %w", err)
+		}
+		fmt.Printf("Operator credential rotated and audited; new token written to %s (0600).\n", outPath)
+		return nil
 	}
 	fmt.Println("Operator credential rotated and audited. New token, shown ONCE:")
 	fmt.Printf("\n    %s\n\n", next)
@@ -303,20 +358,8 @@ func cmdAudit(store *storage.Store, asJSON bool) error {
 	return nil
 }
 
-func cmdResolve(store *storage.Store, m *mandate.Mandate,
-	actionID, outcome, operator, reason string) error {
-	token := os.Getenv("RZP_GUARD_OPERATOR_TOKEN")
-	if token == "" {
-		return errors.New("RZP_GUARD_OPERATOR_TOKEN is not set")
-	}
-
-	// Compare against the hash the GUARD stored at launch. An earlier version
-	// built the console with the same token it then checked, so the comparison
-	// was against itself and any sufficiently long token was accepted -- caught
-	// by its own end-to-end test, which resolved an action with a wrong token.
-	if err := authenticate(store, token); err != nil {
-		return err
-	}
+func cmdResolve(store *storage.Store, m *mandate.Mandate, grant opauth.Grant,
+	actionID, outcome, reason string) error {
 	var landed bool
 	switch outcome {
 	case "landed":
@@ -326,7 +369,7 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate,
 	default:
 		return errors.New(`-outcome must be "landed" or "not-landed"`)
 	}
-	if err := checkAuditText(operator, reason); err != nil {
+	if err := checkAuditText(grant.Subject(), reason); err != nil {
 		return err
 	}
 
@@ -344,11 +387,7 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate,
 	if got := led.State(actionID); got != lifecycle.InDoubt {
 		return fmt.Errorf("%s is %s, not IN_DOUBT — nothing to resolve", actionID, got)
 	}
-	console, err := lifecycle.NewConsole(led, token, store)
-	if err != nil {
-		return err
-	}
-	if err := console.Resolve(token, operator, actionID, landed, reason); err != nil {
+	if err := lifecycle.ResolveInDoubt(grant, led, store, actionID, landed, reason); err != nil {
 		return err
 	}
 
@@ -360,6 +399,6 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate,
 	} else {
 		fmt.Printf("  Budget released and the action is available again.\n")
 	}
-	fmt.Printf("  Audited at %s by %s\n", time.Now().UTC().Format(time.RFC3339), operator)
+	fmt.Printf("  Audited at %s by %s\n", time.Now().UTC().Format(time.RFC3339), grant.Subject())
 	return nil
 }

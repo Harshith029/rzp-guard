@@ -92,3 +92,30 @@ func Verify(token, stored string) error {
 	}
 	return nil
 }
+
+// Grant is unforgeable proof that a token was verified against a stored
+// verifier. Its fields are unexported, so no other package can mint a valid one
+// -- a zero-value Grant from outside opauth is invalid by construction.
+//
+// This exists to close a reusable API trap. lifecycle.Console used to take a
+// token at construction and then compare a caller-supplied token against it,
+// which is a comparison against itself: whoever calls it supplies both sides.
+// The CLI happened to authenticate first, so the product was safe, but any
+// future command could have reintroduced the bypass in one line. Authentication
+// now happens exactly once, here, and the result is a value the resolver
+// demands.
+type Grant struct {
+	subject string
+	ok      bool
+}
+
+func (g Grant) Valid() bool     { return g.ok }
+func (g Grant) Subject() string { return g.subject }
+
+// Authenticate verifies a token and returns a Grant on success.
+func Authenticate(subject, token, stored string) (Grant, error) {
+	if err := Verify(token, stored); err != nil {
+		return Grant{}, err
+	}
+	return Grant{subject: subject, ok: true}, nil
+}

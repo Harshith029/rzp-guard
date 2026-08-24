@@ -102,6 +102,20 @@ func run() error {
 	// rotation live in rzp-guard-operator, and rotation requires the current
 	// token.
 
+	// Refuse to run against a state file with no recovery credential.
+	//
+	// Otherwise the guard silently CREATES an unprovisioned state file, and
+	// whoever runs init first afterwards becomes the recovery authority --
+	// authority established by a race rather than by deployment. Provisioning is
+	// an explicit step: run the operator init command once, before first start.
+	if _, configured, err := boot.Store.OperatorVerifier(); err != nil {
+		return err
+	} else if !configured {
+		return fmt.Errorf("state file %q has no operator recovery credential; run "+
+			"rzp-guard-operator init first, as a deployment step. The guard will not "+
+			"establish that authority itself", *statePath)
+	}
+
 	if len(boot.RecoveredInDoubt) > 0 {
 		fmt.Fprintf(os.Stderr,
 			"rzp-guard: recovered %d in-flight reservation(s) from a previous run as "+

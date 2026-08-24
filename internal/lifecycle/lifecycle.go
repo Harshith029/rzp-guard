@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/harshith/rzp-guard/internal/opauth"
 )
 
 type State string
@@ -273,37 +275,30 @@ func (l *Ledger) resolveInDoubt(actionID string, refundLanded bool, store Resolv
 	return nil
 }
 
-// Console is the operator resolution path: separate from the relay surface,
-// token-gated, and audited. The relay never holds the token.
-type Console struct {
-	ledger *Ledger
-	token  string
-	store  ResolveStore
-}
-
-func NewConsole(l *Ledger, token string, store ResolveStore) (*Console, error) {
-	if len(token) < 16 {
-		return nil, fmt.Errorf("operator token must be at least 16 characters")
-	}
-	if store == nil {
-		return nil, fmt.Errorf("a durable audit store is required: unaudited resolution " +
-			"of a possibly-completed refund is not an acceptable operation")
-	}
-	return &Console{ledger: l, token: token, store: store}, nil
-}
-
-// Resolve clears an IN_DOUBT reservation.
+// ResolveInDoubt clears an IN_DOUBT reservation. It is the ONLY exported way to
+// do so, and it requires an opauth.Grant, which only opauth can mint.
 //
-// refundLanded must come from a human checking Razorpay for the issued receipt.
+// There is deliberately no token parameter and no credential comparison in this
+// package. The previous Console took a token at construction and compared a
+// caller-supplied token against it -- both sides came from the caller, so the
+// check was vacuous. Authentication belongs at one boundary, not scattered into
+// a library where the next caller can get it wrong.
+//
+// landed must come from a human who checked Razorpay for the issued receipt.
 // Absence of a matching record is NOT sufficient to pass false: eventual
-// consistency, a still-pending refund, or a failed lookup all produce "not
-// found" without meaning "did not happen".
-func (c *Console) Resolve(token, operator, actionID string, refundLanded bool, reason string) error {
-	if token != c.token {
+// consistency, a pending refund, or a failed lookup all produce "not found"
+// without meaning "did not happen".
+func ResolveInDoubt(g opauth.Grant, l *Ledger, store ResolveStore,
+	actionID string, landed bool, reason string) error {
+	if !g.Valid() {
 		return ErrNotAuthorized
 	}
-	if operator == "" || reason == "" {
+	if store == nil {
+		return fmt.Errorf("a durable audit store is required: unaudited resolution " +
+			"of a possibly-completed refund is not an acceptable operation")
+	}
+	if g.Subject() == "" || reason == "" {
 		return fmt.Errorf("operator identity and reason are required for the audit record")
 	}
-	return c.ledger.resolveInDoubt(actionID, refundLanded, c.store, operator, reason)
+	return l.resolveInDoubt(actionID, landed, store, g.Subject(), reason)
 }

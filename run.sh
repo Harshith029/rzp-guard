@@ -41,6 +41,13 @@ cmd_all() {
   echo "--- race (lifecycle lane, -tags testhook) ---"; cmd_lifecycle_race
 }
 
+cmd_operator_setup() {
+  cmd_build
+  echo "Creating the recovery credential. This is a DEPLOYMENT STEP: the guard"
+  echo "refuses to start against a state file that has none."
+  ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/block_state.db" init
+}
+
 cmd_build() {
   go build -o rzp-guard.exe ./cmd/rzp-guard
   go build -o gate-verify.exe ./cmd/gate-verify
@@ -58,6 +65,11 @@ cmd_build() {
 cmd_live_block() {
   cmd_build; need_keys
   mkdir -p "$EV"; rm -f "$EV"/block_* 2>/dev/null || true
+  # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
+  # state file, so the gate performs it explicitly rather than letting the
+  # guard establish recovery authority implicitly.
+  ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/block_state.db" \
+      init -out "$EV/block_operator_token" > /dev/null
   printf '%s\n' \
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"live-gate","version":"1"}}}' \
     '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
@@ -86,6 +98,11 @@ cmd_process_recover() {
   cmd_build
   go build -tags testhook -o rzp-guard-testhook.exe ./cmd/rzp-guard
   mkdir -p "$EV"; rm -f "$EV"/recover_* 2>/dev/null || true
+  # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
+  # state file, so the gate performs it explicitly rather than letting the
+  # guard establish recovery authority implicitly.
+  ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/recover_state.db" \
+      init -out "$EV/recover_operator_token" > /dev/null
   ( printf '%s\n' \
       '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYN00000000001","amount":50000}}}'
     sleep 30 ) \
@@ -115,7 +132,8 @@ rzp-guard
                              default lane, reported separately)
   ./run.sh lifecycle-race    lifecycle lane under the race detector
   ./run.sh all               every lane: default, lifecycle, and BOTH race runs
-  ./run.sh build             build ./rzp-guard.exe and ./gate-verify.exe
+  ./run.sh build             build all three binaries
+  ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
   ./run.sh live-block        LIVE: unauthorized refund never reaches the real
                              pinned container, with an enforced alive-control
@@ -135,6 +153,7 @@ case "${1:-help}" in
   all) cmd_all ;;
   vet) cmd_vet ;;
   build) cmd_build ;;
+  operator-setup) cmd_operator_setup ;;
   live-block) cmd_live_block ;;
   process-recover) cmd_process_recover ;;
   help) usage ;;
