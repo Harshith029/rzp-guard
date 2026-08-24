@@ -151,3 +151,24 @@ npipe:////./pipe/dockerDesktopLinuxEngine: The system cannot find the file speci
 ```
 
 A present CLI is not a running daemon. Cost: every Phase 1 live gate is still unmet, and "sits in front of the official server" remains a design claim rather than a demonstrated one.
+
+---
+
+## F9 — Windows Application Control intermittently blocks freshly built test binaries
+
+```
+fork/exec C:\Users\harsh\AppData\Local\Temp\go-build3699973873\b175\relay.test.exe:
+An Application Control policy has blocked this file.
+```
+
+Non-deterministic: the same package passed, then failed, then passed. Moving `GOTMPDIR` into the project directory helped once and then failed again, so it is a reputation/scan delay on newly-created executables rather than a path rule.
+
+**The wrong hypothesis:** I first read it as a build failure and ran `go clean -testcache`, which of course changed nothing — the binary compiles fine, it just cannot be executed.
+
+**Fix:** the canonical test runner is now the `golang:1.26` container. It bypasses Windows Application Control entirely, and it is already where `-race` has to run because the host has no C toolchain (`CGO_ENABLED=0`). One command, one environment, reproducible for a reviewer:
+
+```bash
+docker run --rm -v "$(pwd -W)":/src -w /src golang:1.26 go test -race ./...
+```
+
+Worth noting for the writeup: this is the second environment constraint that pushed work into the container, after the missing C toolchain. Neither was visible from the plan.

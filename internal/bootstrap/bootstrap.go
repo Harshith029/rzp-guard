@@ -1,4 +1,9 @@
-// Package bootstrap is the single startup path for a guard process.
+// Package bootstrap is the ordered constructor a guard process must use.
+//
+// It is NOT yet the single startup path: no cmd/ executable wires it to the
+// relay, the child process lifecycle and CloseInflight. Until that exists and
+// has no alternate construction path, this is a correct constructor rather than
+// a guaranteed entry point.
 //
 // Durable state is only worth having if something actually restores it. A
 // previous revision persisted the rate window and the action lifecycle but left

@@ -199,14 +199,20 @@ func (r *rateLimiter) hasHeadroom(now time.Time) bool {
 	return len(r.times) < r.max
 }
 
+// record persists BEFORE touching the in-memory window. Appending first would
+// leave a slot consumed by a call that was never forwarded when the durable
+// write fails, so a transient SQLite error would silently shrink the merchant's
+// legitimate rate allowance.
 func (r *rateLimiter) record(now time.Time) error {
-	r.mu.Lock()
-	r.times = append(r.times, now)
-	r.mu.Unlock()
-	if r.store == nil {
-		return nil
+	if r.store != nil {
+		if err := r.store.RecordCall(now.UnixNano()); err != nil {
+			return err
+		}
 	}
-	return r.store.RecordCall(now.UnixNano())
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.times = append(r.times, now)
+	return nil
 }
 
 // Guard is session-scoped authorization state, bound to the process lifetime.

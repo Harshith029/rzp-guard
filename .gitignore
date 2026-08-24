@@ -9,3 +9,4 @@ evidence/live/
 *.log
 rzp-guard.exe
 rzp-guard
+.gotmp/

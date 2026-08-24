@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -29,6 +30,22 @@ import (
 // DecisionSink receives every decision for the log and dashboard.
 type DecisionSink func(policy.Decision, json.RawMessage)
 
+// ErrDuplicateRequestID is returned to the agent when a JSON-RPC id is reused
+// while the original is still outstanding.
+var ErrDuplicateRequestID = errors.New("duplicate in-flight JSON-RPC id")
+
+// pending is everything needed to decide whether a child reply really is the
+// reply to THIS refund. Correlating on the JSON-RPC id alone is not enough: an
+// id can be reused, and a reply carrying a matching id proves nothing about
+// which refund the provider executed.
+type pending struct {
+	actionID  string
+	paymentID string
+	amount    int64
+	receipt   string
+	isRefund  bool
+}
+
 // Relay wires an agent-facing stream to a child MCP server.
 type Relay struct {
 	guard *policy.Guard
@@ -38,7 +55,10 @@ type Relay struct {
 	mu       sync.Mutex
 	childIn  io.Writer
 	agentOut io.Writer
-	inflight map[string]string // JSON-RPC id -> reserved action id
+	// Keyed by JSON-RPC id. EVERY outstanding request is tracked, reads
+	// included, so a read cannot reuse a refund's id and have its success
+	// commit the refund.
+	inflight map[string]pending
 }
 
 func New(g *policy.Guard, childIn, agentOut io.Writer, sink DecisionSink) *Relay {
@@ -48,7 +68,7 @@ func New(g *policy.Guard, childIn, agentOut io.Writer, sink DecisionSink) *Relay
 	return &Relay{
 		guard: g, childIn: childIn, agentOut: agentOut, sink: sink,
 		now:      func() time.Time { return time.Now().UTC() },
-		inflight: map[string]string{},
+		inflight: map[string]pending{},
 	}
 }
 
@@ -101,7 +121,8 @@ func (r *Relay) handleAgentLine(line []byte) error {
 	if msg.Method != "tools/call" {
 		// Everything else -- initialize, tools/list, notifications, resources --
 		// is forwarded byte-for-byte.
-		return r.writeChild(line)
+		_, err := r.writeChild(line)
+		return err
 	}
 
 	var tp toolCallParams
@@ -112,6 +133,15 @@ func (r *Relay) handleAgentLine(line []byte) error {
 			fmt.Sprintf("rzp-guard: could not parse tools/call params: %v", err)))
 	}
 
+	// An id already outstanding is refused before any authorization work. A
+	// reused id would overwrite the correlation entry, so a later reply could be
+	// matched to the wrong request.
+	if len(msg.ID) > 0 && r.isInFlight(string(msg.ID)) {
+		return r.writeAgent(errorResponse(msg.ID, -32600,
+			fmt.Sprintf("rzp-guard: %v: id %s is still outstanding",
+				ErrDuplicateRequestID, msg.ID)))
+	}
+
 	d := r.guard.Decide(tp.Name, tp.Arguments, r.now())
 	r.sink(d, msg.ID)
 
@@ -120,26 +150,58 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		return r.writeAgent(toolDenied(msg.ID, d))
 	}
 
-	if d.MatchedActionID != "" && len(msg.ID) > 0 {
+	if len(msg.ID) > 0 {
+		p := pending{actionID: d.MatchedActionID, isRefund: d.MatchedActionID != ""}
+		if p.isRefund {
+			p.paymentID, _ = d.Forwarded["payment_id"].(string)
+			p.amount = d.AuthorizedPaise
+			p.receipt = d.Receipt
+		}
 		r.mu.Lock()
-		r.inflight[string(msg.ID)] = d.MatchedActionID
+		r.inflight[string(msg.ID)] = p
 		r.mu.Unlock()
 	}
 
 	forwarded, err := rewriteArguments(line, msg, tp, d)
 	if err != nil {
 		// Fail closed: if the approved call cannot be re-encoded exactly, the
-		// original is NOT forwarded, and the reservation is rolled back.
+		// original is NOT forwarded, and the reservation is rolled back. Nothing
+		// has been written, so releasing is safe here.
 		if d.MatchedActionID != "" {
 			_ = r.guard.ReleaseConfirmedRejection(d.MatchedActionID)
-			r.mu.Lock()
-			delete(r.inflight, string(msg.ID))
-			r.mu.Unlock()
 		}
+		r.mu.Lock()
+		delete(r.inflight, string(msg.ID))
+		r.mu.Unlock()
 		return r.writeAgent(errorResponse(msg.ID, -32603,
 			fmt.Sprintf("rzp-guard: refusing to forward, re-encode failed: %v", err)))
 	}
-	return r.writeChild(forwarded)
+
+	n, werr := r.writeChild(forwarded)
+	if werr != nil {
+		// A partial write is ambiguous: bytes the child accepted may already have
+		// reached Razorpay. Only a write that moved ZERO bytes is provably
+		// pre-dispatch and safe to release.
+		if d.MatchedActionID != "" {
+			if n == 0 {
+				_ = r.guard.ReleaseConfirmedRejection(d.MatchedActionID)
+			} else {
+				_ = r.guard.MarkInDoubt(d.MatchedActionID)
+			}
+		}
+		r.mu.Lock()
+		delete(r.inflight, string(msg.ID))
+		r.mu.Unlock()
+		return werr
+	}
+	return nil
+}
+
+func (r *Relay) isInFlight(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.inflight[id]
+	return ok
 }
 
 // rewriteArguments replaces the arguments with the guard's canonical version
@@ -205,32 +267,40 @@ func (r *Relay) PumpChild(childOut io.Reader) error {
 // ONCE BYTES HAVE REACHED THE CHILD, THE ONLY AUTOMATIC OUTCOMES ARE COMMIT AND
 // IN_DOUBT. There is deliberately no auto-release here.
 //
-// A previous revision released the authorization on any JSON-RPC error or any
-// isError result, on the assumption that an error means the request was
-// rejected before execution. That assumption was never verified and is not
-// safe: the child can fail after dispatching the HTTP request, or while
-// formatting a response to a refund Razorpay actually processed. Either shape
-// can represent a processed-but-unreported refund, so both hold the action and
-// the budget.
+// Two assumptions were removed from earlier revisions, both of which treated
+// JSON syntax as execution evidence:
 //
-// Releasing after forwarding requires a typed rejection demonstrated in Test
-// Mode to occur strictly before provider execution. Until gate G1.6 establishes
-// that, every non-success is ambiguous.
+//  1. that a JSON-RPC error or isError result proves the request was rejected
+//     BEFORE provider execution -- it does not; the child can fail after
+//     dispatching the HTTP request;
+//  2. that any non-error result proves the refund succeeded -- it does not;
+//     `result: null`, an unparseable body, or a reply that merely shares the id
+//     would all have committed.
+//
+// Commit now requires a refund entity that matches the payment, the amount AND
+// the injected receipt. Anything else is IN_DOUBT.
 func (r *Relay) resolve(id string, msg rpcMessage) {
 	r.mu.Lock()
-	actionID, ok := r.inflight[id]
+	p, ok := r.inflight[id]
 	if ok {
 		delete(r.inflight, id)
 	}
 	r.mu.Unlock()
-	if !ok {
+	if !ok || !p.isRefund {
+		// Reads carry no reservation; nothing to resolve.
 		return
 	}
 	if len(msg.Error) > 0 || isToolError(msg.Result) || len(msg.Result) == 0 {
-		_ = r.guard.MarkInDoubt(actionID)
+		_ = r.guard.MarkInDoubt(p.actionID)
 		return
 	}
-	_ = r.guard.Commit(actionID)
+	if !refundEntityMatches(msg.Result, p) {
+		// The reply is not recognisably the refund we authorized. It may still
+		// have executed, so hold it for an operator rather than guessing.
+		_ = r.guard.MarkInDoubt(p.actionID)
+		return
+	}
+	_ = r.guard.Commit(p.actionID)
 }
 
 func isToolError(result json.RawMessage) bool {
@@ -246,29 +316,82 @@ func isToolError(result json.RawMessage) bool {
 	return probe.IsError
 }
 
+// refundEntityMatches reports whether a tool result carries a refund entity for
+// exactly the payment, amount and receipt this relay authorized.
+//
+// The expected shape is Razorpay's documented refund entity, which includes
+// `receipt` -- confirmed present in the entity field list. It is NOT yet
+// verified against a live Test Mode response. That is gate G1.6, and until it
+// passes the failure mode here is fail-closed: an unrecognised success shape
+// yields IN_DOUBT and an operator look, never a wrong COMMIT.
+func refundEntityMatches(result json.RawMessage, p pending) bool {
+	var wrapper struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(result, &wrapper); err != nil || len(wrapper.Content) == 0 {
+		return false
+	}
+	for _, c := range wrapper.Content {
+		if c.Type != "text" || c.Text == "" {
+			continue
+		}
+		var e struct {
+			Entity    string      `json:"entity"`
+			PaymentID string      `json:"payment_id"`
+			Amount    json.Number `json:"amount"`
+			Receipt   string      `json:"receipt"`
+		}
+		dec := json.NewDecoder(bytes.NewReader([]byte(c.Text)))
+		dec.UseNumber()
+		if err := dec.Decode(&e); err != nil {
+			continue
+		}
+		if e.Entity != "refund" {
+			continue
+		}
+		amt, err := e.Amount.Int64()
+		if err != nil {
+			continue
+		}
+		if e.PaymentID == p.paymentID && amt == p.amount && e.Receipt == p.receipt {
+			return true
+		}
+	}
+	return false
+}
+
 // CloseInflight marks every unresolved reservation IN_DOUBT. Call when the child
 // exits or the session ends: an unanswered refund is exactly the ambiguous case.
 func (r *Relay) CloseInflight() []string {
 	r.mu.Lock()
-	pending := make([]string, 0, len(r.inflight))
-	for id, actionID := range r.inflight {
-		pending = append(pending, actionID)
+	stranded := make([]string, 0, len(r.inflight))
+	for id, p := range r.inflight {
+		if p.isRefund {
+			stranded = append(stranded, p.actionID)
+		}
 		delete(r.inflight, id)
 	}
 	r.mu.Unlock()
-	for _, actionID := range pending {
+	for _, actionID := range stranded {
 		_ = r.guard.MarkInDoubt(actionID)
 	}
-	return pending
+	return stranded
 }
 
-func (r *Relay) writeChild(line []byte) error {
+// writeChild returns the byte count as well as the error, because the caller
+// must distinguish "nothing left this process" from "some bytes were accepted
+// and the provider-side outcome is unknown".
+func (r *Relay) writeChild(line []byte) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, err := r.childIn.Write(append(line, '\n')); err != nil {
-		return fmt.Errorf("relay: write to child: %w", err)
+	n, err := r.childIn.Write(append(line, '\n'))
+	if err != nil {
+		return n, fmt.Errorf("relay: write to child: %w", err)
 	}
-	return nil
+	return n, nil
 }
 
 func (r *Relay) writeAgent(line []byte) error {

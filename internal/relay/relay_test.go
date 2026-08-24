@@ -3,6 +3,8 @@ package relay
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -205,24 +207,198 @@ func TestFractionalAmountNeverReachesTheChild(t *testing.T) {
 	}
 }
 
-// A successful child reply commits; a tool error releases the authorization.
-func TestChildReplyResolvesTheReservation(t *testing.T) {
-	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
-	r, _, _ := newRelay(t, g)
+// refundReply builds a child success reply carrying a real refund entity.
+func refundReply(id, paymentID string, amount int64, receipt string) string {
+	entity := fmt.Sprintf(
+		`{"id":"rfnd_SYN1","entity":"refund","amount":%d,"currency":"INR",`+
+			`"payment_id":%q,"receipt":%q,"status":"processed"}`,
+		amount, paymentID, receipt)
+	b, _ := json.Marshal(entity)
+	return fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":%s,"result":{"content":[{"type":"text","text":%s}]}}`,
+		id, string(b))
+}
 
-	feed(t, r, `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":`+
-		`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`)
-	if g.State("rfa_001") != lifecycle.Reserved {
-		t.Fatalf("state = %s, want RESERVED", g.State("rfa_001"))
+// COMMIT requires a refund entity matching payment, amount AND receipt.
+func TestCommitRequiresAMatchingRefundEntity(t *testing.T) {
+	receipt, _ := mandate.ReceiptFor("mnd_test", "rfa_001")
+
+	cases := []struct {
+		name       string
+		reply      string
+		wantCommit bool
+	}{
+		{"matching entity", refundReply("11", "pay_SYN0001", 20000, receipt), true},
+		{"wrong receipt", refundReply("11", "pay_SYN0001", 20000, "rzpg_somethingelse"), false},
+		{"wrong amount", refundReply("11", "pay_SYN0001", 19999, receipt), false},
+		{"wrong payment", refundReply("11", "pay_SYN9999", 20000, receipt), false},
+		{"null result", `{"jsonrpc":"2.0","id":11,"result":null}`, false},
+		{"empty content", `{"jsonrpc":"2.0","id":11,"result":{"content":[]}}`, false},
+		{"unparseable body", `{"jsonrpc":"2.0","id":11,"result":{"content":` +
+			`[{"type":"text","text":"not json at all"}]}}`, false},
+		{"order entity, not refund", `{"jsonrpc":"2.0","id":11,"result":{"content":` +
+			`[{"type":"text","text":"{\"entity\":\"order\",\"id\":\"order_x\"}"}]}}`, false},
 	}
 
-	reply := `{"jsonrpc":"2.0","id":11,"result":{"content":[{"type":"text",` +
-		`"text":"{\"id\":\"rfnd_X\",\"entity\":\"refund\"}"}]}}`
-	if err := r.PumpChild(strings.NewReader(reply + "\n")); err != nil {
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := newGuard(t,
+				`[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+			r, _, _ := newRelay(t, g)
+			feed(t, r, `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":`+
+				`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`)
+			if err := r.PumpChild(strings.NewReader(tc.reply + "\n")); err != nil {
+				t.Fatal(err)
+			}
+			got := g.State("rfa_001")
+			if tc.wantCommit && got != lifecycle.Committed {
+				t.Fatalf("state = %s, want COMMITTED", got)
+			}
+			if !tc.wantCommit && got != lifecycle.InDoubt {
+				t.Fatalf("state = %s, want IN_DOUBT: this reply does not prove the "+
+					"authorized refund executed", got)
+			}
+		})
+	}
+}
+
+// ------------------------------------------------- id correlation
+
+func TestDuplicateInFlightRequestIDIsRefused(t *testing.T) {
+	g := newGuard(t, `[
+		{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000},
+		{"action_id":"rfa_002","payment_id":"pay_SYN0002","amount_paise":30000}]`)
+	r, child, agent := newRelay(t, g)
+
+	feed(t, r,
+		`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":`+
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`,
+		// Same id, still outstanding.
+		`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":`+
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0002","amount":30000}}}`)
+
+	if n := len(child.Lines()); n != 1 {
+		t.Fatalf("child got %d lines, want 1: a reused id would overwrite the "+
+			"correlation entry", n)
+	}
+	if !strings.Contains(agent.String(), "duplicate in-flight JSON-RPC id") {
+		t.Fatalf("second call was not refused: %s", agent.String())
+	}
+	if g.State("rfa_002") != lifecycle.Available {
+		t.Fatalf("rfa_002 = %s, want AVAILABLE: it must not have been reserved",
+			g.State("rfa_002"))
+	}
+}
+
+// A read reusing a refund's id must not have its success commit the refund.
+func TestReadCannotReuseARefundRequestID(t *testing.T) {
+	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+	r, _, agent := newRelay(t, g)
+
+	feed(t, r,
+		`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":`+
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`,
+		`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":`+
+			`{"name":"fetch_payment","arguments":{"payment_id":"pay_SYN0001"}}}`)
+
+	if !strings.Contains(agent.String(), "duplicate in-flight JSON-RPC id") {
+		t.Fatalf("read reusing an outstanding refund id was accepted: %s", agent.String())
+	}
+
+	// A read-shaped success on that id must not commit the refund.
+	readReply := `{"jsonrpc":"2.0","id":8,"result":{"content":[{"type":"text",` +
+		`"text":"{\"id\":\"pay_SYN0001\",\"entity\":\"payment\",\"amount\":20000}"}]}}`
+	if err := r.PumpChild(strings.NewReader(readReply + "\n")); err != nil {
 		t.Fatal(err)
 	}
-	if g.State("rfa_001") != lifecycle.Committed {
-		t.Fatalf("state = %s, want COMMITTED", g.State("rfa_001"))
+	if got := g.State("rfa_001"); got == lifecycle.Committed {
+		t.Fatal("a payment entity committed a refund action")
+	}
+}
+
+// An id is reusable once its reply has arrived.
+func TestRequestIDIsReusableAfterItsReplyArrives(t *testing.T) {
+	g := newGuard(t, `[
+		{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000},
+		{"action_id":"rfa_002","payment_id":"pay_SYN0002","amount_paise":30000}]`)
+	r, child, _ := newRelay(t, g)
+	receipt1, _ := mandate.ReceiptFor("mnd_test", "rfa_001")
+
+	feed(t, r, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":`+
+		`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}`)
+	if err := r.PumpChild(strings.NewReader(
+		refundReply("4", "pay_SYN0001", 20000, receipt1) + "\n")); err != nil {
+		t.Fatal(err)
+	}
+	feed(t, r, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":`+
+		`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0002","amount":30000}}}`)
+
+	if n := len(child.Lines()); n != 2 {
+		t.Fatalf("child got %d lines, want 2: an id must be reusable once resolved", n)
+	}
+}
+
+// ------------------------------------------------- write failures
+
+// partialWriter accepts some bytes, then fails: the child may already have seen
+// enough to dispatch.
+type partialWriter struct {
+	accept int
+	got    bytes.Buffer
+}
+
+func (p *partialWriter) Write(b []byte) (int, error) {
+	n := p.accept
+	if n > len(b) {
+		n = len(b)
+	}
+	p.got.Write(b[:n])
+	return n, errors.New("pipe broken mid-write")
+}
+
+func TestPartialChildWriteMarksTheActionInDoubt(t *testing.T) {
+	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+	child := &partialWriter{accept: 20}
+	agent := &bytes.Buffer{}
+	r := New(g, child, agent, nil)
+	r.SetClock(func() time.Time { return now })
+
+	err := r.PumpAgent(strings.NewReader(
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":` +
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}` + "\n"))
+	if err == nil {
+		t.Fatal("expected the write error to surface")
+	}
+	if child.got.Len() == 0 {
+		t.Fatal("test precondition: no bytes were accepted")
+	}
+	if got := g.State("rfa_001"); got != lifecycle.InDoubt {
+		t.Fatalf("state = %s, want IN_DOUBT: %d bytes reached the child, so the "+
+			"provider-side outcome is unknown", got, child.got.Len())
+	}
+	if enc := g.Encumbered(); enc != 20000 {
+		t.Fatalf("encumbered = %d, want 20000", enc)
+	}
+}
+
+// zeroWriter fails without accepting anything: provably pre-dispatch.
+type zeroWriter struct{}
+
+func (zeroWriter) Write(b []byte) (int, error) { return 0, errors.New("closed") }
+
+func TestZeroByteChildWriteReleasesTheAuthorization(t *testing.T) {
+	g := newGuard(t, `[{"action_id":"rfa_001","payment_id":"pay_SYN0001","amount_paise":20000}]`)
+	agent := &bytes.Buffer{}
+	r := New(g, zeroWriter{}, agent, nil)
+	r.SetClock(func() time.Time { return now })
+
+	_ = r.PumpAgent(strings.NewReader(
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":` +
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}` + "\n"))
+
+	if got := g.State("rfa_001"); got != lifecycle.Available {
+		t.Fatalf("state = %s, want AVAILABLE: zero bytes left the process, so the "+
+			"authorization must not be burned", got)
 	}
 }
 
