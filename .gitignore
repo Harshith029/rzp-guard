@@ -7,3 +7,5 @@ __pycache__/
 venv/
 evidence/live/
 *.log
+rzp-guard.exe
+rzp-guard
