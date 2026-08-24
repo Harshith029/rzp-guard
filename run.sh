@@ -68,8 +68,12 @@ cmd_live_block() {
   # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
   # state file, so the gate performs it explicitly rather than letting the
   # guard establish recovery authority implicitly.
+  #
+  # -allow-unprotected-out is passed because this writes into a throwaway
+  # evidence directory on a dev box, and on Windows the file cannot land 0600.
+  # A real deployment provisions interactively onto a restricted directory.
   ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/block_state.db" \
-      init -out "$EV/block_operator_token" > /dev/null
+      init -out "$EV/block_operator_token" -allow-unprotected-out > /dev/null
   printf '%s\n' \
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"live-gate","version":"1"}}}' \
     '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
@@ -101,8 +105,12 @@ cmd_process_recover() {
   # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
   # state file, so the gate performs it explicitly rather than letting the
   # guard establish recovery authority implicitly.
+  #
+  # -allow-unprotected-out is passed because this writes into a throwaway
+  # evidence directory on a dev box, and on Windows the file cannot land 0600.
+  # A real deployment provisions interactively onto a restricted directory.
   ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/recover_state.db" \
-      init -out "$EV/recover_operator_token" > /dev/null
+      init -out "$EV/recover_operator_token" -allow-unprotected-out > /dev/null
   ( printf '%s\n' \
       '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYN00000000001","amount":50000}}}'
     sleep 30 ) \

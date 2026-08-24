@@ -372,3 +372,96 @@ func TestInitRefusesToPrintASecretToANonTerminal(t *testing.T) {
 		t.Fatalf("token file missing or malformed: %v %q", err, string(b))
 	}
 }
+
+// A failed token delivery must never leave a committed credential nobody holds.
+//
+// The previous order committed the verifier and then wrote the file, so a bad
+// -out path produced a state file whose only valid token had gone nowhere --
+// and init cannot be re-run, so recovery for that merchant was permanently
+// impossible. Verified before the fix.
+func TestFailedTokenDeliveryLeavesInitRetryable(t *testing.T) {
+	bin := buildOperator(t)
+	dir := t.TempDir()
+	mandatePath := filepath.Join(dir, "mandate.json")
+	if err := os.WriteFile(mandatePath, []byte(mandateDoc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		out  func() string
+	}{
+		{"unwritable path", func() string {
+			return filepath.Join(dir, "no", "such", "dir", "tok")
+		}},
+		{"destination already exists", func() string {
+			p := filepath.Join(dir, "taken")
+			if err := os.WriteFile(p, []byte("SOMEONE ELSES SECRET\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			return p
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dbPath := filepath.Join(t.TempDir(), "state.db")
+			outPath := tc.out()
+
+			out, err := runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath,
+				"init", "-out", outPath)
+			if err == nil {
+				t.Fatalf("init reported success despite a failed delivery:\n%s", out)
+			}
+
+			// An existing destination must be untouched.
+			if tc.name == "destination already exists" {
+				b, readErr := os.ReadFile(outPath)
+				if readErr != nil || string(b) != "SOMEONE ELSES SECRET\n" {
+					t.Fatalf("an existing file was modified: %q (err %v)", string(b), readErr)
+				}
+			}
+
+			// THE POINT: no credential was committed, so init can be retried.
+			good := filepath.Join(t.TempDir(), "tok")
+			out, err = runOperator(t, bin, "", "-mandate", mandatePath, "-state", dbPath,
+				"init", "-out", good)
+			if err != nil {
+				t.Fatalf("init could not be retried after a failed delivery -- "+
+					"recovery is permanently locked out: %v\n%s", err, out)
+			}
+			b, err := os.ReadFile(good)
+			if err != nil || !strings.HasPrefix(string(b), "rzpop_") {
+				t.Fatalf("retry did not deliver a token: %v %q", err, string(b))
+			}
+		})
+	}
+}
+
+// The same ordering matters more for rotate: delivering after rotating would
+// invalidate a WORKING credential while the replacement reached nobody.
+func TestFailedRotationDeliveryLeavesTheOldTokenWorking(t *testing.T) {
+	bin := buildOperator(t)
+	dbPath, mandatePath, realToken := stuckState(t, true)
+
+	taken := filepath.Join(t.TempDir(), "taken")
+	if err := os.WriteFile(taken, []byte("EXISTING\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runOperator(t, bin, realToken, "-mandate", mandatePath, "-state", dbPath,
+		"-operator", "ops", "rotate", "-reason", "attempted", "-out", taken)
+	if err == nil {
+		t.Fatalf("rotation succeeded despite a failed delivery:\n%s", out)
+	}
+	if b, _ := os.ReadFile(taken); string(b) != "EXISTING\n" {
+		t.Fatalf("an existing file was modified during a failed rotation: %q", string(b))
+	}
+
+	// The old credential must still authenticate: no rotation happened.
+	out, err = runOperator(t, bin, realToken, "-mandate", mandatePath, "-state", dbPath,
+		"-operator", "ops", "audit")
+	if err != nil {
+		t.Fatalf("a failed rotation destroyed the working credential: %v\n%s", err, out)
+	}
+}

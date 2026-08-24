@@ -249,3 +249,45 @@ This is not a fork and not a modification: same image, same binary, its own publ
 **What it cost:** the first live run of the executable failed outright, and the honest first reaction was to assume my own flag plumbing was wrong. It was not — three separate vendor-side breakages stacked on top of each other, and only measuring tool counts against known-good single values untangled them.
 
 **What it changes about the claim:** `initiate_payment` is still exposed by the child even at 20 tools, because it lives in the `payments` toolset alongside the reads the mandate needs. That is precisely why `rzp-guard` keeps its own build-level allowlist rather than trusting the child's configuration — the two boundaries are independent, and this is the concrete reason.
+
+---
+
+## F11 — A failed token delivery locked recovery out permanently
+
+The operator credential was committed to the state file **before** the token was written to `-out`. Verified:
+
+```
+$ rzp-guard-operator ... init -out /tmp/nope/sub/tok
+create token file: ... The system cannot find the path specified.
+
+$ rzp-guard-operator ... init -out /tmp/good_tok
+an operator credential already exists for this state file; use rotate ... instead
+```
+
+The verifier survived. `init` refuses to run twice — deliberately, because that refusal is what closed the earlier restart bypass. So a merchant whose token file failed to write had a state file **nobody could ever recover**, with locked `IN_DOUBT` refunds and no path to resolve them. For `rotate` it was worse: rotating first would invalidate a *working* credential while the replacement reached nobody.
+
+**Also found in the same pass:** `-out` used `os.WriteFile`, which truncates. A typo pointed at another file destroyed it:
+
+```
+$ echo "MY-OTHER-SECRET" > /tmp/victim.txt
+$ rzp-guard-operator ... init -out /tmp/victim.txt
+$ cat /tmp/victim.txt
+rzpop_kq_PhCdER_SfId...
+```
+
+**Fix:** deliver first, commit second, and undo the delivery if the commit fails. The file is created with `O_CREATE|O_EXCL` — an existing destination is never touched and a symlink cannot redirect the secret — then fsynced before the credential is committed.
+
+**And the mode claim was not a control.** The code asked for `0600` and never checked. On Windows the file lands `0666`, measured:
+
+```
+token file landed with mode 0666, not 0600, so this platform did not apply the
+restriction (Windows does not honour Unix mode bits). Write it interactively
+instead, or re-run with -allow-unprotected-out once <dir> is a directory you
+have restricted yourself
+```
+
+`-out` now **verifies** the resulting mode and refuses by default, with an explicit opt-out that names what the operator is taking responsibility for. "Directory ACLs are the boundary" was a sentence in a README; this is an enforced check.
+
+`os.ModeCharDevice` was also replaced with `x/term.IsTerminal` for the non-terminal guard — a false positive there commits the verifier while the token goes to a sink, which is the same lockout.
+
+Mutation-verified: restoring commit-then-deliver fails both subtests with *"init could not be retried after a failed delivery -- recovery is permanently locked out"*.

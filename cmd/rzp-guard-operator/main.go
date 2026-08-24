@@ -37,9 +37,11 @@ import (
 
 const usage = `rzp-guard-operator — resolve refunds whose outcome is unknown
 
-  rzp-guard-operator -mandate M -state S init [-out FILE]
+  rzp-guard-operator -mandate M -state S init [-out NEW-FILE]
         DEPLOYMENT STEP, run once BEFORE the guard is ever started.
-        Refuses to print to a non-terminal; use -out for a 0600 file.
+        Refuses to print to a non-terminal. -out must NOT already exist and the
+        token is written and fsynced BEFORE the credential is committed, so a
+        failed delivery never locks recovery out.
 
   rzp-guard-operator -mandate M -state S rotate -operator <who> -reason <text>
         replace it, authenticated with the CURRENT token, audited
@@ -82,7 +84,10 @@ func run() error {
 		operator    = flag.String("operator", "", "who is resolving (resolve only)")
 		reason      = flag.String("reason", "", "what you checked and found (resolve only)")
 		asJSON      = flag.Bool("json", false, "machine-readable output")
-		out         = flag.String("out", "", "init/rotate: file to write the new token to (mode 0600)")
+		out         = flag.String("out", "", "init/rotate: NEW file to write the token to (must not exist)")
+		allowUnprot = flag.Bool("allow-unprotected-out", false,
+			"permit -out on a platform that cannot apply 0600 (Windows); the "+
+				"containing directory must already be restricted by you")
 	)
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
@@ -139,7 +144,7 @@ func run() error {
 	// init is the only command that runs without a credential, because it is
 	// the one that creates it.
 	if args[0] == "init" {
-		return cmdInit(store, *out)
+		return cmdInit(store, *out, *allowUnprot)
 	}
 
 	// EVERY other command authenticates, including the read-only ones. list and
@@ -157,7 +162,7 @@ func run() error {
 
 	switch args[0] {
 	case "rotate":
-		return cmdRotate(store, grant, *reason, *out)
+		return cmdRotate(store, grant, *reason, *out, *allowUnprot)
 	case "list":
 		return cmdList(store, m, *asJSON)
 	case "audit":
@@ -190,27 +195,16 @@ func authenticate(store *storage.Store, subject, token string) (opauth.Grant, er
 	return opauth.Authenticate(subject, token, stored)
 }
 
-// stdoutIsTerminal reports whether stdout is an interactive character device.
-func stdoutIsTerminal() bool {
-	fi, err := os.Stdout.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
-}
-
 // cmdInit generates the credential. It refuses if one already exists: a second
 // init must not be able to silently replace it, which is how the restart bypass
 // worked when the guard rewrote the credential on every start.
-func cmdInit(store *storage.Store, outPath string) error {
-	// NOTE ON 0600: Windows does not honour Unix permission bits, so the mode
-	// below is advisory there and the file lands 0644. On Windows the operator
-	// must rely on directory ACLs. Measured, not assumed - stat reported 644.
-	//
-	// "Shown once" means nothing if stdout is a pipe: CI logs, terminal
-	// recordings and shell history all capture it. Refuse to print a secret to
-	// anything that is not an interactive terminal, and offer a 0600 file.
-	if outPath == "" && !stdoutIsTerminal() {
+func cmdInit(store *storage.Store, outPath string, allowUnprotected bool) error {
+	// "Shown once" is meaningless when CI logs, pipes and terminal recordings
+	// capture stdout, so a secret is never printed to a non-terminal.
+	if outPath == "" && !opauth.StdoutIsTerminal() {
 		return errors.New("refusing to print a new credential to a non-terminal " +
 			"(CI logs, pipes and terminal recording all capture it). Re-run " +
-			"interactively, or pass -out <path> to write a 0600 file")
+			"interactively, or pass -out <new-file> to write it to a file")
 	}
 	token, err := opauth.NewToken()
 	if err != nil {
@@ -220,16 +214,30 @@ func cmdInit(store *storage.Store, outPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := store.InitOperatorVerifier(verifier); err != nil {
-		return err
-	}
+
+	// ORDER IS THE WHOLE POINT. Deliver the token first, commit the verifier
+	// second, and undo the delivery if the commit fails.
+	//
+	// The previous order committed the verifier and then wrote the file. A
+	// failed write -- bad path, full disk, interrupted -- left a credential
+	// nobody held, and init cannot be re-run, so recovery for that state file
+	// was permanently impossible. Verified before the fix: a bad -out path
+	// produced exactly that dead end.
 	if outPath != "" {
-		if err := os.WriteFile(outPath, []byte(token+"\n"), 0o600); err != nil {
-			return fmt.Errorf("write token: %w", err)
+		if err := opauth.WriteTokenExclusive(outPath, token, allowUnprotected); err != nil {
+			return err
 		}
-		fmt.Printf("Operator credential created and written to %s (mode 0600).\n", outPath)
+		if err := store.InitOperatorVerifier(verifier); err != nil {
+			os.Remove(outPath) // the token is worthless; do not leave it lying around
+			return err
+		}
+		fmt.Printf("Operator credential created and written to %s.\n", outPath)
 		fmt.Println("Move it somewhere a human can reach during an incident, then delete it.")
 		return nil
+	}
+
+	if err := store.InitOperatorVerifier(verifier); err != nil {
+		return err
 	}
 	fmt.Println("Operator credential created. Shown ONCE and not recoverable:")
 	fmt.Printf("\n    %s\n\n", token)
@@ -238,13 +246,14 @@ func cmdInit(store *storage.Store, outPath string) error {
 }
 
 // cmdRotate replaces the credential, authenticated by the CURRENT token.
-func cmdRotate(store *storage.Store, grant opauth.Grant, reason, outPath string) error {
+func cmdRotate(store *storage.Store, grant opauth.Grant, reason, outPath string,
+	allowUnprotected bool) error {
 	if err := checkAuditText(grant.Subject(), reason); err != nil {
 		return err
 	}
-	if outPath == "" && !stdoutIsTerminal() {
+	if outPath == "" && !opauth.StdoutIsTerminal() {
 		return errors.New("refusing to print a rotated credential to a non-terminal; " +
-			"re-run interactively or pass -out <path>")
+			"re-run interactively or pass -out <new-file>")
 	}
 	next, err := opauth.NewToken()
 	if err != nil {
@@ -254,15 +263,25 @@ func cmdRotate(store *storage.Store, grant opauth.Grant, reason, outPath string)
 	if err != nil {
 		return err
 	}
+
+	// Deliver first, rotate second. Rotating first and then failing to deliver
+	// would invalidate the OLD token while the new one reached nobody -- the
+	// same lockout as init, but worse, because it destroys a working credential.
+	if outPath != "" {
+		if err := opauth.WriteTokenExclusive(outPath, next, allowUnprotected); err != nil {
+			return err
+		}
+		if err := store.RotateOperatorVerifier(verifier, grant.Subject(), reason); err != nil {
+			os.Remove(outPath) // rotation did not happen; the old token still works
+			return err
+		}
+		fmt.Printf("Operator credential rotated and audited; new token written to %s.\n", outPath)
+		fmt.Println("The previous token no longer authenticates.")
+		return nil
+	}
+
 	if err := store.RotateOperatorVerifier(verifier, grant.Subject(), reason); err != nil {
 		return err
-	}
-	if outPath != "" {
-		if err := os.WriteFile(outPath, []byte(next+"\n"), 0o600); err != nil {
-			return fmt.Errorf("write token: %w", err)
-		}
-		fmt.Printf("Operator credential rotated and audited; new token written to %s (0600).\n", outPath)
-		return nil
 	}
 	fmt.Println("Operator credential rotated and audited. New token, shown ONCE:")
 	fmt.Printf("\n    %s\n\n", next)
