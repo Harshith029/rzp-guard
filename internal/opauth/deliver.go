@@ -9,8 +9,11 @@ import (
 	"golang.org/x/term"
 )
 
-// ErrDestinationExists is returned when a token destination already exists.
-var ErrDestinationExists = errors.New("destination already exists")
+var (
+	ErrDestinationExists = errors.New("destination already exists")
+
+	errUnsupportedDirSync = errors.New("this platform cannot fsync a directory")
+)
 
 // StdoutIsTerminal reports whether stdout is a real interactive terminal.
 //
@@ -23,35 +26,41 @@ func StdoutIsTerminal() bool { return term.IsTerminal(int(os.Stdout.Fd())) }
 
 // WriteTokenExclusive creates path and writes the token to it.
 //
-// O_EXCL means an existing file is NEVER touched: a typo cannot destroy another
-// secret, and the open fails rather than following a symlink to somewhere the
-// token would be disclosed. Verified before the fix: -out over a file holding
-// other content replaced it outright.
+// O_EXCL means an EXISTING FINAL PATH is never touched: a typo cannot destroy
+// another secret. Verified before the fix, when -out over a file holding other
+// content replaced it outright.
 //
-// The file is fsynced before return, so a caller that commits a credential
-// afterwards knows the token is actually on disk.
-func WriteTokenExclusive(path, token string, allowUnprotected bool) error {
+// Scope of that guarantee, stated precisely: it covers the final path only. It
+// does NOT establish that parent directories are free of symlinks or Windows
+// reparse points, nor that the resolved directory is private. Canonical-path
+// and platform-specific reparse checks would be needed for that, and are not
+// implemented.
+//
+// The file is fsynced, and so is its parent directory where the platform allows
+// it -- syncing the file alone leaves the directory entry itself vulnerable to
+// a crash. durable reports whether that second step actually happened.
+func WriteTokenExclusive(path, token string, allowUnprotected bool) (durable bool, err error) {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		if os.IsExist(err) {
-			return fmt.Errorf("%w: %s (refusing to overwrite; choose a new path)",
+			return false, fmt.Errorf("%w: %s (refusing to overwrite; choose a new path)",
 				ErrDestinationExists, path)
 		}
-		return fmt.Errorf("create token file: %w", err)
+		return false, fmt.Errorf("create token file: %w", err)
 	}
 	if _, err := f.WriteString(token + "\n"); err != nil {
 		f.Close()
 		os.Remove(path)
-		return fmt.Errorf("write token file: %w", err)
+		return false, fmt.Errorf("write token file: %w", err)
 	}
 	if err := f.Sync(); err != nil {
 		f.Close()
 		os.Remove(path)
-		return fmt.Errorf("sync token file: %w", err)
+		return false, fmt.Errorf("sync token file: %w", err)
 	}
 	if err := f.Close(); err != nil {
 		os.Remove(path)
-		return fmt.Errorf("close token file: %w", err)
+		return false, fmt.Errorf("close token file: %w", err)
 	}
 
 	// Verify the permission bits actually took, rather than assuming they did.
@@ -61,15 +70,25 @@ func WriteTokenExclusive(path, token string, allowUnprotected bool) error {
 	fi, err := os.Stat(path)
 	if err != nil {
 		os.Remove(path)
-		return fmt.Errorf("stat token file: %w", err)
+		return false, fmt.Errorf("stat token file: %w", err)
 	}
 	if perm := fi.Mode().Perm(); perm != 0o600 && !allowUnprotected {
 		os.Remove(path)
-		return fmt.Errorf("token file landed with mode %04o, not 0600, so this "+
+		return false, fmt.Errorf("token file landed with mode %04o, not 0600, so this "+
 			"platform did not apply the restriction (Windows does not honour Unix "+
-			"mode bits). Write it interactively instead, or re-run with "+
-			"-allow-unprotected-out once %s is on a directory you have restricted "+
-			"yourself", perm, filepath.Dir(path))
+			"mode bits). %s is therefore not protected by this program. Provision "+
+			"interactively, or use an OS secret store", perm, filepath.Dir(path))
 	}
-	return nil
+
+	// Make the directory entry durable. A failure here is reported, never
+	// swallowed: the caller must not commit a credential believing the token is
+	// safely on disk when it might not survive a crash.
+	if err := syncParentDir(path); err != nil {
+		if errors.Is(err, errUnsupportedDirSync) {
+			return false, nil // caller warns; see DirSyncSupported
+		}
+		os.Remove(path)
+		return false, err
+	}
+	return true, nil
 }

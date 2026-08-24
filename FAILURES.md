@@ -291,3 +291,26 @@ have restricted yourself
 `os.ModeCharDevice` was also replaced with `x/term.IsTerminal` for the non-terminal guard — a false positive there commits the verifier while the token goes to a sink, which is the same lockout.
 
 Mutation-verified: restoring commit-then-deliver fails both subtests with *"init could not be retried after a failed delivery -- recovery is permanently locked out"*.
+
+
+---
+
+## F12 — The gates wrote real recovery tokens into a OneDrive-synced folder
+
+Provisioning in the live gates used `-out` into `evidence/live/`, and left the token there after the gate passed:
+
+```
+evidence/live/block_operator_token
+evidence/live/recover_operator_token
+```
+
+Both are genuine recovery credentials. `.gitignore` covers `evidence/live/`, which is exactly why it felt safe — but this working tree is `C:/Users/harsh/OneDrive/Desktop/Razorpay`, so an ignored file still syncs to the cloud. **Gitignore is not a confidentiality control.**
+
+**Fix:** the gates delete the token immediately after provisioning, and `gate-verify` now asserts its absence — a leak fails the gate rather than passing quietly.
+
+Two related corrections landed with it:
+
+- **`-allow-unprotected-out` was a production flag that bypassed the very check the README advertised.** It now exists only under `-tags testhook`; the shipped binary has no way past the `0600` verification. Confirmed: `rzp-guard-operator -h` shows the flag `0` times, the test-hook build `1`.
+- **The durability gap was one layer deeper than the earlier fix.** The token file was fsynced, but not its parent directory — after a power loss the contents can be on disk while the entry naming them is not, which recreates the permanent lockout at the filesystem boundary. The parent directory is now synced where the platform allows it; Windows cannot, and the command says so rather than implying crash-safety it does not have.
+
+Also corrected a claim that was too broad: `O_EXCL` protects the **final path**, not the parent chain. It does not establish that parent directories are free of symlinks or reparse points, and the code now says exactly that.

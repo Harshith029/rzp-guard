@@ -163,6 +163,16 @@ func verifyBlock(dir string) {
 			"blocked response carries the deciding rule NO_AUTHORIZED_ACTION")
 	}
 
+	// 2b. The gate must not leave a real recovery credential lying around. This
+	//     tree is OneDrive-backed, so a gitignored file still syncs to the cloud;
+	//     two such tokens were found sitting in evidence/live before this check.
+	if _, err := os.Stat(dir + "/block_operator_token"); !os.IsNotExist(err) {
+		check(false, "provisioning token was deleted after use (found one at %s)",
+			dir+"/block_operator_token")
+	} else {
+		check(true, "provisioning token was deleted after use")
+	}
+
 	// 3. THE CONTROL. Without this the gate passes against a dead container or
 	//    invalid credentials, which is precisely what it exists to rule out.
 	control, ok := find(out, "4")
@@ -226,6 +236,13 @@ func verifyRecover(dir string) {
 		}
 	}
 	check(found, "after restart a fresh process still refuses the replay (ACTION_CONSUMED, IN_DOUBT)")
+
+	if _, err := os.Stat(dir + "/recover_operator_token"); !os.IsNotExist(err) {
+		check(false, "provisioning token was deleted after use (found one at %s)",
+			dir+"/recover_operator_token")
+	} else {
+		check(true, "provisioning token was deleted after use")
+	}
 }
 
 func must(err error) {

@@ -85,11 +85,9 @@ func run() error {
 		reason      = flag.String("reason", "", "what you checked and found (resolve only)")
 		asJSON      = flag.Bool("json", false, "machine-readable output")
 		out         = flag.String("out", "", "init/rotate: NEW file to write the token to (must not exist)")
-		allowUnprot = flag.Bool("allow-unprotected-out", false,
-			"permit -out on a platform that cannot apply 0600 (Windows); the "+
-				"containing directory must already be restricted by you")
 	)
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	allowUnprot := allowUnprotectedFlag()
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage+unprotectedHelp) }
 
 	// Go's flag package stops parsing at the first non-flag argument, so
 	// "resolve rfa_x -outcome landed" would leave -outcome unparsed and silently
@@ -224,8 +222,17 @@ func cmdInit(store *storage.Store, outPath string, allowUnprotected bool) error 
 	// was permanently impossible. Verified before the fix: a bad -out path
 	// produced exactly that dead end.
 	if outPath != "" {
-		if err := opauth.WriteTokenExclusive(outPath, token, allowUnprotected); err != nil {
+		durable, err := opauth.WriteTokenExclusive(outPath, token, allowUnprotected)
+		if err != nil {
 			return err
+		}
+		if !durable {
+			fmt.Fprintf(os.Stderr,
+				"rzp-guard-operator: WARNING - this platform cannot fsync a directory, "+
+					"so the token file's directory entry is not crash-durable. If the "+
+					"machine loses power in the next moment the credential may exist "+
+					"with no token, and recovery for this state file would be lost. "+
+					"Confirm %s is readable before relying on it.\n", outPath)
 		}
 		if err := store.InitOperatorVerifier(verifier); err != nil {
 			os.Remove(outPath) // the token is worthless; do not leave it lying around
@@ -239,6 +246,12 @@ func cmdInit(store *storage.Store, outPath string, allowUnprotected bool) error 
 	if err := store.InitOperatorVerifier(verifier); err != nil {
 		return err
 	}
+	fmt.Fprintln(os.Stderr,
+		"rzp-guard-operator: NOTE - printing a credential to a terminal is a "+
+			"development convenience, NOT safe delivery. A disconnect, a recording, "+
+			"or a scrollback loss after the credential is committed leaves no "+
+			"human-held token. Prefer -out onto a protected directory, or an OS "+
+			"secret store.")
 	fmt.Println("Operator credential created. Shown ONCE and not recoverable:")
 	fmt.Printf("\n    %s\n\n", token)
 	fmt.Println("The guard never reads or writes this credential. Only this command does.")
@@ -268,8 +281,14 @@ func cmdRotate(store *storage.Store, grant opauth.Grant, reason, outPath string,
 	// would invalidate the OLD token while the new one reached nobody -- the
 	// same lockout as init, but worse, because it destroys a working credential.
 	if outPath != "" {
-		if err := opauth.WriteTokenExclusive(outPath, next, allowUnprotected); err != nil {
+		durable, err := opauth.WriteTokenExclusive(outPath, next, allowUnprotected)
+		if err != nil {
 			return err
+		}
+		if !durable {
+			fmt.Fprintf(os.Stderr,
+				"rzp-guard-operator: WARNING - directory entry not crash-durable on "+
+					"this platform; confirm %s is readable before continuing.\n", outPath)
 		}
 		if err := store.RotateOperatorVerifier(verifier, grant.Subject(), reason); err != nil {
 			os.Remove(outPath) // rotation did not happen; the old token still works
