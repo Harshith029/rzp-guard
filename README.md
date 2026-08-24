@@ -6,13 +6,19 @@ An authorization proxy that sits in front of Razorpay's **official, unmodified**
 > This is a **tested Go authorization core with a live-verified block path**. It is **not** a detector, and **no precision, recall or false-positive numbers exist**. Test counts measure authorization and transport conformance, nothing more. The automatic *success* path is an explicitly unverified compatibility guess (§Known limits).
 
 ```bash
-./run.sh test          # 77 unit tests, no Docker child, no keys, no network
-./run.sh race          # same under the race detector
-./run.sh live-block    # unauthorized refund never reaches the real container
-./run.sh live-recover  # child death → durable IN_DOUBT that survives restart
+./run.sh test              # 77 unit tests: no Docker child, no keys, no network
+./run.sh race              # same under the race detector
+./run.sh live-block        # LIVE: unauthorized refund never reaches the real
+                           #       pinned container, with an ENFORCED alive-control
+./run.sh process-recover   # child death → durable IN_DOUBT surviving restart
+                           #       (local stub child; not the official container)
 ```
 
-Live gates need Docker running and **test-mode** keys in `.env`. `RAZORPAY_KEY_ID` must start with `rzp_test`; the guard refuses to start otherwise.
+`live-block` needs Docker running and **test-mode** keys in `.env`. `RAZORPAY_KEY_ID` must start with `rzp_test`; the guard refuses to start otherwise.
+
+Only `live-block` drives the official container. `process-recover` is named honestly: it exercises the guard's cleanup wiring against a local stub, because against the real container Razorpay answers in well under a second and the reply wins the race against any kill — measured at 2s and 0.15s, not assumed.
+
+**The gates are assertions, not printouts.** `cmd/gate-verify` parses the captured JSON and fails the run if the control read is not a genuine non-error Razorpay entity. Verified negatively: with a wrong secret the gate exits 1.
 
 ---
 
@@ -76,11 +82,12 @@ Every fix is **mutation-verified**: the protection is removed, the test is confi
 == guard's answer for the blocked id 3 ==
    BLOCKED by rzp-guard [NO_AUTHORIZED_ACTION]: no authorized refund action exists for pay_SYN99999999999
 
-== ALIVE CONTROL: did the real container answer id 4? ==
-   replies: 1
+  [PASS] CONTROL: real container produced a response for the allowed read id 4
+  [PASS] CONTROL: read response is a success, not a tool error
+  [PASS] CONTROL: response carries an "entity" field, so it came from the API
 ```
 
-The control matters: the container answered a legitimate read on id 4 with a real Razorpay response, so the absence of id 3 is a block — not a dead child.
+The control matters: the container answered a legitimate read with a real Razorpay response, so the absence of the blocked call is a block — not a dead child. Run against a wrong secret, the same gate fails.
 
 ```
 == refund forwarded, child died without answering ==
@@ -95,14 +102,17 @@ The control matters: the container answered a legitimate read on id 4 with a rea
 
 1. **No detector metric exists.** No precision, recall or false-positive cost. The conformance corpus in `corpus/` cannot supply them: its labels are computed from the same predicate the policy matches on, so scoring against it measures conformance to the spec, not detection ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)). The real measurement needs agent traces with intent specified independently of the mandate, and it has not been run.
 2. **Automatic `COMMITTED` is an unverified compatibility path.** The expected refund-entity shape comes from Razorpay's documentation; no live success envelope has been captured, because that needs a real captured payment via Checkout. The failure mode is fail-closed — an unrecognised success shape yields `IN_DOUBT`, never a wrong COMMIT — but the success path itself is not demonstrated.
-3. **The operator console is a library boundary, not an interface.** Token-gated and durably audited, with no path to it from the relay, but no command or authenticated endpoint invokes it yet.
-4. **Cumulative caps are per state file.** Enforced by exclusive ownership rather than distributed coordination.
-5. **Provenance detects a narrow literal-flow subclass**, and is forensic only.
+3. **`process-recover` uses a stub child**, not the official container, for the reason above. Only `live-block` is live.
+4. **The operator console is a library boundary, not an interface.** Token-gated and durably audited, with no path to it from the relay, but no command or authenticated endpoint invokes it yet.
+5. **Cumulative caps are per state file.** Enforced by exclusive ownership rather than distributed coordination.
+6. **Provenance detects a narrow literal-flow subclass**, and is forensic only.
 
 ## Layout
 
 ```
 cmd/rzp-guard/      the executable: bootstrap → relay → pinned child container
+                    (child fixed at the pinned digest; no runtime override)
+cmd/gate-verify/    enforces the live gates' assertions from captured JSON
 internal/mandate    capability list, receipt derivation
 internal/policy     default-deny decision pipeline
 internal/lifecycle  action + budget state machine, operator console
