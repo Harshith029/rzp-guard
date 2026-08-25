@@ -116,27 +116,34 @@ cmd_build() {
 # The earlier version printed its control and exited 0 whenever the blocked call
 # was simply absent from the tee -- which also passes against a dead container
 # or invalid credentials, the exact cases the control exists to rule out.
-# The study provider. A DIRECT account only.
+# The study provider. `proxy` by default: it is the only credential available.
 #
-# A third-party proxy was tried and rejected (PROTOCOL.md 4.4): it silently
-# served grok-4.6 for a gpt-5.6 request. A backend free to swap the model can
-# move every measured rate in this study without the guard changing at all,
-# because every denominator counts calls the agent actually emitted.
-RZP_STUDY_PROVIDER="${RZP_STUDY_PROVIDER:-openai}"
+# It is UNTRUSTED instrumentation and the repository says so everywhere it
+# matters (PROTOCOL.md 4.5). It silently served grok-4.6 for a gpt-5.6 request,
+# names no operator and publishes no retention policy. The response is not to
+# pretend otherwise but to scope the claim: the study reports what the guard did
+# with a PUBLISHED set of emitted calls, and does not claim to know which model
+# produced them.
+RZP_STUDY_PROVIDER="${RZP_STUDY_PROVIDER:-proxy}"
 
 need_study_creds() {
   case "$RZP_STUDY_PROVIDER" in
+    proxy)
+      if [ -z "${NIHAL_CUSTOM_KEY:-}" ]; then
+        echo "NIHAL_CUSTOM_KEY is not set (RZP_STUDY_PROVIDER=proxy)." >&2
+        echo "Put it in .env (gitignored) and re-run:" >&2
+        echo "  set -a && . ./.env && set +a && ./run.sh study-model -model gpt-5.6-sol" >&2
+        exit 2
+      fi
+      ;;
     openai)
       if [ -z "${OPENAI_API_KEY:-}" ]; then
-        echo "OPENAI_API_KEY is not set." >&2
-        echo "Put it in .env (gitignored) and re-run:" >&2
-        echo "  set -a && . ./.env && set +a && ./run.sh study-model" >&2
+        echo "OPENAI_API_KEY is not set (RZP_STUDY_PROVIDER=openai)." >&2
         exit 2
       fi
       ;;
     *)
-      echo "unknown RZP_STUDY_PROVIDER=$RZP_STUDY_PROVIDER (only 'openai' is supported)" >&2
-      echo "An API proxy is not acceptable instrumentation here; see PROTOCOL.md 4.4." >&2
+      echo "unknown RZP_STUDY_PROVIDER=$RZP_STUDY_PROVIDER (expected proxy|openai)" >&2
       exit 2
       ;;
   esac
@@ -151,7 +158,8 @@ need_study_creds() {
 study_docker() {
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
       -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
-      -e RZP_STUDY_PROVIDER -e OPENAI_API_KEY \
+      -e RZP_STUDY_PROVIDER -e RZP_STUDY_PROXY_BASE \
+      -e NIHAL_CUSTOM_KEY -e OPENAI_API_KEY \
       "$GOIMAGE" "$@"
 }
 
@@ -400,8 +408,9 @@ rzp-guard
                              (no API key, no spend, never a study result)
   ./run.sh study-model       Phase 4b: resolve + record provider, endpoint and
                              model. COMMIT the result BEFORE running traces.
-                             Direct provider only; needs OPENAI_API_KEY. An
-                             API proxy is refused: PROTOCOL.md 4.4.
+                             Proxy by default; needs NIHAL_CUSTOM_KEY. It has
+                             no trustworthy model list, so -model <id> is
+                             required, e.g. -model gpt-5.6-sol.
   ./run.sh study-smoke       Phase 4b: ONE real trace to prove the integration.
                              Not a study result; cannot write under study/.
   ./run.sh study-run [flags] Phase 4b: run the 45 pre-declared traces

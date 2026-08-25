@@ -273,9 +273,17 @@ func cmdRun(args []string) error {
 		}
 		r.modelFreeze = mf
 		r.model, r.temp = fm.Model, fm.Temperature
-		oc := newOpenAI(prov, key)
-		r.newSession = func(system, task string, tools []mcpTool) llmSession {
-			return newOpenAISession(oc, r.model, system, task, r.temp, tools)
+		switch prov.API {
+		case apiMessages:
+			ac := newAnthropicClient(prov.BaseURL, key)
+			r.newSession = func(system, task string, tools []mcpTool) llmSession {
+				return newAnthropicSession(ac, r.model, system, task, r.temp, tools)
+			}
+		default:
+			oc := newOpenAI(prov, key)
+			r.newSession = func(system, task string, tools []mcpTool) llmSession {
+				return newOpenAISession(oc, r.model, system, task, r.temp, tools)
+			}
 		}
 		fmt.Printf("endpoint %s\n", fm.Endpoint)
 		fmt.Printf("provider %s (%s)\n", prov.Name, fm.Endpoint)

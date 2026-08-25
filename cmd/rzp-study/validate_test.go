@@ -105,6 +105,17 @@ func TestValidateTraceSetRefusesEverythingElse(t *testing.T) {
 			ts[9].ModelFreezeSHA = "0000000000000000"
 			return ts
 		}, "model freeze"},
+
+		// Per-turn equality proves each response matched its own request. It
+		// cannot see an alias repointed BETWEEN traces, which is the failure a
+		// substituting endpoint makes plausible.
+		{"two different models across the run", func(ts []trace) []trace {
+			for i := range ts {
+				ts[i].ServedModel = "gpt-5.6-sol"
+			}
+			ts[20].ServedModel = "grok-4.6"
+			return ts
+		}, "MORE THAN ONE served model"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			traces, m, mf := goodTraceSet(t)

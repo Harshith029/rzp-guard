@@ -91,6 +91,38 @@ func validateTraceSet(traces []trace, dir string, m *manifest, mf *modelFreeze) 
 		}
 	}
 
+	// Every trace must name the SAME served model.
+	//
+	// Per-turn equality only proves each response matched its own request. It
+	// cannot see an alias being repointed between traces, or a router sending
+	// half the study one way and half the other -- and the study runs through an
+	// endpoint demonstrated to substitute (PROTOCOL.md 4.5). Since every
+	// denominator counts calls the agent actually emitted, two generators means
+	// two call distributions blended into one number that describes neither.
+	served := map[string][]string{}
+	for _, t := range traces {
+		if t.ServedModel != "" {
+			key := fmt.Sprintf("%s/run%d", t.BriefID, t.RunIndex)
+			served[t.ServedModel] = append(served[t.ServedModel], key)
+		}
+	}
+	if len(served) > 1 {
+		var names []string
+		for name, keys := range served {
+			sort.Strings(keys)
+			shown := keys
+			if len(shown) > 3 {
+				shown = append(append([]string{}, shown[:3]...), "…")
+			}
+			names = append(names, fmt.Sprintf("%s (%d traces: %s)",
+				name, len(keys), strings.Join(shown, ", ")))
+		}
+		sort.Strings(names)
+		problems = append(problems, "traces report MORE THAN ONE served model: "+
+			strings.Join(names, "; ")+
+			" -- two generators means two call distributions blended into one rate")
+	}
+
 	for key, n := range seen {
 		if n > 1 {
 			problems = append(problems, fmt.Sprintf("%s: appears %d times", key, n))

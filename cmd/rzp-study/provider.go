@@ -14,25 +14,48 @@ import (
 // silently point at a different service than the protocol names and the traces
 // would carry no evidence of it.
 //
-// ONE PROVIDER, AND IT MUST BE A DIRECT ACCOUNT.
+// TWO PROVIDERS, AND ONE OF THEM IS UNTRUSTED BY CONSTRUCTION.
 //
-// A third-party API proxy was tried and REJECTED (PROTOCOL.md 4.4). It
-// substituted models silently -- a request for gpt-5.6 was served by grok-4.6,
-// deterministically, while gpt-5.6 sat in its own advertised catalogue -- named
-// no operator, published no retention policy, and offered no way to verify what
-// actually answered.
+//	openai   OpenAI Responses API, direct account        apiResponses
+//	proxy    Anthropic Messages format, intermediary     apiMessages
 //
-// That is not merely a caveat on one metric. Every quantity this study reports
-// has a denominator counting calls the agent ACTUALLY EMITTED, which is a
-// sample from one model's behaviour. A backend free to swap the model is free
-// to move every one of those numbers while the guard stands still. So an
-// intermediary is not acceptable instrumentation here, and no proxy client
-// remains in this repository.
+// The proxy is used because it is the only credential available, and its
+// limitations are handled by SCOPING THE CLAIM rather than by pretending they
+// are absent (PROTOCOL.md 4.5).
+//
+// What is actually wrong with it, measured: requesting gpt-5.6 returned
+// grok-4.6, deterministically, while gpt-5.6 sat in its own advertised
+// catalogue. It names no operator, publishes no retention policy, and cannot be
+// audited from outside.
+//
+// Why that matters to EVERY number, not just the model-specific one: each
+// denominator counts calls the agent ACTUALLY EMITTED, so a change of model
+// changes the call distribution and moves the measured rates while the guard
+// stands still.
+//
+// The controls that make it usable at all, none of which establish trust:
+//
+//	per turn     the served model must equal the requested one, or hard error
+//	per turn     the response id is recorded
+//	per study    every trace must report the SAME served model
+//	in the write-up  the generator is named as unverified, and every emitted
+//	                 call is published so the distribution is observable data
+//	                 rather than something inferred from a model label
 
 const (
 	providerOpenAI = "openai"
+	providerProxy  = "proxy"
 
 	apiResponses = "responses"
+	apiMessages  = "messages"
+
+	// The proxy speaks the Anthropic Messages format but is NOT Anthropic. Its
+	// key deliberately does not reuse ANTHROPIC_API_KEY: that variable belongs
+	// to the operator's own tooling, and borrowing it risks billing or leaking
+	// the wrong credential.
+	proxyKeyEnv     = "NIHAL_CUSTOM_KEY"
+	proxyBaseEnv    = "RZP_STUDY_PROXY_BASE"
+	proxyDefaultURL = "https://api.a6api.com"
 
 	openAIBase   = "https://api.openai.com/v1"
 	openAIKeyEnv = "OPENAI_API_KEY"
@@ -53,11 +76,16 @@ func resolveProvider(name string) (*provider, error) {
 	case providerOpenAI:
 		return &provider{Name: providerOpenAI, API: apiResponses,
 			BaseURL: openAIBase, KeyEnv: openAIKeyEnv}, nil
+	case providerProxy:
+		base := strings.TrimSpace(os.Getenv(proxyBaseEnv))
+		if base == "" {
+			base = proxyDefaultURL
+		}
+		return &provider{Name: providerProxy, API: apiMessages,
+			BaseURL: strings.TrimRight(base, "/"), KeyEnv: proxyKeyEnv}, nil
 	default:
-		return nil, fmt.Errorf("unknown provider %q; only %q is supported. "+
-			"A third-party proxy was rejected as instrumentation (PROTOCOL.md 4.4): "+
-			"it substituted models silently, so it could move every measured rate "+
-			"without the guard changing at all", name, providerOpenAI)
+		return nil, fmt.Errorf("unknown provider %q; expected %s or %s",
+			name, providerOpenAI, providerProxy)
 	}
 }
 
@@ -69,12 +97,12 @@ func providerFromFrozen(fm *frozenModel) (*provider, error) {
 		return nil, fmt.Errorf("study/model.frozen.json records no provider/base_url/api; " +
 			"re-run resolve-model and commit the result")
 	}
-	if fm.Provider != providerOpenAI {
-		return nil, fmt.Errorf("model freeze names provider %q, which is not supported; "+
-			"re-resolve against a direct provider account", fm.Provider)
+	keyEnv := openAIKeyEnv
+	if fm.Provider == providerProxy {
+		keyEnv = proxyKeyEnv
 	}
 	return &provider{Name: fm.Provider, API: fm.API,
-		BaseURL: fm.BaseURL, KeyEnv: openAIKeyEnv}, nil
+		BaseURL: fm.BaseURL, KeyEnv: keyEnv}, nil
 }
 
 func (p *provider) credential() (string, error) {
@@ -86,6 +114,12 @@ func (p *provider) credential() (string, error) {
 }
 
 // enumerates reports whether the mechanical selection rule can be applied.
+//
+// Not against the proxy: its catalogue is a claim about routing, not a
+// guarantee of what is served, and it advertised gpt-5.6 while serving
+// grok-4.6. Running a "highest version" rule over such a list would be theatre.
+// There the model is operator-supplied, recorded as such, and checked against
+// every response instead.
 func (p *provider) enumerates() bool { return p.API == apiResponses }
 
 func validateModelID(p *provider, id string) error {

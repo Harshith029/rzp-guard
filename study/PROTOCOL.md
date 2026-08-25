@@ -32,6 +32,14 @@
 > to the proxy and changes how every agent-trace metric must be described. Trace
 > count is still 0.
 
+> **Amendment E, 2026-08-25 — made before any trace ran.**
+> No direct provider account is obtainable, so the study runs on the rejected
+> proxy after all. **Amendment D's findings all stand — only its conclusion
+> changes.** The proxy is not trusted and is not made trustworthy by being used.
+> What changes instead is the CLAIM: the study stops asserting a model identity,
+> and reports what the guard did with a **published** set of emitted calls.
+> **§4.5** states exactly what is and is not claimed. Trace count is still 0.
+
 This is the artifact PREREGISTRATION Amendment 2 §A2.4 requires: task set, compiled mandates with their recorded coverage gaps, model, sampling parameters, every prompt verbatim, the intended trace count declared in advance, and the adjudication rule with worked examples.
 
 Amendment 2 fixed the *method*. This fixes the *parameters*. Nothing below may be changed once a trace has been run; if something has to change, the run is void and restarts under an amendment that says why.
@@ -191,6 +199,53 @@ So the correct statement is:
 The claim survived being written into a frozen protocol because it sounded like the reassuring thing to say about a compromised dependency. That is precisely the kind of sentence pre-registration exists to catch, and it was caught by review rather than by me.
 
 **Consequence for the run.** The study needs a provider whose model identity is verifiable — a direct provider account, no intermediary. Until then, no trace runs. The `openai` provider path remains in the repository for that purpose; the proxy path does not.
+
+
+---
+
+
+### 4.5 Running on an untrusted generator, and what that costs
+
+The provider is the Amendment C proxy: `https://api.a6api.com/v1/messages`, Anthropic Messages format, model requested as `gpt-5.6-sol`. It is used because it is the only credential available, and the decision was taken by the project owner with §4.4's findings in front of them.
+
+**Nothing in §4.4 is withdrawn.** The endpoint silently served `grok-4.6` for a `gpt-5.6` request, deterministically, while advertising `gpt-5.6` in its own catalogue. It names no operator, publishes no privacy, retention or billing terms, and cannot be audited from outside. Using it does not make any of that untrue.
+
+#### What the study therefore claims — and does not
+
+The retraction in §4.4 established that **all three quantities depend on the model's call distribution**. An unverifiable generator therefore cannot support a claim of the form *"model X behaves like this"*, for any X, on any quantity.
+
+So the study stops making that claim. The generator is described as **"an unverified third-party endpoint, asked for `gpt-5.6-sol`"** — never as GPT-5.6-sol — and the following is what remains, which is not nothing:
+
+> **Every emitted call is published.** Each `create_refund` the agent produced, its arguments, the guard's decision, and the adjudicated label with its reason.
+
+That matters because it changes what the reader has to take on trust. The call distribution stops being a property inferred from a model label and becomes **observed data sitting in the repository**. A reader who distrusts the generator entirely — as they should — can still read the published call set and check what the guard did with each one. The evaluation of the guard rests on the calls, not on their provenance.
+
+| Claimed | Not claimed |
+|---|---|
+| Given *these published calls*, the guard blocked these and allowed those | That a named model behaves this way |
+| Every label, with its reason, is inspectable and disputable | That the rates transfer to another model, prompt, or merchant traffic |
+| The call set is real agent output, not hand-written fixtures | That the generator's identity is known |
+
+Quantity 3 is the most damaged and is reported as a property of *whatever answered*, which is a much weaker statement than the protocol originally intended. It is reported anyway, labelled as such, rather than quietly dropped.
+
+#### Controls, and their honest reach
+
+| Control | Catches | Does not catch |
+|---|---|---|
+| Per-turn served-model equality; mismatch is a hard error | a response answering as a different model than requested | a proxy that lies consistently |
+| Per-turn response id recorded | correlation, and a change in id shape | a proxy that mints ids to match |
+| **All traces must report the same served model** | an alias repointed *between* traces, or a router splitting the run | a uniform lie |
+| Every emitted call published | — | — |
+
+The first three are self-consistency checks. **None establishes trust, and they are not presented as doing so.** A proxy that substitutes uniformly and reports uniformly defeats all of them, and nothing available from outside would reveal it.
+
+#### If a direct key becomes available
+
+Re-resolve against it, re-freeze, and re-run. That deletes this entire section's caveat and costs a few dollars. It remains the right thing to do and the reason it has not been done is availability, not judgement.
+
+#### Data sent to the endpoint
+
+The frozen system prompt, the frozen briefs, non-resolvable `pay_SYN####` identifiers, published Razorpay tool schemas, and stub tool results. **No Razorpay credentials, no real payment identifiers, no personal data** — the study runs against `mcp-stub`, never the live provider. Everything sent is already public in this repository.
 
 
 ---
