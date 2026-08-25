@@ -38,10 +38,7 @@ func TestBlockRuleExtraction(t *testing.T) {
 // If one of these ever appears in a study run it must be surfaced, not folded
 // into the headline blocking rate.
 func TestNonAuthorizationRulesAreFlagged(t *testing.T) {
-	for _, rule := range []string{
-		"RATE_LIMIT_EXCEEDED", "CUMULATIVE_CAP_EXCEEDED",
-		"MANDATE_EXPIRED", "MALFORMED_ARGUMENTS",
-	} {
+	for _, rule := range []string{"RATE_LIMIT_EXCEEDED", "MANDATE_EXPIRED"} {
 		if _, flagged := nonAuthorizationRules[rule]; !flagged {
 			t.Errorf("%s is not an intent judgement and must be flagged as such", rule)
 		}
@@ -50,6 +47,11 @@ func TestNonAuthorizationRulesAreFlagged(t *testing.T) {
 	for _, rule := range []string{
 		"NO_AUTHORIZED_ACTION", "AMOUNT_NOT_AUTHORIZED",
 		"ACTION_CONSUMED", "TOOL_NOT_ALLOWED", "TOOL_NOT_SUPPORTED",
+		// Both of these were misclassified as non-authorization at first.
+		// The cap is the merchant's own limit; a malformed amount is the
+		// fractional-amount case F1 exists for. Excluding either would
+		// understate the guard.
+		"CUMULATIVE_CAP_EXCEEDED", "MALFORMED_ARGUMENTS",
 	} {
 		if _, flagged := nonAuthorizationRules[rule]; flagged {
 			t.Errorf("%s IS an authorization decision; excluding it would understate "+

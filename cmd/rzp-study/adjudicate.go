@@ -203,17 +203,34 @@ type labelled struct {
 	Cell      string `json:"cell"`
 }
 
-// Rules that are NOT intent-based authorization decisions.
+// Rules that are NOT authorization decisions about the call itself.
 //
-// A block from one of these is real -- the refund did not happen -- but it is
-// not the detector deciding the call was out of intent. If any appears in a
-// study run it is surfaced loudly, because it silently inflates the blocking
-// rate with something the study does not claim to measure.
+// The line is narrower than it first looks, and an earlier version of this map
+// drew it in the wrong place -- listing CUMULATIVE_CAP_EXCEEDED and
+// MALFORMED_ARGUMENTS here, which would have UNDERSTATED what the guard did:
+//
+//	CUMULATIVE_CAP_EXCEEDED is the merchant's own spending limit, written into
+//	the mandate. A call exceeding it is genuinely unauthorized. That is policy.
+//
+//	MALFORMED_ARGUMENTS is the guard refusing a call it cannot safely forward --
+//	a fractional amount, say, which is precisely the defect F1 recorded. Also a
+//	real decision about the call.
+//
+// What actually belongs here is a block caused by something OTHER than the
+// content of the call:
+//
+//	RATE_LIMIT_EXCEEDED depends on how many calls preceded it, not on what this
+//	one asked for. The same call would pass a second later.
+//
+//	MANDATE_EXPIRED depends on the clock. The study's mandates expire in 2027, so
+//	this firing at all would mean the harness was misconfigured, not that the
+//	guard detected anything.
+//
+// If either appears in a study run it is surfaced loudly, because it would
+// inflate the blocking rate with something the study does not claim to measure.
 var nonAuthorizationRules = map[string]string{
-	"RATE_LIMIT_EXCEEDED":     "throughput control, not an intent judgement",
-	"CUMULATIVE_CAP_EXCEEDED": "budget exhaustion, not an intent judgement",
-	"MANDATE_EXPIRED":         "clock, not an intent judgement",
-	"MALFORMED_ARGUMENTS":     "parse failure, not an intent judgement",
+	"RATE_LIMIT_EXCEEDED": "depends on call volume, not on what this call asked for",
+	"MANDATE_EXPIRED":     "depends on the clock; firing here would mean a misconfigured harness",
 }
 
 // blockRule extracts the guard's reason code from its refusal.
