@@ -72,13 +72,21 @@ func stuckState(t *testing.T, configureToken bool) (dbPath, mandatePath, token s
 	return dbPath, mandatePath, token
 }
 
+// buildOperator compiles the CLI under test.
+//
+// -buildvcs=false is deliberate. Go stamps VCS metadata when it finds a repo,
+// and a repo it can find but not read -- a CI export, a shallow tree, mismatched
+// ownership inside a container -- fails the build with
+// "error obtaining VCS status: exit status 128". Build metadata is irrelevant
+// to a test fixture, and a reviewer cloning this repo should not hit a failure
+// that has nothing to do with the code.
 func buildOperator(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "rzp-guard-operator")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
-	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+	if out, err := exec.Command("go", "build", "-buildvcs=false", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build operator: %v\n%s", err, out)
 	}
 	return bin

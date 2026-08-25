@@ -1,0 +1,54 @@
+name: reproducibility
+
+# Runs the documented commands from a source tree with UNUSABLE VCS metadata.
+#
+# A reviewer reported that ./run.sh all failed in a clean containerised run:
+# eleven operator tests died before reaching a single assertion with
+# "error obtaining VCS status: exit status 128". Go stamps VCS metadata when it
+# finds a repo, and a repo it can find but not read -- a CI export, a shallow
+# tree, mismatched ownership inside a container -- fails the build. The product
+# was fine; the shipped runner was not, which is worse for a project whose whole
+# claim is reproducible evidence.
+#
+# This job reproduces that condition deliberately so it cannot regress.
+
+on: [push, pull_request]
+
+jobs:
+  no-vcs-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Break VCS metadata (reproduce the reported failure condition)
+        run: |
+          rm -rf .git
+          mkdir -p .git
+          echo corrupt > .git/HEAD
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: false
+
+      # Deliberately NOT setting GOFLAGS here: the point is that the repository's
+      # own build invocations must work without help from the environment.
+      - name: go build
+        run: go build ./...
+
+      - name: default lane
+        run: go test ./...
+
+      - name: lifecycle lane
+        run: go test -tags testhook ./cmd/rzp-guard/
+
+      - name: race, default lane
+        run: go test -race ./...
+
+      - name: race, lifecycle lane
+        run: go test -race -tags testhook ./cmd/rzp-guard/
+
+      # The live gates need Docker plus Razorpay Test Mode keys, so they are not
+      # run here. What CI covers is the reproducibility defect itself.
+      - name: gofmt
+        run: test -z "$(gofmt -l ./cmd ./internal)"

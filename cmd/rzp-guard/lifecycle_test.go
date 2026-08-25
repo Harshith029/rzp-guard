@@ -33,7 +33,7 @@ func buildTestHook(t *testing.T) string {
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
-	cmd := exec.Command("go", "build", "-tags", "testhook", "-o", bin, ".")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-tags", "testhook", "-o", bin, ".")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build test-hook binary: %v\n%s", err, out)
 	}

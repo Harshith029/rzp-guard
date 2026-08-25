@@ -13,7 +13,16 @@ cd "$(dirname "$0")"
 PWDW="$(pwd -W 2>/dev/null || pwd)"
 EV=evidence/live
 
-gorun() { MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$GOIMAGE" "$@"; }
+# GOFLAGS carries -buildvcs=false into every build the container performs,
+# including the ones tests spawn as subprocesses. Go stamps VCS metadata when it
+# finds a repo, and a repo it can find but not read -- a CI export, a shallow
+# tree, mismatched ownership inside a container -- fails with
+# "error obtaining VCS status: exit status 128". Reproduced against a tree with
+# an unreadable .git: eleven operator tests failed before reaching a single
+# assertion.
+gorun() {
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src     -e GOFLAGS=-buildvcs=false "$GOIMAGE" "$@"
+}
 
 need_keys() {
   [ -f .env ] || { echo "ERROR: .env not found. Live gates need test-mode keys." >&2; exit 1; }
@@ -49,9 +58,9 @@ cmd_operator_setup() {
 }
 
 cmd_build() {
-  go build -o rzp-guard.exe ./cmd/rzp-guard
-  go build -o gate-verify.exe ./cmd/gate-verify
-  go build -o rzp-guard-operator.exe ./cmd/rzp-guard-operator
+  go build -buildvcs=false -o rzp-guard.exe ./cmd/rzp-guard
+  go build -buildvcs=false -o gate-verify.exe ./cmd/gate-verify
+  go build -buildvcs=false -o rzp-guard-operator.exe ./cmd/rzp-guard-operator
   echo "built ./rzp-guard.exe ./gate-verify.exe ./rzp-guard-operator.exe"
 }
 
@@ -78,11 +87,11 @@ cmd_live_block() {
   # evidence was produced on a platform the project declares unsupported, using
   # test-hook escapes to provision. That gap is what this closes.
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src -e CGO_ENABLED=0 \
-      -e GOOS=linux -e GOARCH=amd64 "$GOIMAGE" sh -c '
+      -e GOOS=linux -e GOARCH=amd64 -e GOFLAGS=-buildvcs=false "$GOIMAGE" sh -c '
     mkdir -p .gotmp/linux
-    go build -o .gotmp/linux/rzp-guard ./cmd/rzp-guard
-    go build -o .gotmp/linux/rzp-guard-operator ./cmd/rzp-guard-operator
-    go build -o .gotmp/linux/gate-verify ./cmd/gate-verify
+    go build -buildvcs=false -o .gotmp/linux/rzp-guard ./cmd/rzp-guard
+    go build -buildvcs=false -o .gotmp/linux/rzp-guard-operator ./cmd/rzp-guard-operator
+    go build -buildvcs=false -o .gotmp/linux/gate-verify ./cmd/gate-verify
   '
 
   MSYS_NO_PATHCONV=1 docker run --rm \
@@ -136,11 +145,11 @@ cmd_process_recover() {
   # a fresh output path did not help. The container sidesteps that and is
   # already the canonical runner for everything else.
   mkdir -p "$EV"; rm -f "$EV"/recover_* 2>/dev/null || true
-  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$GOIMAGE" sh -c '
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src       -e GOFLAGS=-buildvcs=false "$GOIMAGE" sh -c '
     set -e
-    go build -tags testhook -o /tmp/guard-th ./cmd/rzp-guard
-    go build -o /tmp/op ./cmd/rzp-guard-operator
-    go build -o /tmp/gate-verify ./cmd/gate-verify
+    go build -buildvcs=false -tags testhook -o /tmp/guard-th ./cmd/rzp-guard
+    go build -buildvcs=false -o /tmp/op ./cmd/rzp-guard-operator
+    go build -buildvcs=false -o /tmp/gate-verify ./cmd/gate-verify
     EV=evidence/live
 
     # REAL provisioning, on the SHIPPED operator binary, with no escape flags.
