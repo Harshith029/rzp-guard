@@ -147,6 +147,10 @@ type runner struct {
 
 const maxTurnsFrozen = 12
 
+// dryRunModel stamps every trace produced without a real model, so a
+// downstream step can refuse to treat scripted output as a measurement.
+const dryRunModel = "DRY-RUN-SCRIPTED-FAKE"
+
 func cmdRun(args []string) error {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	guard := fs.String("guard", ".gotmp/linux/rzp-guard-th", "rzp-guard binary (test-hook build)")
@@ -188,7 +192,7 @@ func cmdRun(args []string) error {
 	}
 
 	if *dry {
-		r.model = "DRY-RUN-SCRIPTED-FAKE"
+		r.model = dryRunModel
 	} else {
 		// Every one of these fails closed, before a single token is spent.
 		mf, err := requireCommittedModelFreeze()

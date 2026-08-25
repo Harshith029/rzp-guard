@@ -109,6 +109,7 @@ func cmdWorksheet(args []string) error {
 	fs := flag.NewFlagSet("worksheet", flag.ExitOnError)
 	dir := fs.String("traces", "study/traces", "trace directory")
 	out := fs.String("out", "study/adjudication/worksheet.json", "worksheet path")
+	allowDry := fs.Bool("allow-dry", false, "permit dry-run traces (tooling test; cannot write under study/)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -117,6 +118,9 @@ func cmdWorksheet(args []string) error {
 	}
 	traces, err := loadTraces(*dir)
 	if err != nil {
+		return err
+	}
+	if err := refuseDryArtifacts(traces, *allowDry, *out); err != nil {
 		return err
 	}
 	if _, err := os.Stat(*out); err == nil {
@@ -175,12 +179,50 @@ type labelled struct {
 	Cell      string `json:"cell"`
 }
 
+// refuseDryArtifacts stops scripted output from becoming a result.
+//
+// The dry run exists to exercise plumbing, and its "verdicts" are whatever the
+// script happened to emit. A tooling test wrote labelled_calls.json straight
+// into study/adjudication/ -- the canonical path -- where a reader would
+// reasonably take it for study output. Numbers that look like a measurement and
+// are not are the exact failure this project keeps having to correct.
+//
+// Dry traces therefore need -allow-dry, and even then may not write anywhere
+// under study/.
+func refuseDryArtifacts(traces []trace, allowDry bool, paths ...string) error {
+	dry := 0
+	for _, t := range traces {
+		if t.Model == dryRunModel {
+			dry++
+		}
+	}
+	if dry == 0 {
+		return nil
+	}
+	if !allowDry {
+		return fmt.Errorf("%d of %d traces are DRY RUNS (scripted, no model was called); "+
+			"they cannot produce a measurement. Pass -allow-dry to exercise the tooling on them",
+			dry, len(traces))
+	}
+	for _, p := range paths {
+		clean := filepath.ToSlash(filepath.Clean(p))
+		if clean == "study" || strings.HasPrefix(clean, "study/") {
+			return fmt.Errorf("refusing to write dry-run output to %s: %s is where real "+
+				"study artifacts live; send it somewhere else", p, "study/")
+		}
+	}
+	fmt.Fprintf(os.Stderr,
+		"WARNING: %d dry-run traces. This exercises the tooling and is NOT a study result.\n", dry)
+	return nil
+}
+
 func cmdReport(args []string) error {
 	fs := flag.NewFlagSet("report", flag.ExitOnError)
 	dir := fs.String("traces", "study/traces", "trace directory")
 	ws := fs.String("worksheet", "study/adjudication/worksheet.json", "filled worksheet")
 	out := fs.String("out", "study/RESULTS.md", "report path")
 	labels := fs.String("labels", "study/adjudication/labelled_calls.json", "published per-call labels")
+	allowDry := fs.Bool("allow-dry", false, "permit dry-run traces (tooling test; cannot write under study/)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -189,6 +231,9 @@ func cmdReport(args []string) error {
 	}
 	traces, err := loadTraces(*dir)
 	if err != nil {
+		return err
+	}
+	if err := refuseDryArtifacts(traces, *allowDry, *out, *labels); err != nil {
 		return err
 	}
 	b, err := os.ReadFile(*ws)
