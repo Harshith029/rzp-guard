@@ -95,22 +95,31 @@ type toolCallRecord struct {
 }
 
 type trace struct {
-	BriefID      string            `json:"brief_id"`
-	Family       string            `json:"family"`
-	RunIndex     int               `json:"run_index"`
-	Model        string            `json:"model"`
-	Temperature  *float64          `json:"temperature"`
-	StartedAt    string            `json:"started_at_utc"`
-	Status       string            `json:"status"`
-	VoidReason   string            `json:"void_reason,omitempty"`
-	Turns        int               `json:"turns"`
-	ToolCalls    []toolCallRecord  `json:"tool_calls"`
-	FinalText    string            `json:"final_text"`
-	Decisions    []json.RawMessage `json:"guard_decisions"`
-	InputTokens  int               `json:"input_tokens"`
-	OutputTokens int               `json:"output_tokens"`
-	GuardStderr  string            `json:"guard_stderr,omitempty"`
-	FreezeSHA    string            `json:"freeze_sha256"`
+	BriefID     string            `json:"brief_id"`
+	Family      string            `json:"family"`
+	RunIndex    int               `json:"run_index"`
+	Model       string            `json:"model"`
+	Temperature *float64          `json:"temperature"`
+	StartedAt   string            `json:"started_at_utc"`
+	Status      string            `json:"status"`
+	VoidReason  string            `json:"void_reason,omitempty"`
+	Turns       int               `json:"turns"`
+	ToolCalls   []toolCallRecord  `json:"tool_calls"`
+	FinalText   string            `json:"final_text"`
+	Decisions   []json.RawMessage `json:"guard_decisions"`
+	// Smoke marks a trace produced by the integration check rather than by the
+	// study. It is written into the file itself so a stray trace can never be
+	// mistaken for a result.
+	Smoke bool `json:"smoke,omitempty"`
+	// ServedModel is the model id the endpoint reported, as distinct from the
+	// one requested. Recorded because the study runs through a third-party proxy
+	// that has been observed substituting models, so "which model produced this
+	// trace" must be evidenced rather than assumed.
+	ServedModel  string `json:"served_model,omitempty"`
+	InputTokens  int    `json:"input_tokens"`
+	OutputTokens int    `json:"output_tokens"`
+	GuardStderr  string `json:"guard_stderr,omitempty"`
+	FreezeSHA    string `json:"freeze_sha256"`
 
 	// Which model freeze this trace ran under, and the commit that fixed it.
 	// Recorded per-trace so a reader can check the model was committed before
@@ -135,14 +144,19 @@ type turnRecord struct {
 type runner struct {
 	guard, operator, stub string
 	outDir                string
-	client                *openAI
 	model                 string
 	temp                  *float64
 	sysPrompt             string
 	freezeSHA             string
 	dryRun                bool
+	smoke                 bool
 	modelFreeze           *modelFreeze
 	maxTurns              int
+
+	// newSession builds one conversation. A factory rather than a client
+	// because the providers speak different wire formats and each owns its own
+	// history representation; see llm.go.
+	newSession func(system, task string, tools []mcpTool) llmSession
 }
 
 const maxTurnsFrozen = 12
@@ -160,6 +174,8 @@ func cmdRun(args []string) error {
 	only := fs.String("only", "", "run a single brief id")
 	runs := fs.Int("runs", 0, "runs per brief (0 = the frozen 3)")
 	dry := fs.Bool("dry-run", false, "scripted fake model, no API calls")
+	smoke := fs.Bool("smoke", false,
+		"one real trace to prove the integration; not a study run, cannot write under study/")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -178,26 +194,57 @@ func cmdRun(args []string) error {
 	}
 
 	perBrief := 3
-	if *dry {
+	switch {
+	case *dry:
 		if *runs > 0 {
 			perBrief = *runs
 		}
-	} else if err := requireFullTraceSet(len(briefs), perBrief, m.DeclaredTraceCount, *only, *runs); err != nil {
-		return err
+	case *smoke:
+		// A smoke trace exists to prove the integration works BEFORE the real
+		// run starts. Without it the only way to discover a broken transport is
+		// to burn the pre-declared 45, then delete and re-run -- which is
+		// exactly the "re-run until it works" freedom the pre-registration
+		// exists to remove. It is one brief, one run, and it may not write
+		// anywhere a study artifact lives.
+		perBrief = 1
+		if len(briefs) > 1 {
+			briefs = briefs[:1]
+		}
+		if err := refuseStudyPath(*outDir); err != nil {
+			return err
+		}
+	default:
+		if err := requireFullTraceSet(len(briefs), perBrief, m.DeclaredTraceCount, *only, *runs); err != nil {
+			return err
+		}
 	}
 
 	r := &runner{
 		guard: *guard, operator: *operator, stub: *stub, outDir: *outDir,
-		sysPrompt: sp, freezeSHA: m.FreezeSHA256, dryRun: *dry, maxTurns: maxTurnsFrozen,
+		sysPrompt: sp, freezeSHA: m.FreezeSHA256, dryRun: *dry, smoke: *smoke,
+		maxTurns: maxTurnsFrozen,
 	}
 
 	if *dry {
 		r.model = dryRunModel
 	} else {
 		// Every one of these fails closed, before a single token is spent.
-		mf, err := requireCommittedModelFreeze()
-		if err != nil {
-			return err
+		//
+		// The committed-model-freeze requirement is the single check a smoke
+		// trace relaxes, and only because it cannot be satisfied yet: the point
+		// of the smoke trace is to validate the model choice BEFORE committing
+		// it. Everything else -- freeze integrity, immutable output, the
+		// study/ path ban -- still applies.
+		var mf *modelFreeze
+		if r.smoke {
+			fmt.Fprintln(os.Stderr,
+				"SMOKE TRACE: not a study run. The model freeze is not required to be "+
+					"committed, and output may not be written under study/.")
+		} else {
+			mf, err = requireCommittedModelFreeze()
+			if err != nil {
+				return err
+			}
 		}
 		if err := requireEmptyTraceDir(r.outDir); err != nil {
 			return err
@@ -221,7 +268,20 @@ func cmdRun(args []string) error {
 			return err
 		}
 		r.modelFreeze = mf
-		r.model, r.temp, r.client = fm.Model, fm.Temperature, newOpenAI(prov, key)
+		r.model, r.temp = fm.Model, fm.Temperature
+		switch prov.API {
+		case apiMessages:
+			ac := newAnthropicClient(prov.BaseURL, key)
+			r.newSession = func(system, task string, tools []mcpTool) llmSession {
+				return newAnthropicSession(ac, r.model, system, task, r.temp, tools)
+			}
+		default:
+			oc := newOpenAI(prov, key)
+			r.newSession = func(system, task string, tools []mcpTool) llmSession {
+				return newOpenAISession(oc, r.model, system, task, r.temp, tools)
+			}
+		}
+		fmt.Printf("endpoint %s\n", fm.Endpoint)
 		fmt.Printf("provider %s (%s)\n", prov.Name, fm.Endpoint)
 	}
 
@@ -274,6 +334,7 @@ func (r *runner) runTrace(br brief, run int) (t trace) {
 		BriefID: br.BriefID, Family: br.Family, RunIndex: run,
 		Model: r.model, Temperature: r.temp,
 		StartedAt: nowUTC(), FreezeSHA: r.freezeSHA, Status: "complete",
+		Smoke: r.smoke,
 	}
 	if r.modelFreeze != nil {
 		t.ModelFreezeSHA = r.modelFreeze.SHA256
@@ -326,7 +387,7 @@ func (r *runner) runTrace(br brief, run int) (t trace) {
 		r.driveScripted(&t, sess, br)
 		return t
 	}
-	r.driveModel(&t, sess, br, mcpToolsToOpenAI(tools))
+	r.driveModel(&t, sess, br, tools)
 	return t
 }
 
@@ -354,88 +415,59 @@ func blockedByGuard(res mcpResult) bool {
 
 // ---------------------------------------------------------------- model loop
 
-func (r *runner) driveModel(t *trace, sess *mcpSession, br brief, tools []anyMap) {
-	input := []any{
-		anyMap{"role": "user", "content": br.AgentTask},
-	}
-	temp := r.temp
+// driveModel is the agent loop, and is provider-agnostic on purpose: the
+// experiment must not differ by transport. Same prompt, same task, same tool
+// schemas, same turn cap, same recording, whichever API is underneath.
+func (r *runner) driveModel(t *trace, sess *mcpSession, br brief, tools []mcpTool) {
+	conv := r.newSession(r.sysPrompt, br.AgentTask, tools)
 
 	for turn := 1; turn <= r.maxTurns; turn++ {
 		t.Turns = turn
-		reply, err := r.client.respond(responsesRequest{
-			Model:        r.model,
-			Instructions: r.sysPrompt,
-			Input:        input,
-			Tools:        tools,
-			Temperature:  temp,
-		})
+
+		reply, err := conv.Next()
 		if err != nil {
-			// PROTOCOL.md 4.1 contingency: retry once without the parameter and
-			// record that the run used the model default, rather than silently
-			// running a different experiment.
-			if strings.Contains(err.Error(), errTemperatureUnsupported.Error()) && temp != nil {
-				temp = nil
-				t.Temperature = nil
-				continue
-			}
-			t.Status, t.VoidReason = "void", "responses api: "+err.Error()
+			t.Status, t.VoidReason = "void", "model: "+err.Error()
 			return
 		}
 
-		snapshot := make([]json.RawMessage, 0, len(input))
-		for _, it := range input {
-			b, err := json.Marshal(it)
-			if err != nil {
-				continue
-			}
-			snapshot = append(snapshot, b)
+		// Whatever temperature actually ended up in force, including nil if the
+		// PROTOCOL.md 4.1 contingency fired. Recorded per-trace so the fallback
+		// is visible rather than assumed.
+		t.Temperature = conv.Temperature()
+		if sm, ok := conv.(interface{ ServedModel() string }); ok {
+			t.ServedModel = sm.ServedModel()
 		}
+
 		t.Messages = append(t.Messages, turnRecord{
-			Turn: turn, Input: snapshot, Output: reply.rawOutput,
+			Turn: turn, Input: reply.RawInput, Output: reply.RawOutput,
 		})
-		t.InputTokens += reply.Usage.InputTokens
-		t.OutputTokens += reply.Usage.OutputTokens
-
-		// Echo every returned item back on the next turn, reasoning items
-		// included; dropping them degrades multi-step tool use.
-		for _, raw := range reply.rawOutput {
-			input = append(input, json.RawMessage(raw))
+		t.InputTokens += reply.InputTokens
+		t.OutputTokens += reply.OutputTokens
+		if reply.Text != "" {
+			t.FinalText = reply.Text
 		}
 
-		var calls []outputItem
-		for _, item := range reply.Output {
-			switch item.Type {
-			case "function_call":
-				calls = append(calls, item)
-			case "message":
-				if txt := extractText(item.Raw); txt != "" {
-					t.FinalText = txt
-				}
-			}
-		}
-		if len(calls) == 0 {
+		if len(reply.Calls) == 0 {
 			t.Status = "complete"
 			return
 		}
 
-		for _, c := range calls {
-			args := map[string]any{}
-			if c.Arguments != "" {
-				_ = json.Unmarshal([]byte(c.Arguments), &args)
-			}
-			res, err := sess.callTool(c.Name, args)
+		results := make([]agentToolResult, 0, len(reply.Calls))
+		for _, c := range reply.Calls {
+			res, err := sess.callTool(c.Name, c.Args)
 			if err != nil {
 				t.Status, t.VoidReason = "void", "tool call: "+err.Error()
 				return
 			}
 			t.ToolCalls = append(t.ToolCalls, toolCallRecord{
-				Turn: turn, CallID: c.CallID, Name: c.Name, Arguments: c.Arguments,
+				Turn: turn, CallID: c.ID, Name: c.Name, Arguments: c.ArgsJSON,
 				ResultText: res.Text, IsError: res.IsError, Blocked: blockedByGuard(res),
 			})
-			input = append(input, anyMap{
-				"type": "function_call_output", "call_id": c.CallID, "output": res.Text,
+			results = append(results, agentToolResult{
+				Call: c, Text: res.Text, IsError: res.IsError,
 			})
 		}
+		conv.Provide(results)
 	}
 	t.Status = "turn_limit"
 }

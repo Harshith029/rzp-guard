@@ -54,7 +54,7 @@ func usage() {
 
   verify-freeze    check study/manifest.json against the files on disk
   resolve-model    resolve and record provider+endpoint+model (PROTOCOL.md 4),
-                   pre-trace. Flags: -provider openai|bedrock, -model <id>
+                   pre-trace. Flags: -provider proxy|openai, -model <id>
   run [flags]      run the traces
   worksheet        emit the BLINDED adjudication worksheet from the traces
   report           join filled verdicts onto the traces -> confusion matrix
@@ -167,6 +167,7 @@ func cmdVerifyFreeze() error {
 
 type frozenModel struct {
 	Provider        string   `json:"provider"`
+	API             string   `json:"api"`
 	BaseURL         string   `json:"base_url"`
 	Model           string   `json:"model"`
 	ResolvedAt      string   `json:"resolved_at_utc"`
@@ -264,10 +265,36 @@ func pickModel(models []modelInfo) (string, []string) {
 	return cands[0].id, names
 }
 
+// endpointFor records the concrete URL a run will POST to, so the freeze names
+// an address rather than a base.
+func endpointFor(p *provider) string {
+	if p.API == apiMessages {
+		return p.BaseURL + "/v1/messages"
+	}
+	return p.BaseURL + responsesPath
+}
+
+// ruleFor records the rule that was ACTUALLY applied.
+//
+// Recording the tier rule on an operator-supplied choice produced a freeze that
+// contradicted itself: it said "excluding the advanced-reasoning tier (sol)"
+// while naming gpt-5.6-sol as the model. The tier rule governs enumerable
+// endpoints; where an operator supplies the id, saying so is the honest record.
+func ruleFor(method string) string {
+	if method == "operator-supplied" {
+		return "operator-supplied: the endpoint publishes no trustworthy model list " +
+			"(it has been observed substituting models), so the tier rule in " +
+			"PROTOCOL.md 4 is inapplicable and does not govern this choice. The id " +
+			"was chosen because it is one the endpoint routes without substitution, " +
+			"and every response is checked against it -- see PROTOCOL.md 4.3."
+	}
+	return selectionRule
+}
+
 func cmdResolveModel(args []string) error {
 	fs := flag.NewFlagSet("resolve-model", flag.ExitOnError)
-	providerName := fs.String("provider", providerBedrock,
-		"openai | bedrock")
+	providerName := fs.String("provider", providerProxy,
+		"proxy | openai")
 	explicit := fs.String("model", "",
 		"record this model id verbatim instead of enumerating (required when the "+
 			"endpoint does not expose a model list)")
@@ -292,6 +319,18 @@ func cmdResolveModel(args []string) error {
 		cands          []string
 		listed         int
 	)
+
+	// Where the endpoint cannot be enumerated meaningfully, an operator supplies
+	// the id. The proxy publishes no trustworthy list -- it substitutes models
+	// silently -- so a "mechanical pick" there would be theatre dressed as rigour.
+	if *explicit == "" && !p.enumerates() {
+		return fmt.Errorf("provider %q needs an explicit -model.\n"+
+			"Its model list is a claim about routing, not a guarantee of what is\n"+
+			"served, so a mechanical pick would be meaningless. Supply the id and\n"+
+			"it is recorded as operator-supplied; every response is then checked\n"+
+			"against it. Example:\n"+
+			"  ./run.sh study-model -model gpt-5.6-sol", p.Name)
+	}
 
 	if *explicit != "" {
 		// Bedrock's OpenAI-compatible route is an inference endpoint and is not
@@ -333,17 +372,18 @@ func cmdResolveModel(args []string) error {
 	temp := 0.2
 	fm := frozenModel{
 		Provider:        p.Name,
+		API:             p.API,
 		BaseURL:         p.BaseURL,
 		Model:           picked,
 		ResolvedAt:      nowUTC(),
-		SelectionRule:   selectionRule,
+		SelectionRule:   ruleFor(method),
 		SelectionMethod: method,
 		Candidates:      cands,
 		TotalListed:     listed,
 		Temperature:     &temp,
 		TemperatureNote: "frozen at 0.2; if this model rejects the parameter the run " +
 			"applies the PROTOCOL.md 4.1 contingency and records the fallback per-trace",
-		Endpoint: p.BaseURL + responsesPath,
+		Endpoint: endpointFor(p),
 	}
 	b, _ := json.MarshalIndent(fm, "", "  ")
 	path := filepath.Join(studyDir(), "model.frozen.json")
@@ -351,7 +391,7 @@ func cmdResolveModel(args []string) error {
 		return err
 	}
 
-	fmt.Printf("provider  %s\n", p.Name)
+	fmt.Printf("provider  %s (%s API)\n", p.Name, p.API)
 	fmt.Printf("endpoint  %s\n", fm.Endpoint)
 	fmt.Printf("model     %s  (%s)\n", picked, method)
 	if method == "enumerated" {

@@ -94,22 +94,18 @@ cmd_build() {
 # The earlier version printed its control and exited 0 whenever the blocked call
 # was simply absent from the tee -- which also passes against a dead container
 # or invalid credentials, the exact cases the control exists to rule out.
-# The study provider. Bedrock by default: it is where this project's credits
-# are, and its OpenAI-compatible route takes the same bearer auth, so the only
-# real difference from OpenAI direct is the base URL.
-RZP_STUDY_PROVIDER="${RZP_STUDY_PROVIDER:-bedrock}"
+# The study provider. `proxy` by default: it is what this project has
+# credentials for. It speaks the Anthropic Messages format but is NOT Anthropic
+# -- it is a third-party endpoint that routes to several vendors' models.
+RZP_STUDY_PROVIDER="${RZP_STUDY_PROVIDER:-proxy}"
 
 need_study_creds() {
   case "$RZP_STUDY_PROVIDER" in
-    bedrock)
-      if [ -z "${AWS_BEARER_TOKEN_BEDROCK:-}" ] || [ -z "${AWS_REGION:-}" ]; then
-        echo "Bedrock needs AWS_BEARER_TOKEN_BEDROCK and AWS_REGION." >&2
-        echo "Put them in .env (gitignored) and re-run:" >&2
-        echo "  set -a && . ./.env && set +a && ./run.sh study-model" >&2
-        echo "" >&2
-        echo "AWS_REGION has no default on purpose: Bedrock endpoints are" >&2
-        echo "per-Region, and guessing one would silently change where the" >&2
-        echo "traces ran." >&2
+    proxy)
+      if [ -z "${NIHAL_CUSTOM_KEY:-}" ]; then
+        echo "NIHAL_CUSTOM_KEY is not set (RZP_STUDY_PROVIDER=proxy)." >&2
+        echo "Put it in .env (gitignored) and re-run:" >&2
+        echo "  set -a && . ./.env && set +a && ./run.sh study-model -model gpt-5.6-sol" >&2
         exit 2
       fi
       ;;
@@ -120,7 +116,7 @@ need_study_creds() {
       fi
       ;;
     *)
-      echo "unknown RZP_STUDY_PROVIDER=$RZP_STUDY_PROVIDER (expected bedrock|openai)" >&2
+      echo "unknown RZP_STUDY_PROVIDER=$RZP_STUDY_PROVIDER (expected proxy|openai)" >&2
       exit 2
       ;;
   esac
@@ -135,8 +131,8 @@ need_study_creds() {
 study_docker() {
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
       -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
-      -e RZP_STUDY_PROVIDER \
-      -e AWS_BEARER_TOKEN_BEDROCK -e AWS_REGION -e OPENAI_API_KEY \
+      -e RZP_STUDY_PROVIDER -e RZP_STUDY_PROXY_BASE \
+      -e NIHAL_CUSTOM_KEY -e OPENAI_API_KEY \
       "$GOIMAGE" "$@"
 }
 
@@ -342,6 +338,20 @@ cmd_study_model() {
   echo "modified model freeze: a promise nobody can fail is not a control."
 }
 
+cmd_study_smoke() {
+  # One REAL trace, to prove the integration before spending the pre-declared
+  # 45. Without it, the only way to find a broken transport is to burn the real
+  # run, delete it, and start again -- which is the "re-run until it works"
+  # freedom the pre-registration exists to remove.
+  #
+  # It is not a study result: output is forced outside study/ and every trace it
+  # writes is stamped "smoke": true.
+  need_study_creds
+  cmd_study_build
+  rm -rf .gotmp/smoke
+  study_docker ./.gotmp/linux/rzp-study run -smoke -out .gotmp/smoke "$@"
+}
+
 cmd_study_run() {
   need_study_creds
   cmd_study_build
@@ -366,9 +376,11 @@ rzp-guard
                              (no API key, no spend, never a study result)
   ./run.sh study-model       Phase 4b: resolve + record provider, endpoint and
                              model. COMMIT the result BEFORE running traces.
-                             Bedrock by default; needs AWS_BEARER_TOKEN_BEDROCK
-                             and AWS_REGION. Add -model <id> if the endpoint
-                             does not enumerate models.
+                             Proxy by default; needs NIHAL_CUSTOM_KEY. The
+                             proxy publishes no trustworthy model list, so
+                             -model <id> is required, e.g. -model gpt-5.6-sol.
+  ./run.sh study-smoke       Phase 4b: ONE real trace to prove the integration.
+                             Not a study result; cannot write under study/.
   ./run.sh study-run [flags] Phase 4b: run the 45 pre-declared traces
   ./run.sh verify-refund-evidence
                              Re-check the captured G1.6 allow-path evidence.
@@ -396,6 +408,7 @@ case "${1:-help}" in
   study-verify) cmd_study_verify ;;
   study-dry) cmd_study_dry ;;
   study-model) shift; cmd_study_model "$@" ;;
+  study-smoke) shift; cmd_study_smoke "$@" ;;
   study-run) shift; cmd_study_run "$@" ;;
   verify-refund-evidence) cmd_verify_refund_evidence ;;
   live-block) cmd_live_block ;;

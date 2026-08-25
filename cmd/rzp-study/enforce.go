@@ -104,3 +104,17 @@ func requireFullTraceSet(briefs, perBrief, declared int, only string, runsOverri
 	}
 	return nil
 }
+
+// refuseStudyPath keeps non-study output out of the study directory.
+//
+// A smoke trace is real model output but is NOT the pre-registered experiment.
+// Letting one land in study/traces/ would put a trace with no committed model
+// freeze behind it among the 45 that do have one.
+func refuseStudyPath(dir string) error {
+	clean := filepath.ToSlash(filepath.Clean(dir))
+	if clean == studyDir() || strings.HasPrefix(clean, studyDir()+"/") {
+		return fmt.Errorf("refusing to write smoke output to %s: %s/ is where real "+
+			"study artifacts live. Send it elsewhere, e.g. -out .gotmp/smoke", dir, studyDir())
+	}
+	return nil
+}
