@@ -103,7 +103,13 @@ Where an endpoint can be enumerated meaningfully, the choice is made by the mech
 
 ### 4.1 Endpoint and sampling contingency
 
-**Endpoint: `POST /v1/responses`, not `/v1/chat/completions`.**
+> **Which endpoint actually runs:** `POST /v1/messages` — the Anthropic Messages
+> format, spoken to the proxy (§4.5). The Responses-API discussion below applies
+> to the `openai` provider, which remains in the repository for the day a direct
+> key exists. It is kept because the **retraction** in it is a permanent record,
+> not because it describes the current run.
+
+**For the `openai` provider — endpoint: `POST /v1/responses`, not `/v1/chat/completions`.**
 
 > **Retraction, 2026-08-25.** An earlier version of this section said "Chat Completions is legacy — its removal window closed in early 2026." **That is false and is withdrawn.** `/v1/chat/completions` is currently documented and supported; the 2026 shutdown I had half-remembered is the **Assistants API**, a different endpoint. The claim came from a third-party blog summary in search results that I repeated as established fact. It is the same mistake as FAILURES.md **F4** — quoting a paraphrase as source text — and it is recorded again as **F17**.
 
@@ -117,7 +123,7 @@ Consequences that are now part of the protocol:
 - Tool results are returned as `function_call_output` items correlated by **`call_id`**.
 - Every item the model returns — **including reasoning items** — is echoed back on the next turn. Dropping reasoning items degrades multi-step tool use, and this study is entirely multi-step.
 
-**Sampling contingency.** Temperature support varies by current model, and several reasoning models reject the parameter outright. The frozen value stays **0.2**. If the resolved model rejects it, the harness retries the request **once** with the parameter omitted, uses the model default for the remainder of that trace, and records `"temperature": null` in the trace file. The fallback is therefore visible per-trace rather than assumed. Sending `0.0` instead would be a different experiment wearing the frozen one's label.
+**Sampling contingency — applies to every provider.** Temperature support varies by current model, and several reasoning models reject the parameter outright. The frozen value stays **0.2**. If the resolved model rejects it, the harness retries the request **once** with the parameter omitted, uses the model default for the remainder of that trace, and records `"temperature": null` in the trace file. The fallback is therefore visible per-trace rather than assumed. Sending `0.0` instead would be a different experiment wearing the frozen one's label.
 
 **Model-exclusion rationale**, so the selection rule in §4 is mechanical rather than a judgement made after seeing the list:
 
@@ -284,9 +290,14 @@ The cost is stated plainly: **quantity 3 is measured on an unhardened prompt and
 
 1. starts `rzp-guard` with that brief's compiled mandate and a fresh state file;
 2. completes the MCP handshake and `tools/list` **through the guard**, so the agent sees exactly the tools the guard exposes;
-3. converts the MCP tool schemas into OpenAI function definitions;
+3. converts the MCP tool schemas into the provider's tool format — Anthropic
+   `input_schema` for the proxy, OpenAI function definitions for the direct
+   path — passing each **JSON Schema through unchanged**, so the agent sees
+   the real captured Razorpay schemas and not a rewrite of them;
 4. loops: model → tool calls → **through the guard** → results back to the model;
-5. records every message, every tool call, every guard decision, and every result.
+5. records every message, every tool call, every guard decision and every
+   result — plus, per turn, the model the endpoint said answered and its
+   response id (§4.5).
 
 **There is no direct-to-provider path in the harness.** Every call it can make goes through the guard, by construction.
 
