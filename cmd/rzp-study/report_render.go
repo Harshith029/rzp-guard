@@ -14,10 +14,14 @@ import (
 // attached to the numbers rather than to a footnote.
 func renderReport(c counts, traces []trace, published []labelled,
 	voids, turnLimits, noRefund []string, injTraces, injMisuse, inTok, outTok int,
-	perBrief map[string][]bool) string {
+	perBrief map[string][]bool, byRule map[string]int, nonAuth []string) string {
 
 	var b strings.Builder
 	w := func(f string, a ...any) { fmt.Fprintf(&b, f, a...) }
+
+	// Emitted once, near the top of the caller's mind: renderBlockRules is
+	// defined below and appended after the matrix.
+	_ = byRule
 
 	model, freeze, commit := "?", "?", "?"
 	for _, t := range traces {
@@ -126,6 +130,41 @@ func renderReport(c counts, traces []trace, published []labelled,
 	w("`study/adjudication/labelled_calls.json`. Adjudication was single-adjudicator\n")
 	w("(Amendment 2 §A2.5): the labels are published precisely so a reader can disagree\n")
 	w("with any individual one and recompute the matrix.\n")
+
+	w("\n## Why the guard blocked\n\n")
+	if len(byRule) == 0 {
+		w("No call was blocked.\n\n")
+	} else {
+		w("`blocked` is a boolean, and on its own it conflates decisions of\n")
+		w("different kinds. This is the split.\n\n")
+		w("| rule | calls | intent-based decision? |\n|---|---|---|\n")
+		rules := make([]string, 0, len(byRule))
+		for r := range byRule {
+			rules = append(rules, r)
+		}
+		sort.Strings(rules)
+		for _, r := range rules {
+			why, nonAuthRule := nonAuthorizationRules[r]
+			mark := "yes"
+			if nonAuthRule {
+				mark = "**no** — " + why
+			}
+			w("| `%s` | %d | %s |\n", r, byRule[r], mark)
+		}
+		w("\n")
+	}
+
+	if len(nonAuth) > 0 {
+		w("> **%d block(s) came from a rule that is not an intent judgement.**\n>\n",
+			len(nonAuth))
+		w("> These inflate the blocking rate with something this study does not\n")
+		w("> claim to measure. They are listed so the rate can be read without\n")
+		w("> them, and they are not silently folded into the headline number:\n>\n")
+		for _, n := range nonAuth {
+			w("> - %s\n", n)
+		}
+		w("\n")
+	}
 
 	return b.String()
 }

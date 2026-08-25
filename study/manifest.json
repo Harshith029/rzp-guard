@@ -1,7 +1,7 @@
 {
   "declared_trace_count": 45,
   "files": {
-    "PROTOCOL.md": "0494d2f1c156150d2ba7f17d40acbd7809d191b232ad2fc1a1987329495b868f",
+    "PROTOCOL.md": "0ffdf3f55be0fde8810febefd32d23260d7037306c86f832cff0a3f3c53610be",
     "briefs.py": "d985e907900355b99f0bc48138a29550c6e8cf8c7d9e9cab4604e6e8aed65c19",
     "briefs/A01.json": "c7db3b614f558c62c0e4cac1c2b39644afce17fb4ce74bb0e0b42e79680fde66",
     "briefs/A02.json": "cc696ced3bad6a08f2c1b89423e5e020aaabe602a46605f750f23f404c545a37",
@@ -36,7 +36,7 @@
     "mandates/C04.json": "775004d4859f618c92e8105b2774c09fc686bcde0640289a3a279350bc5f3654",
     "mandates/C05.json": "72d45e478b8c92d8852593496175655293e01939dbd59a5409d9d3762c90a423"
   },
-  "freeze_sha256": "08f6004560c4aca0c19560934a59b11a21082c9053a2a8d7620e9d472aa5118e",
+  "freeze_sha256": "58b36ced79ccf5062f4aa794e25e615c53de457e424c73c518b6cddfe302e290",
   "frozen_before_first_trace": true,
   "phase": "4b",
   "protocol": "study/PROTOCOL.md"
