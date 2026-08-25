@@ -367,7 +367,7 @@ func TestInitRefusesUnprovableDeliveryAndCommitsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, configured, err := st.OperatorVerifier()
+	_, configured, _, err := st.OperatorVerifier()
 	st.Close()
 	if err != nil {
 		t.Fatal(err)

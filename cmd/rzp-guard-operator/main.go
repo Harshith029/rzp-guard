@@ -89,12 +89,8 @@ func run() error {
 		out         = flag.String("out", "", "init/rotate: NEW file to write the token to (must not exist)")
 	)
 	allowUnprot := allowUnprotectedFlag()
-	acceptRisk := flag.Bool("accept-delivery-risk", false,
-		"UNSUPPORTED FOR DEPLOYMENT: commit the credential even though delivery "+
-			"cannot be proven durable (terminal output, or a platform that cannot "+
-			"fsync a directory). A crash or a lost terminal then leaves recovery "+
-			"permanently impossible.")
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage+unprotectedHelp+ephemeralHelp) }
+	acceptRisk := acceptRiskFlag()
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage+unprotectedHelp+ephemeralHelp+riskHelp) }
 
 	// Go's flag package stops parsing at the first non-flag argument, so
 	// "resolve rfa_x -outcome landed" would leave -outcome unparsed and silently
@@ -188,7 +184,7 @@ func run() error {
 
 // authenticate verifies a presented token and returns an unforgeable Grant.
 func authenticate(store *storage.Store, subject, token string) (opauth.Grant, error) {
-	stored, configured, err := store.OperatorVerifier()
+	stored, configured, _, err := store.OperatorVerifier()
 	if err != nil {
 		return opauth.Grant{}, err
 	}

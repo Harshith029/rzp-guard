@@ -64,33 +64,32 @@ cmd_build() {
 # or invalid credentials, the exact cases the control exists to rule out.
 cmd_live_block() {
   cmd_build; need_keys
+  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
   mkdir -p "$EV"; rm -f "$EV"/block_* 2>/dev/null || true
-  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
-  # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
-  # state file, so the gate performs it explicitly rather than letting the
-  # guard establish recovery authority implicitly.
-  #
-  # -allow-unprotected-out is passed because this writes into a throwaway
-  # evidence directory on a dev box, and on Windows the file cannot land 0600.
-  # A real deployment provisions interactively onto a restricted directory.
-  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
-  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
-  # Provisioning is a DEPLOYMENT STEP and the guard refuses an unprovisioned
-  # state file, so the gate performs it explicitly.
-  #
-  # init-ephemeral derives a verifier from a token that is immediately
-  # DISCARDED, so no usable recovery secret is ever created. Writing a real
-  # token here and deleting it afterwards was not enough: this tree is
-  # OneDrive-backed, so sync software could upload it during the window, and
-  # asserting absence at the end proves nothing about whether it was copied.
-  ./rzp-guard-operator-testhook.exe -mandate "$MANDATE" \
-      -state "$EV/block_state.db" init-ephemeral > /dev/null
+
+  # State file and token live in an OS TEMP DIRECTORY, never in the repo tree.
+  # This tree is OneDrive-backed, so anything written here can be uploaded --
+  # gitignore is not a confidentiality control, and deleting a secret afterwards
+  # does not prove sync never copied it.
+  GATE_DIR="$(mktemp -d)"
+  trap 'rm -rf "$GATE_DIR"' EXIT
+
+  # A REAL credential, not the ephemeral fixture: the production guard now
+  # refuses an ephemeral state file outright, because a discarded token means no
+  # human could ever resolve an IN_DOUBT refund in it. The test-hook operator is
+  # used only to bypass the 0600 and durability checks, neither of which Windows
+  # can satisfy. THIS GATE THEREFORE DOES NOT DEMONSTRATE PRODUCTION
+  # PROVISIONING -- it proves one thing: the production guard blocks an
+  # unauthorized refund before the child sees it.
+  ./rzp-guard-operator-testhook.exe -mandate "$MANDATE" -state "$GATE_DIR/state.db" \
+      init -out "$GATE_DIR/token" -allow-unprotected-out -accept-delivery-risk > /dev/null
+
   printf '%s\n' \
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"live-gate","version":"1"}}}' \
     '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
     '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYN99999999999","amount":90000}}}' \
     '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"fetch_all_payments","arguments":{"count":1}}}' \
-  | ./rzp-guard.exe -mandate "$MANDATE" -state "$EV/block_state.db" \
+  | ./rzp-guard.exe -mandate "$MANDATE" -state "$GATE_DIR/state.db" \
       -child-tee "$EV/block_child_stdin.jsonl" \
       -decision-log "$EV/block_decisions.jsonl" \
       > "$EV/block_stdout.jsonl" 2> "$EV/block_stderr.txt"
@@ -122,15 +121,16 @@ cmd_process_recover() {
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$GOIMAGE" sh -c '
     set -e
     go build -tags testhook -o /tmp/guard-th ./cmd/rzp-guard
-    go build -tags testhook -o /tmp/op-th ./cmd/rzp-guard-operator
+    go build -o /tmp/op ./cmd/rzp-guard-operator
     go build -o /tmp/gate-verify ./cmd/gate-verify
     EV=evidence/live
 
-    # init-ephemeral derives a verifier from a token that is immediately
-    # DISCARDED, so no usable recovery secret is ever created. Writing a real
-    # token here and deleting it afterwards was not enough: this tree is
-    # OneDrive-backed, so sync software could upload it during the window.
-    /tmp/op-th -mandate examples/mandate.json -state "$EV/recover_state.db"         init-ephemeral > /dev/null
+    # REAL provisioning, on the SHIPPED operator binary, with no escape flags.
+    # Linux supports directory fsync and honours 0600, so the supported path
+    # works here exactly as a deployment would use it. The token goes to an OS
+    # temp dir, never into this OneDrive-backed tree.
+    GATE_DIR=$(mktemp -d)
+    /tmp/op -mandate examples/mandate.json -state "$EV/recover_state.db"         init -out "$GATE_DIR/token" > /dev/null
 
     ( printf "%s\n" "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"pay_SYN00000000001\",\"amount\":50000}}}"
       sleep 20 )     | RZP_GUARD_CHILD_CMD="head -c 120 > /dev/null; exit 0"       RAZORPAY_KEY_ID=rzp_test_stub RAZORPAY_KEY_SECRET=stub       /tmp/guard-th -mandate examples/mandate.json -state "$EV/recover_state.db"         -child-tee "$EV/recover_child_stdin.jsonl"         > "$EV/recover_stdout.jsonl" 2> "$EV/recover_stderr.txt" || true
@@ -138,6 +138,7 @@ cmd_process_recover() {
     printf "%s\n" "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"pay_SYN00000000001\",\"amount\":50000}}}"     | RZP_GUARD_CHILD_CMD="cat > /dev/null"       RAZORPAY_KEY_ID=rzp_test_stub RAZORPAY_KEY_SECRET=stub       /tmp/guard-th -mandate examples/mandate.json -state "$EV/recover_state.db"         > "$EV/recover_restart.jsonl" 2>/dev/null || true
 
     echo
+    rm -rf "$GATE_DIR"
     /tmp/gate-verify recover "$EV"
   '
 }

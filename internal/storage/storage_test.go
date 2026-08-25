@@ -145,3 +145,48 @@ func TestRateWindowSurvivesRestart(t *testing.T) {
 			"max_calls_per_minute", len(times))
 	}
 }
+
+// A fixture credential must be distinguishable from a real one.
+//
+// init-ephemeral derives a verifier from a token that is immediately discarded.
+// That satisfies "a credential is configured" while being impossible for any
+// human to present, so a state file marked this way must never be accepted by
+// the production guard: an allowed refund could land IN_DOUBT with no possible
+// operator resolution. Without the marker, "configured" only proves a row
+// exists -- not that recovery is possible.
+func TestEphemeralVerifierIsDistinguishableFromAReal(t *testing.T) {
+	real := filepath.Join(t.TempDir(), "real.db")
+	st, err := Open(real, "mnd_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InitOperatorVerifier("argon2id$3$65536$4$c2FsdA$aGFzaA"); err != nil {
+		t.Fatal(err)
+	}
+	_, configured, ephemeral, err := st.OperatorVerifier()
+	st.Close()
+	if err != nil || !configured {
+		t.Fatalf("real credential not configured: %v", err)
+	}
+	if ephemeral {
+		t.Fatal("a real credential was marked ephemeral")
+	}
+
+	eph := filepath.Join(t.TempDir(), "eph.db")
+	st2, err := Open(eph, "mnd_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st2.InitEphemeralVerifier("argon2id$3$65536$4$c2FsdA$aGFzaA"); err != nil {
+		t.Fatal(err)
+	}
+	_, configured, ephemeral, err = st2.OperatorVerifier()
+	st2.Close()
+	if err != nil || !configured {
+		t.Fatalf("ephemeral credential not configured: %v", err)
+	}
+	if !ephemeral {
+		t.Fatal("an ephemeral fixture credential was NOT marked, so the guard would " +
+			"accept a state file nobody can recover")
+	}
+}

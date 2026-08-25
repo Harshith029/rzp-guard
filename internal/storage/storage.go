@@ -76,7 +76,13 @@ CREATE TABLE IF NOT EXISTS operator_verifier (
   id       INTEGER PRIMARY KEY CHECK (id = 1),
   verifier TEXT NOT NULL,
   set_at   TEXT NOT NULL,
-  rotations INTEGER NOT NULL DEFAULT 0
+  rotations INTEGER NOT NULL DEFAULT 0,
+  -- 1 when the verifier was created by a TEST FIXTURE whose token was
+  -- discarded. Such a state file satisfies "a credential is configured" while
+  -- being impossible for any human to recover, so the production guard must
+  -- refuse it. Without this column, "configured" is not evidence that recovery
+  -- is possible -- it only proves a row exists.
+  ephemeral INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS audit (
@@ -402,17 +408,19 @@ func (s *Store) AuditTrail() ([]AuditRow, error) {
 	return out, rows.Err()
 }
 
-// OperatorVerifier returns the stored verifier, or false if none is set.
-func (s *Store) OperatorVerifier() (string, bool, error) {
-	var v string
-	err := s.db.QueryRow(`SELECT verifier FROM operator_verifier WHERE id = 1`).Scan(&v)
+// OperatorVerifier returns the stored verifier, whether one is set, and whether
+// it is an EPHEMERAL fixture credential that no human can present.
+func (s *Store) OperatorVerifier() (verifier string, configured, ephemeral bool, err error) {
+	var eph int
+	err = s.db.QueryRow(
+		`SELECT verifier, ephemeral FROM operator_verifier WHERE id = 1`).Scan(&verifier, &eph)
 	if err == sql.ErrNoRows {
-		return "", false, nil
+		return "", false, false, nil
 	}
 	if err != nil {
-		return "", false, fmt.Errorf("storage: operator verifier: %w", err)
+		return "", false, false, fmt.Errorf("storage: operator verifier: %w", err)
 	}
-	return v, v != "", nil
+	return verifier, verifier != "", eph == 1, nil
 }
 
 // InitOperatorVerifier writes the verifier ONLY if none exists.
@@ -421,10 +429,24 @@ func (s *Store) OperatorVerifier() (string, bool, error) {
 // replace an existing credential, which is exactly how the restart bypass
 // worked. Rotation is a separate, authenticated operation.
 func (s *Store) InitOperatorVerifier(verifier string) error {
+	return s.initVerifier(verifier, false)
+}
+
+// InitEphemeralVerifier records a fixture credential whose token was discarded.
+// The production guard refuses a state file marked this way.
+func (s *Store) InitEphemeralVerifier(verifier string) error {
+	return s.initVerifier(verifier, true)
+}
+
+func (s *Store) initVerifier(verifier string, ephemeral bool) error {
+	eph := 0
+	if ephemeral {
+		eph = 1
+	}
 	res, err := s.db.Exec(
-		`INSERT OR IGNORE INTO operator_verifier (id, verifier, set_at, rotations)
-		 VALUES (1, ?, ?, 0)`,
-		verifier, time.Now().UTC().Format(time.RFC3339Nano))
+		`INSERT OR IGNORE INTO operator_verifier (id, verifier, set_at, rotations, ephemeral)
+		 VALUES (1, ?, ?, 0, ?)`,
+		verifier, time.Now().UTC().Format(time.RFC3339Nano), eph)
 	if err != nil {
 		return fmt.Errorf("storage: init operator verifier: %w", err)
 	}

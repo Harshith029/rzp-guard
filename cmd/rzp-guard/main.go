@@ -108,9 +108,21 @@ func run() error {
 	// whoever runs init first afterwards becomes the recovery authority --
 	// authority established by a race rather than by deployment. Provisioning is
 	// an explicit step: run the operator init command once, before first start.
-	if _, configured, err := boot.Store.OperatorVerifier(); err != nil {
+	_, configured, ephemeral, err := boot.Store.OperatorVerifier()
+	if err != nil {
 		return err
-	} else if !configured {
+	}
+	if ephemeral {
+		// A fixture credential satisfies "configured" while being unrecoverable
+		// by anyone. Accepting it would mean an allowed refund could land in
+		// IN_DOUBT with no possible operator resolution -- the guard's own
+		// recovery guarantee, defeated by its own test setup.
+		return fmt.Errorf("state file %q was provisioned by a TEST FIXTURE whose "+
+			"operator token was discarded; no human can resolve an IN_DOUBT refund "+
+			"in it. Refusing to run. Provision a real credential with "+
+			"rzp-guard-operator init", *statePath)
+	}
+	if !configured {
 		return fmt.Errorf("state file %q has no operator recovery credential; run "+
 			"rzp-guard-operator init first, as a deployment step. The guard will not "+
 			"establish that authority itself", *statePath)

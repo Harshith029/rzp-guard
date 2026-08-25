@@ -35,7 +35,7 @@ func initEphemeral(s any) error {
 	if err != nil {
 		return err
 	}
-	if err := store.InitOperatorVerifier(verifier); err != nil {
+	if err := store.InitEphemeralVerifier(verifier); err != nil {
 		return err
 	}
 	fmt.Println("Ephemeral credential provisioned; the token was discarded and this " +
