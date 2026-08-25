@@ -63,38 +63,56 @@ cmd_build() {
 # was simply absent from the tee -- which also passes against a dead container
 # or invalid credentials, the exact cases the control exists to rule out.
 cmd_live_block() {
-  cmd_build; need_keys
-  go build -tags testhook -o rzp-guard-operator-testhook.exe ./cmd/rzp-guard-operator
-  mkdir -p "$EV"; rm -f "$EV"/block_* 2>/dev/null || true
+  need_keys
+  mkdir -p evidence/linux; rm -f evidence/linux/* 2>/dev/null || true
 
-  # State file and token live in an OS TEMP DIRECTORY, never in the repo tree.
-  # This tree is OneDrive-backed, so anything written here can be uploaded --
-  # gitignore is not a confidentiality control, and deleting a secret afterwards
-  # does not prove sync never copied it.
-  GATE_DIR="$(mktemp -d)"
-  trap 'rm -rf "$GATE_DIR"' EXIT
+  # THE END-TO-END GATE, ON THE DECLARED DEPLOYMENT TARGET.
+  #
+  # Everything runs on Linux: static linux/amd64 binaries, the SHIPPED operator
+  # with no escape flags (Linux honours 0600 and supports directory fsync, so
+  # the supported provisioning path works exactly as documented), and the
+  # production guard spawning Razorpay's official pinned container as a sibling
+  # through the mounted Docker socket.
+  #
+  # A previous version ran the native Windows guard, which meant the strongest
+  # evidence was produced on a platform the project declares unsupported, using
+  # test-hook escapes to provision. That gap is what this closes.
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src -e CGO_ENABLED=0 \
+      -e GOOS=linux -e GOARCH=amd64 "$GOIMAGE" sh -c '
+    mkdir -p .gotmp/linux
+    go build -o .gotmp/linux/rzp-guard ./cmd/rzp-guard
+    go build -o .gotmp/linux/rzp-guard-operator ./cmd/rzp-guard-operator
+    go build -o .gotmp/linux/gate-verify ./cmd/gate-verify
+  '
 
-  # A REAL credential, not the ephemeral fixture: the production guard now
-  # refuses an ephemeral state file outright, because a discarded token means no
-  # human could ever resolve an IN_DOUBT refund in it. The test-hook operator is
-  # used only to bypass the 0600 and durability checks, neither of which Windows
-  # can satisfy. THIS GATE THEREFORE DOES NOT DEMONSTRATE PRODUCTION
-  # PROVISIONING -- it proves one thing: the production guard blocks an
-  # unauthorized refund before the child sees it.
-  ./rzp-guard-operator-testhook.exe -mandate "$MANDATE" -state "$GATE_DIR/state.db" \
-      init -out "$GATE_DIR/token" -allow-unprotected-out -accept-delivery-risk > /dev/null
+  MSYS_NO_PATHCONV=1 docker run --rm \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v "$PWDW":/src -w /src \
+      -e RAZORPAY_KEY_ID -e RAZORPAY_KEY_SECRET \
+      docker:cli sh -c '
+    set -e
+    GATE=$(mktemp -d)
+    trap "rm -rf $GATE" EXIT
 
-  printf '%s\n' \
-    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"live-gate","version":"1"}}}' \
-    '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-    '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYN99999999999","amount":90000}}}' \
-    '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"fetch_all_payments","arguments":{"count":1}}}' \
-  | ./rzp-guard.exe -mandate "$MANDATE" -state "$GATE_DIR/state.db" \
-      -child-tee "$EV/block_child_stdin.jsonl" \
-      -decision-log "$EV/block_decisions.jsonl" \
-      > "$EV/block_stdout.jsonl" 2> "$EV/block_stderr.txt"
-  echo ""
-  ./gate-verify.exe block "$EV"
+    # Shipped operator, supported path, no escape flags. The token goes to an OS
+    # temp dir, never into this OneDrive-backed tree.
+    ./.gotmp/linux/rzp-guard-operator -mandate examples/mandate.json \
+        -state "$GATE/state.db" init -out "$GATE/token" > /dev/null
+    echo "provisioned with the shipped operator; token mode $(stat -c %a "$GATE/token")"
+
+    printf "%s\n" \
+     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"linux-gate\",\"version\":\"1\"}}}" \
+     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}" \
+     "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"pay_SYN99999999999\",\"amount\":90000}}}" \
+     "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"fetch_all_payments\",\"arguments\":{\"count\":1}}}" \
+    | ./.gotmp/linux/rzp-guard -mandate examples/mandate.json -state "$GATE/state.db" \
+        -child-tee evidence/linux/block_child_stdin.jsonl \
+        -decision-log evidence/linux/block_decisions.jsonl \
+        > evidence/linux/block_stdout.jsonl 2> evidence/linux/block_stderr.txt
+
+    echo
+    ./.gotmp/linux/gate-verify block evidence/linux
+  '
 }
 
 # Process-boundary recovery. Deliberately NOT called "live": it exercises the
@@ -156,8 +174,9 @@ rzp-guard
   ./run.sh build             build all three binaries
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
-  ./run.sh live-block        LIVE: unauthorized refund never reaches the real
-                             pinned container, with an enforced alive-control
+  ./run.sh live-block        LIVE, ON LINUX: production guard + shipped operator
+                             (no escape flags) -> official pinned container.
+                             Proves BLOCKING ONLY, with an enforced alive-control.
   ./run.sh process-recover   child death -> durable IN_DOUBT surviving restart
                              (local stub child; not the official container)
 

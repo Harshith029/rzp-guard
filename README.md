@@ -11,13 +11,11 @@ An authorization proxy that sits in front of Razorpay's **official, unmodified**
 ./run.sh race              # same under the race detector
 ./run.sh lifecycle         # 4 process-lifecycle tests (-tags testhook, separate lane)
 ./run.sh all               # every lane, including BOTH race runs
-./run.sh live-block        # LIVE: unauthorized refund never reaches the real
-                           #       pinned container, with an ENFORCED alive-control
+./run.sh live-block        # LIVE, ON LINUX: production guard + shipped operator
+                           #       -> official pinned container. BLOCKING ONLY.
 ./run.sh process-recover   # child death → durable IN_DOUBT surviving restart
                            #       (local stub child; not the official container)
 ```
-
-`live-block` proves one thing: **the production guard blocks before the child's stdin**. It does not demonstrate safe credential provisioning — its fixture uses a test-hook `init-ephemeral` that discards the token, and provisioning on Windows is separately unproven.
 
 `live-block` needs Docker running and **test-mode** keys in `.env`. `RAZORPAY_KEY_ID` must start with `rzp_test`; the guard refuses to start otherwise.
 
@@ -119,9 +117,17 @@ The control matters: the container answered a legitimate read with a real Razorp
 
 **Credential delivery is the weakest part of this design, and it now fails closed.** The credential is committed **only when delivery can be proven durable** — the token file written, fsynced, and its parent directory fsynced. Terminal output cannot be proven (a disconnect or lost scrollback leaves no token), and Windows cannot fsync a directory, so **both are refused unless `-accept-delivery-risk` is passed**, which prints an `UNSUPPORTED FOR DEPLOYMENT` banner.
 
+### What each gate proves, exactly
+
+| Gate | Platform | Provisioning | Proves |
+|---|---|---|---|
+| `live-block` | Linux (container, host Docker socket) | **shipped** operator, supported path, **no escape flags**, token mode `600` | An unauthorized `create_refund` never reaches the official pinned container's stdin, with an enforced alive-control |
+| `process-recover` | Linux (container) | **shipped** operator, supported path | Child death leaves a durable `IN_DOUBT` that survives restart |
+
+Neither gate proves a **successful** refund: see G1.6 under Known limits. `process-recover` uses a local non-responding stub child, because against the real container Razorpay answers in well under a second and the death path would never be exercised — measured at 2s and 0.15s kills.
+
 **Declared deployment target: Linux (or a container).** Windows cannot honour `0600` and cannot fsync a directory, so there is no supported credential-delivery path there and provisioning simply fails — by design, since the alternative is a silent lockout. There is no shipped flag to override either check; the escapes exist only under `-tags testhook`. A Windows deployment would need a real DACL/secret-store implementation, which this does not have.
 
-**Platform boundary in the evidence:** `process-recover` runs on Linux in the container and uses the **shipped** operator binary on the supported path with no escape flags. `live-block` runs the native Windows guard, and its provisioning step uses test-hook escapes — so it proves **blocking only**, and cannot be cited for provisioning, recovery, or deployment readiness. Child-death recovery is therefore demonstrated on Linux, not on the native Windows binary.
 5. **Recovery takes the guard offline.** The operator CLI needs the state file, and the guard holds an exclusive lock on it for its lifetime. So the procedure is stop → check Razorpay → resolve → restart, which means the protection layer is down while an ambiguous transaction is adjudicated. It is a **tested offline recovery procedure, not an operational workflow**: no run yet shows an operator resolving a real Test Mode refund whose status was checked in the Razorpay dashboard.
 6. **`process-recover` uses a stub child**, not the official container, for the reason above. Only `live-block` is live.
 7. **Cumulative caps are per state file.** Enforced by exclusive ownership rather than distributed coordination.

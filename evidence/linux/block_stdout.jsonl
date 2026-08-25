@@ -1,0 +1,3 @@
+{"id":3,"jsonrpc":"2.0","result":{"content":[{"text":"BLOCKED by rzp-guard [NO_AUTHORIZED_ACTION]: no authorized refund action exists for pay_SYN99999999999","type":"text"}],"isError":true}}
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"logging":{},"resources":{"subscribe":true,"listChanged":true},"tools":{"listChanged":true}},"serverInfo":{"name":"razorpay-mcp-server","version":"1.0.0"}}}
+{"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"{\"count\":0,\"entity\":\"collection\",\"items\":[]}"}]}}

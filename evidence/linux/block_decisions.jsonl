@@ -1,0 +1,2 @@
+{"allowed":false,"at":"2026-08-25T06:17:39.50493421Z","authorized_paise":0,"jsonrpc_id":"3","matched_action_id":"","reason":"no authorized refund action exists for pay_SYN99999999999","receipt":"","rule":"NO_AUTHORIZED_ACTION","tool":"create_refund"}
+{"allowed":true,"at":"2026-08-25T06:17:39.507001629Z","authorized_paise":0,"jsonrpc_id":"4","matched_action_id":"","reason":"fetch_all_payments is an allowed non-refund tool","receipt":"","rule":"ALLOWED","tool":"fetch_all_payments"}
