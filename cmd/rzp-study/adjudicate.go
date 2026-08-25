@@ -128,17 +128,8 @@ func cmdWorksheet(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := refuseDryArtifacts(traces, *allowDry, *out); err != nil {
+	if err := gateAdjudication(traces, *dir, m, *allowDry, *out); err != nil {
 		return err
-	}
-	if !*allowDry {
-		mf, err := requireCommittedModelFreeze()
-		if err != nil {
-			return err
-		}
-		if err := validateTraceSet(traces, *dir, m, mf); err != nil {
-			return err
-		}
 	}
 	if err := refuseOverwrite(*out); err != nil {
 		return err
@@ -206,41 +197,54 @@ type labelled struct {
 	Cell      string `json:"cell"`
 }
 
-// refuseDryArtifacts stops scripted output from becoming a result.
+// gateAdjudication decides whether a trace set may produce an artifact, and
+// where it may be written.
 //
-// The dry run exists to exercise plumbing, and its "verdicts" are whatever the
-// script happened to emit. A tooling test wrote labelled_calls.json straight
-// into study/adjudication/ -- the canonical path -- where a reader would
-// reasonably take it for study output. Numbers that look like a measurement and
-// are not are the exact failure this project keeps having to correct.
+// THE BRANCH IS ON THE DATA, NOT ON A FLAG. That distinction is the whole
+// point, and getting it wrong is how the previous version leaked:
+// -allow-dry was written as "skip the checks", so a set of ONE real trace out
+// of a declared forty-five sailed past validateTraceSet and wrote a worksheet
+// straight into study/. Demonstrated, not theorised. The flag was meant to
+// relax exactly one thing -- tolerate scripted traces during a tooling test --
+// and instead disabled every downstream guarantee.
 //
-// Dry traces therefore need -allow-dry, and even then may not write anywhere
-// under study/.
-func refuseDryArtifacts(traces []trace, allowDry bool, paths ...string) error {
-	dry := 0
+//	scripted/smoke traces present  -> needs -allow-dry, output forced outside
+//	                                  study/, and trace-set validation cannot
+//	                                  apply because this is not the study
+//	no scripted traces             -> validateTraceSet ALWAYS runs, whatever
+//	                                  flags were passed
+func gateAdjudication(traces []trace, dir string, m *manifest, allowDry bool, outputs ...string) error {
+	scripted := 0
 	for _, t := range traces {
-		if t.Model == dryRunModel {
-			dry++
+		if t.Model == dryRunModel || t.Smoke {
+			scripted++
 		}
 	}
-	if dry == 0 {
+
+	if scripted > 0 {
+		if !allowDry {
+			return fmt.Errorf("%d of %d traces are scripted or smoke traces; they "+
+				"cannot produce a measurement. Pass -allow-dry to exercise the "+
+				"tooling on them", scripted, len(traces))
+		}
+		for _, out := range outputs {
+			if err := refuseStudyPath(out); err != nil {
+				return err
+			}
+		}
+		fmt.Fprintf(os.Stderr,
+			"WARNING: %d scripted/smoke traces. This exercises the tooling and is "+
+				"NOT a study result.\n", scripted)
 		return nil
 	}
-	if !allowDry {
-		return fmt.Errorf("%d of %d traces are DRY RUNS (scripted, no model was called); "+
-			"they cannot produce a measurement. Pass -allow-dry to exercise the tooling on them",
-			dry, len(traces))
+
+	// Real traces. -allow-dry buys nothing here: a partial, duplicated, foreign
+	// or stale set is not the registered study whatever flag was passed.
+	mf, err := requireCommittedModelFreeze()
+	if err != nil {
+		return err
 	}
-	for _, p := range paths {
-		clean := filepath.ToSlash(filepath.Clean(p))
-		if clean == "study" || strings.HasPrefix(clean, "study/") {
-			return fmt.Errorf("refusing to write dry-run output to %s: %s is where real "+
-				"study artifacts live; send it somewhere else", p, "study/")
-		}
-	}
-	fmt.Fprintf(os.Stderr,
-		"WARNING: %d dry-run traces. This exercises the tooling and is NOT a study result.\n", dry)
-	return nil
+	return validateTraceSet(traces, dir, m, mf)
 }
 
 func cmdReport(args []string) error {
@@ -261,17 +265,8 @@ func cmdReport(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := refuseDryArtifacts(traces, *allowDry, *out, *labels); err != nil {
+	if err := gateAdjudication(traces, *dir, m, *allowDry, *out, *labels); err != nil {
 		return err
-	}
-	if !*allowDry {
-		mfz, err := requireCommittedModelFreeze()
-		if err != nil {
-			return err
-		}
-		if err := validateTraceSet(traces, *dir, m, mfz); err != nil {
-			return err
-		}
 	}
 	if err := refuseOverwrite(*out, *labels); err != nil {
 		return err

@@ -531,3 +531,49 @@ equivalent of 555-0100.
 **What the fix does not do.** Deleting the files now does not undo any sync that
 already happened. Those records may exist in OneDrive's cloud copy and version
 history, and no change in this repository can retract them.
+
+## F20 — I fixed a bypass by gating on the flag instead of the fact
+
+A reviewer showed that `worksheet` accepted the scripted dry-run directory and
+emitted a worksheet for 27 calls, which is not the registered 45-trace study.
+I added `validateTraceSet` and an `-allow-dry` escape for the tooling test, and
+called it closed.
+
+It was not. I wrote the gate as:
+
+```go
+if !*allowDry {
+    validateTraceSet(...)
+}
+```
+
+so `-allow-dry` did not mean "tolerate scripted traces" — it meant **skip every
+check**. Found by attacking my own fix: plant ONE real-looking trace where the
+study declares forty-five, pass the flag, and point the output at `study/`.
+
+```
+$ rzp-study worksheet -allow-dry -traces .gotmp/fake -out study/adjudication/worksheet.json
+worksheet: 1 emitted refund calls across 1 traces -> study/adjudication/worksheet.json
+```
+
+A one-of-forty-five worksheet, inside the study directory, from a flag whose
+stated purpose was unrelated. `refuseDryArtifacts` did not save it either: it
+returned early when no scripted traces were present, so it never checked the
+output path for a set of real ones.
+
+**The mistake underneath both versions is the same shape.** I keep writing gates
+that ask *"which flag did the caller pass?"* when the safe question is *"what is
+this data?"* A flag is a claim by the caller; the traces are the fact. F13 was
+this — detecting an unsafe condition and proceeding anyway — and this is its
+sibling: making the check conditional on something the caller controls.
+
+**Fix.** One `gateAdjudication` for both commands, branching on the traces:
+
+- scripted or smoke traces present → require `-allow-dry`, force output outside
+  `study/`, and skip trace-set validation because this is not the study;
+- no scripted traces → `validateTraceSet` **always** runs, whatever flags were
+  passed.
+
+Verified in four directions, and the bypass is now a regression test: a partial
+real set is refused with the flag and without it; scripted traces still work
+outside `study/`; scripted traces are still refused into `study/`.

@@ -151,3 +151,50 @@ func TestRefuseOverwriteProtectsPublishedOutput(t *testing.T) {
 		t.Fatalf("error should explain why: %v", err)
 	}
 }
+
+// -allow-dry must relax exactly ONE thing: tolerate scripted traces during a
+// tooling test. It used to mean "skip the checks", and a set of ONE real trace
+// out of a declared forty-five sailed past validateTraceSet and wrote a
+// worksheet into study/. The branch has to be on what the traces ARE, not on
+// which flag was passed.
+func TestAllowDryCannotBypassValidationForRealTraces(t *testing.T) {
+	atRepoRoot(t)
+	full, m, _ := goodTraceSet(t)
+	partial := full[:1] // one real trace; the study declares 45
+
+	for _, allowDry := range []bool{false, true} {
+		name := "without -allow-dry"
+		if allowDry {
+			name = "WITH -allow-dry"
+		}
+		t.Run(name, func(t *testing.T) {
+			err := gateAdjudication(partial, ".gotmp/fake", m, allowDry,
+				"study/adjudication/worksheet.json")
+			if err == nil {
+				t.Fatal("a partial REAL trace set must never produce an artifact, " +
+					"and no flag may buy an exemption")
+			}
+		})
+	}
+}
+
+// The flag still has to work for what it is actually for.
+func TestAllowDryPermitsScriptedTracesOutsideStudy(t *testing.T) {
+	atRepoRoot(t)
+	m, err := verifyFreeze()
+	if err != nil {
+		t.Fatalf("freeze: %v", err)
+	}
+	scripted := []trace{{BriefID: "A01", RunIndex: 1, Model: dryRunModel}}
+
+	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, false, ".gotmp/w.json"); err == nil {
+		t.Fatal("scripted traces need the flag")
+	}
+	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, true, ".gotmp/w.json"); err != nil {
+		t.Fatalf("scripted traces outside study/ are the flag's purpose: %v", err)
+	}
+	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, true,
+		"study/adjudication/w.json"); err == nil {
+		t.Fatal("scripted output must never land in study/, flag or no flag")
+	}
+}
