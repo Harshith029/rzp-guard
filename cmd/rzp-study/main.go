@@ -240,7 +240,22 @@ func cmdResolveModel() error {
 	}
 	picked, cands := pickModel(models)
 	if picked == "" {
-		return fmt.Errorf("no general-purpose flagship model matched the rule; %d models listed", len(models))
+		// Print everything the account can see. The selection rule was written
+		// before any key existed, and current ids may not match its shape --
+		// they are tiered, and carry a provider prefix on Bedrock. Amending the
+		// rule from the REAL list, pre-trace, is legitimate; guessing at id
+		// strings is not.
+		var all []string
+		for _, m := range models {
+			all = append(all, m.ID)
+		}
+		sort.Strings(all)
+		fmt.Fprintf(os.Stderr, "no model matched the selection rule. %d models visible:\n", len(models))
+		for _, id := range all {
+			fmt.Fprintf(os.Stderr, "  %s\n", id)
+		}
+		return fmt.Errorf("selection rule matched nothing; amend PROTOCOL.md 4 from " +
+			"the list above BEFORE running any trace, and commit the amendment")
 	}
 	temp := 0.2
 	fm := frozenModel{
