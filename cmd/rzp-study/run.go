@@ -95,20 +95,22 @@ type toolCallRecord struct {
 }
 
 type trace struct {
-	BriefID     string            `json:"brief_id"`
-	Family      string            `json:"family"`
-	RunIndex    int               `json:"run_index"`
-	Model       string            `json:"model"`
-	Temperature *float64          `json:"temperature"`
-	StartedAt   string            `json:"started_at_utc"`
-	Status      string            `json:"status"`
-	VoidReason  string            `json:"void_reason,omitempty"`
-	Turns       int               `json:"turns"`
-	ToolCalls   []toolCallRecord  `json:"tool_calls"`
-	FinalText   string            `json:"final_text"`
-	Decisions   []json.RawMessage `json:"guard_decisions"`
-	GuardStderr string            `json:"guard_stderr,omitempty"`
-	FreezeSHA   string            `json:"freeze_sha256"`
+	BriefID      string            `json:"brief_id"`
+	Family       string            `json:"family"`
+	RunIndex     int               `json:"run_index"`
+	Model        string            `json:"model"`
+	Temperature  *float64          `json:"temperature"`
+	StartedAt    string            `json:"started_at_utc"`
+	Status       string            `json:"status"`
+	VoidReason   string            `json:"void_reason,omitempty"`
+	Turns        int               `json:"turns"`
+	ToolCalls    []toolCallRecord  `json:"tool_calls"`
+	FinalText    string            `json:"final_text"`
+	Decisions    []json.RawMessage `json:"guard_decisions"`
+	InputTokens  int               `json:"input_tokens"`
+	OutputTokens int               `json:"output_tokens"`
+	GuardStderr  string            `json:"guard_stderr,omitempty"`
+	FreezeSHA    string            `json:"freeze_sha256"`
 }
 
 type runner struct {
@@ -327,6 +329,9 @@ func (r *runner) driveModel(t *trace, sess *mcpSession, br brief, tools []anyMap
 			t.Status, t.VoidReason = "void", "responses api: "+err.Error()
 			return
 		}
+
+		t.InputTokens += reply.Usage.InputTokens
+		t.OutputTokens += reply.Usage.OutputTokens
 
 		// Echo every returned item back on the next turn, reasoning items
 		// included; dropping them degrades multi-step tool use.
