@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func main() {
 	case "verify-freeze":
 		err = cmdVerifyFreeze()
 	case "resolve-model":
-		err = cmdResolveModel()
+		err = cmdResolveModel(os.Args[2:])
 	case "run":
 		err = cmdRun(os.Args[2:])
 	case "worksheet":
@@ -52,7 +53,8 @@ func usage() {
 	fmt.Fprint(os.Stderr, `usage: rzp-study <command>
 
   verify-freeze    check study/manifest.json against the files on disk
-  resolve-model    resolve and record the model id (PROTOCOL.md 4), pre-trace
+  resolve-model    resolve and record provider+endpoint+model (PROTOCOL.md 4),
+                   pre-trace. Flags: -provider openai|bedrock, -model <id>
   run [flags]      run the traces
   worksheet        emit the BLINDED adjudication worksheet from the traces
   report           join filled verdicts onto the traces -> confusion matrix
@@ -164,9 +166,12 @@ func cmdVerifyFreeze() error {
 // ---------------------------------------------------------------- model
 
 type frozenModel struct {
+	Provider        string   `json:"provider"`
+	BaseURL         string   `json:"base_url"`
 	Model           string   `json:"model"`
 	ResolvedAt      string   `json:"resolved_at_utc"`
 	SelectionRule   string   `json:"selection_rule"`
+	SelectionMethod string   `json:"selection_method"`
 	Candidates      []string `json:"candidates_considered"`
 	TotalListed     int      `json:"total_models_listed"`
 	Temperature     *float64 `json:"temperature"`
@@ -174,18 +179,52 @@ type frozenModel struct {
 	Endpoint        string   `json:"endpoint"`
 }
 
-// Size and reasoning variants are excluded so the choice is mechanical rather
-// than a judgement call made after seeing the list. -pro is excluded on cost:
-// it is an order of magnitude dearer per trace and this study runs 45 of them.
+// The selection rule, mechanical so the choice cannot be made after seeing a
+// result.
+//
+// The original rule matched a bare gpt-<major>[.<minor>] id. That shape is no
+// longer how the flagship line is named: it is TIERED, and on Bedrock ids also
+// carry a provider prefix and, on the cross-Region route, a geography prefix.
+// So `us.openai.gpt-5.6-terra` must parse to {version 5.6, tier terra}.
+//
+// Tier preference is decided here, in advance, on the same reasoning already
+// used to exclude -pro:
+//
+//	terra  everyday-production tier -- SELECTED. It is what a real support
+//	       deployment would run, and this study is a simulation of one.
+//	sol    advanced-reasoning tier -- excluded on cost, exactly as -pro was.
+//	luna   fast/high-volume tier -- excluded as a size/speed variant, exactly
+//	       as mini and nano were.
+//
+// An unrecognised tier is excluded rather than guessed at. That fails closed:
+// resolve-model then prints every visible id so the rule can be amended from
+// real data, pre-trace and committed, instead of silently picking something.
 var (
-	flagshipRE = regexp.MustCompile(`^gpt-(\d+)(?:\.(\d+))?$`)
-	excludeRE  = regexp.MustCompile(`mini|nano|pro|preview|audio|realtime|transcribe|tts|embedding|image|moderation|search|codex|instruct|turbo|\d{4}-\d{2}-\d{2}`)
+	modelRE   = regexp.MustCompile(`(?:^|\.)gpt-(\d+)(?:\.(\d+))?(?:-([a-z]+))?$`)
+	excludeRE = regexp.MustCompile(`mini|nano|pro|preview|audio|realtime|transcribe|tts|embedding|image|moderation|search|codex|instruct|turbo|\d{4}-\d{2}-\d{2}`)
 )
+
+const selectionRule = "highest version of the everyday-production tier (terra), " +
+	"excluding the advanced-reasoning tier (sol) on cost, the fast/high-volume " +
+	"tier (luna) as a size variant, and mini/nano/pro/preview/dated snapshots " +
+	"and non-general-purpose endpoints; see PROTOCOL.md 4"
+
+func tierRank(tier string) int {
+	switch tier {
+	case "terra":
+		return 2 // everyday production: the deployment tier being simulated
+	case "":
+		return 1 // untiered flagship, if a provider still publishes one
+	default:
+		return 0 // sol, luna, or anything unrecognised: not eligible
+	}
+}
 
 func pickModel(models []modelInfo) (string, []string) {
 	type cand struct {
 		id           string
 		major, minor int
+		rank         int
 	}
 	var cands []cand
 	var names []string
@@ -193,8 +232,12 @@ func pickModel(models []modelInfo) (string, []string) {
 		if excludeRE.MatchString(m.ID) {
 			continue
 		}
-		g := flagshipRE.FindStringSubmatch(m.ID)
+		g := modelRE.FindStringSubmatch(m.ID)
 		if g == nil {
+			continue
+		}
+		rank := tierRank(g[3])
+		if rank == 0 {
 			continue
 		}
 		major, _ := strconv.Atoi(g[1])
@@ -202,10 +245,13 @@ func pickModel(models []modelInfo) (string, []string) {
 		if g[2] != "" {
 			minor, _ = strconv.Atoi(g[2])
 		}
-		cands = append(cands, cand{m.ID, major, minor})
+		cands = append(cands, cand{m.ID, major, minor, rank})
 		names = append(names, m.ID)
 	}
 	sort.Slice(cands, func(i, j int) bool {
+		if cands[i].rank != cands[j].rank {
+			return cands[i].rank > cands[j].rank
+		}
 		if cands[i].major != cands[j].major {
 			return cands[i].major > cands[j].major
 		}
@@ -218,68 +264,103 @@ func pickModel(models []modelInfo) (string, []string) {
 	return cands[0].id, names
 }
 
-func apiKey() (string, error) {
-	k := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
-	if k == "" {
-		return "", fmt.Errorf("OPENAI_API_KEY is not set")
+func cmdResolveModel(args []string) error {
+	fs := flag.NewFlagSet("resolve-model", flag.ExitOnError)
+	providerName := fs.String("provider", providerBedrock,
+		"openai | bedrock")
+	explicit := fs.String("model", "",
+		"record this model id verbatim instead of enumerating (required when the "+
+			"endpoint does not expose a model list)")
+	if err := fs.Parse(args); err != nil {
+		return err
 	}
-	return k, nil
-}
-
-func cmdResolveModel() error {
 	if _, err := verifyFreeze(); err != nil {
 		return err
 	}
-	key, err := apiKey()
+
+	p, err := resolveProvider(*providerName)
 	if err != nil {
 		return err
 	}
-	models, err := newOpenAI(key).listModels()
+	key, err := p.credential()
 	if err != nil {
 		return err
 	}
-	picked, cands := pickModel(models)
-	if picked == "" {
-		// Print everything the account can see. The selection rule was written
-		// before any key existed, and current ids may not match its shape --
-		// they are tiered, and carry a provider prefix on Bedrock. Amending the
-		// rule from the REAL list, pre-trace, is legitimate; guessing at id
-		// strings is not.
-		var all []string
-		for _, m := range models {
-			all = append(all, m.ID)
+
+	var (
+		picked, method string
+		cands          []string
+		listed         int
+	)
+
+	if *explicit != "" {
+		// Bedrock's OpenAI-compatible route is an inference endpoint and is not
+		// guaranteed to enumerate models. Recording an operator-supplied id
+		// verbatim is a legitimate resolution, PROVIDED it is recorded as such:
+		// the freeze then shows the choice was made by a person, not derived by
+		// the rule, and a reader can weigh it accordingly.
+		picked, method = *explicit, "operator-supplied"
+	} else {
+		models, lerr := newOpenAI(p, key).listModels()
+		if lerr != nil {
+			return fmt.Errorf("could not list models from %s: %w\n"+
+				"if this endpoint does not expose a model list, pass -model <id> to "+
+				"record one verbatim (it is stored as operator-supplied, not as a "+
+				"rule-derived choice)", p.BaseURL, lerr)
 		}
-		sort.Strings(all)
-		fmt.Fprintf(os.Stderr, "no model matched the selection rule. %d models visible:\n", len(models))
-		for _, id := range all {
-			fmt.Fprintf(os.Stderr, "  %s\n", id)
+		listed = len(models)
+		picked, cands = pickModel(models)
+		method = "enumerated"
+		if picked == "" {
+			var all []string
+			for _, m := range models {
+				all = append(all, m.ID)
+			}
+			sort.Strings(all)
+			fmt.Fprintf(os.Stderr, "no model matched the selection rule. %d models visible:\n", listed)
+			for _, id := range all {
+				fmt.Fprintf(os.Stderr, "  %s\n", id)
+			}
+			return fmt.Errorf("selection rule matched nothing; amend PROTOCOL.md 4 from " +
+				"the list above BEFORE running any trace, and commit the amendment")
 		}
-		return fmt.Errorf("selection rule matched nothing; amend PROTOCOL.md 4 from " +
-			"the list above BEFORE running any trace, and commit the amendment")
 	}
+
+	if err := validateModelID(p, picked); err != nil {
+		return err
+	}
+
 	temp := 0.2
 	fm := frozenModel{
-		Model:      picked,
-		ResolvedAt: nowUTC(),
-		SelectionRule: "highest gpt-<major>[.<minor>] id, excluding size variants " +
-			"(mini/nano), extended-reasoning variants (pro), dated snapshots, and " +
-			"non-general-purpose endpoints; see PROTOCOL.md 4",
-		Candidates:  cands,
-		TotalListed: len(models),
-		Temperature: &temp,
+		Provider:        p.Name,
+		BaseURL:         p.BaseURL,
+		Model:           picked,
+		ResolvedAt:      nowUTC(),
+		SelectionRule:   selectionRule,
+		SelectionMethod: method,
+		Candidates:      cands,
+		TotalListed:     listed,
+		Temperature:     &temp,
 		TemperatureNote: "frozen at 0.2; if this model rejects the parameter the run " +
-			"applies the PROTOCOL.md 4.1 contingency and records the fallback here",
-		Endpoint: apiBase + responsesPath,
+			"applies the PROTOCOL.md 4.1 contingency and records the fallback per-trace",
+		Endpoint: p.BaseURL + responsesPath,
 	}
 	b, _ := json.MarshalIndent(fm, "", "  ")
 	path := filepath.Join(studyDir(), "model.frozen.json")
 	if err := os.WriteFile(path, append(b, '\n'), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("resolved model: %s\n", picked)
-	fmt.Printf("  candidates matching the rule: %s\n", strings.Join(cands, ", "))
-	fmt.Printf("  of %d models listed\n", len(models))
-	fmt.Printf("  recorded in %s -- commit this BEFORE the first trace\n", path)
+
+	fmt.Printf("provider  %s\n", p.Name)
+	fmt.Printf("endpoint  %s\n", fm.Endpoint)
+	fmt.Printf("model     %s  (%s)\n", picked, method)
+	if method == "enumerated" {
+		fmt.Printf("  candidates matching the rule: %s\n", strings.Join(cands, ", "))
+		fmt.Printf("  of %d models listed\n", listed)
+	}
+	fmt.Printf("\nrecorded in %s\n", path)
+	fmt.Printf("COMMIT IT before running any trace -- the runner refuses an " +
+		"uncommitted or modified model freeze.\n")
 	return nil
 }
 

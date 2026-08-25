@@ -206,12 +206,23 @@ func cmdRun(args []string) error {
 		if err != nil {
 			return err
 		}
-		key, err := apiKey()
+		// Provider and endpoint come from the COMMITTED freeze, never from the
+		// environment, so a run cannot be redirected at a different service
+		// after the fact.
+		prov, err := providerFromFrozen(fm)
+		if err != nil {
+			return err
+		}
+		if err := validateModelID(prov, fm.Model); err != nil {
+			return err
+		}
+		key, err := prov.credential()
 		if err != nil {
 			return err
 		}
 		r.modelFreeze = mf
-		r.model, r.temp, r.client = fm.Model, fm.Temperature, newOpenAI(key)
+		r.model, r.temp, r.client = fm.Model, fm.Temperature, newOpenAI(prov, key)
+		fmt.Printf("provider %s (%s)\n", prov.Name, fm.Endpoint)
 	}
 
 	if err := os.MkdirAll(r.outDir, 0o755); err != nil {

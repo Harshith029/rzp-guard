@@ -10,6 +10,13 @@
 > is recorded here rather than quietly applied. `freeze_sha256` changes with this
 > edit, and every trace records the freeze it ran under.
 
+> **Amendment B, 2026-08-25 — made before any trace ran.**
+> The provider is **Amazon Bedrock**, not OpenAI direct: that is where this
+> project's credits are. Bedrock serves the same OpenAI models over the same
+> Responses API with the same bearer auth, so this changes the endpoint and the
+> shape of the model identifier, not the experiment. Details in **§4.2**. Trace
+> count is still 0.
+
 This is the artifact PREREGISTRATION Amendment 2 §A2.4 requires: task set, compiled mandates with their recorded coverage gaps, model, sampling parameters, every prompt verbatim, the intended trace count declared in advance, and the adjudication rule with worked examples.
 
 Amendment 2 fixed the *method*. This fixes the *parameters*. Nothing below may be changed once a trace has been run; if something has to change, the run is void and restarts under an amendment that says why.
@@ -95,6 +102,41 @@ Consequences that are now part of the protocol:
 | audio / realtime / image / embedding / moderation / codex / instruct / turbo | not general-purpose chat with tool calling |
 
 The full candidate list the rule matched is recorded in `study/model.frozen.json` alongside the choice, so the selection can be audited rather than taken on trust.
+
+---
+
+### 4.2 Provider: Amazon Bedrock
+
+**Endpoint: `https://bedrock-runtime.{region}.amazonaws.com/openai/v1`.**
+
+Amazon exposes two OpenAI-compatible routes and they are **not** interchangeable:
+
+| Route | Scope | Model identifier |
+|---|---|---|
+| `bedrock-mantle.{region}.api.aws/openai/v1` | in-Region | raw id, `openai.gpt-5.6-terra` |
+| `bedrock-runtime.{region}.amazonaws.com/openai/v1` | cross-Region | **inference profile id**, `us.openai.gpt-5.6-terra` |
+
+The cross-Region route is chosen because a single-Region endpoint makes a 45-trace run hostage to capacity in one Region, and a study that dies halfway is a study that gets re-run until it finishes — precisely the freedom pre-registration exists to remove. Passing the wrong identifier shape for the route is the most likely first-call failure, so the harness validates it before spending anything rather than letting a 400 explain it.
+
+Authentication is a bearer token from `AWS_BEARER_TOKEN_BEDROCK`, the same header the OpenAI-direct path uses. `AWS_REGION` has **no default**: Bedrock endpoints are per-Region, and a guessed default would silently change where the traces ran.
+
+**The endpoint is part of the freeze.** `resolve-model` records provider, base URL and model into `study/model.frozen.json`, which must be committed before any trace; the runner reads the endpoint back from that committed file and never from the environment. A run therefore cannot be redirected at a different service after the fact without leaving evidence.
+
+**Amended selection rule.** §4's rule matched a bare `gpt-<major>[.<minor>]` id. That is no longer how the flagship line is named — it is **tiered** — so the rule is restated on the same reasoning already used to exclude `-pro`:
+
+| Tier | Role | Decision |
+|---|---|---|
+| `terra` | everyday production | **selected** — what a real support deployment runs, which is what this study simulates |
+| `sol` | advanced reasoning | excluded on cost, exactly as `-pro` was |
+| `luna` | fast / high-volume | excluded as a size-and-speed variant, exactly as `mini` and `nano` were |
+| anything else | unrecognised | excluded; `resolve-model` prints every visible id so the rule can be amended from real data |
+
+Among eligible ids, the highest version wins. The rule is exercised by tests over realistic id lists, and each branch was mutation-verified.
+
+**If the endpoint does not enumerate models.** Bedrock's OpenAI-compatible route is an inference endpoint and is not guaranteed to serve `GET /models`. If listing fails, an operator-supplied id may be recorded verbatim — and it is stamped `"selection_method": "operator-supplied"` in the freeze, so a reader can see the choice was made by a person rather than derived by the rule, and weigh it accordingly.
+
+**One risk, stated in advance.** Amazon documents support for *a subset* of Responses API capabilities. Tool calling is documented as available, but this protocol depends on it entirely, so a single smoke trace confirms it works before the 45-trace run begins. If it does not work, that is reported as a finding rather than worked around silently.
+
 
 ---
 

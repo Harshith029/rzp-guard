@@ -94,13 +94,50 @@ cmd_build() {
 # The earlier version printed its control and exited 0 whenever the blocked call
 # was simply absent from the tee -- which also passes against a dead container
 # or invalid credentials, the exact cases the control exists to rule out.
-need_openai_key() {
-  if [ -z "${OPENAI_API_KEY:-}" ]; then
-    echo "OPENAI_API_KEY is not set." >&2
-    echo "Put it in .env (which is gitignored) and re-run:" >&2
-    echo "  set -a && . ./.env && set +a && ./run.sh study-run" >&2
-    exit 2
-  fi
+# The study provider. Bedrock by default: it is where this project's credits
+# are, and its OpenAI-compatible route takes the same bearer auth, so the only
+# real difference from OpenAI direct is the base URL.
+RZP_STUDY_PROVIDER="${RZP_STUDY_PROVIDER:-bedrock}"
+
+need_study_creds() {
+  case "$RZP_STUDY_PROVIDER" in
+    bedrock)
+      if [ -z "${AWS_BEARER_TOKEN_BEDROCK:-}" ] || [ -z "${AWS_REGION:-}" ]; then
+        echo "Bedrock needs AWS_BEARER_TOKEN_BEDROCK and AWS_REGION." >&2
+        echo "Put them in .env (gitignored) and re-run:" >&2
+        echo "  set -a && . ./.env && set +a && ./run.sh study-model" >&2
+        echo "" >&2
+        echo "AWS_REGION has no default on purpose: Bedrock endpoints are" >&2
+        echo "per-Region, and guessing one would silently change where the" >&2
+        echo "traces ran." >&2
+        exit 2
+      fi
+      ;;
+    openai)
+      if [ -z "${OPENAI_API_KEY:-}" ]; then
+        echo "OPENAI_API_KEY is not set (RZP_STUDY_PROVIDER=openai)." >&2
+        exit 2
+      fi
+      ;;
+    *)
+      echo "unknown RZP_STUDY_PROVIDER=$RZP_STUDY_PROVIDER (expected bedrock|openai)" >&2
+      exit 2
+      ;;
+  esac
+}
+
+# The study runs in the GO image, not alpine.
+#
+# requireCommittedModelFreeze shells out to git to prove the model choice was
+# committed before any trace existed. Alpine has no git, so the check would
+# fail closed and block every real run -- correct behaviour, useless outcome.
+# Verified: no git in the pinned alpine, git 2.47 in the pinned golang.
+study_docker() {
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
+      -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
+      -e RZP_STUDY_PROVIDER \
+      -e AWS_BEARER_TOKEN_BEDROCK -e AWS_REGION -e OPENAI_API_KEY \
+      "$GOIMAGE" "$@"
 }
 
 redact_evidence() {
@@ -297,17 +334,18 @@ cmd_study_dry() {
 }
 
 cmd_study_model() {
-  need_openai_key
+  need_study_creds
   cmd_study_build
-  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
-      -e OPENAI_API_KEY "$ALPINE" ./.gotmp/linux/rzp-study resolve-model
+  study_docker ./.gotmp/linux/rzp-study resolve-model -provider "$RZP_STUDY_PROVIDER" "$@"
+  echo ""
+  echo "Now COMMIT study/model.frozen.json. The runner refuses an uncommitted or"
+  echo "modified model freeze: a promise nobody can fail is not a control."
 }
 
 cmd_study_run() {
-  need_openai_key
+  need_study_creds
   cmd_study_build
-  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
-      -e OPENAI_API_KEY "$ALPINE" ./.gotmp/linux/rzp-study run "$@"
+  study_docker ./.gotmp/linux/rzp-study run "$@"
 }
 
 usage() {
@@ -326,9 +364,12 @@ rzp-guard
   ./run.sh study-verify      Phase 4b: check the frozen protocol is intact
   ./run.sh study-dry         Phase 4b: whole harness on a scripted fake model
                              (no API key, no spend, never a study result)
-  ./run.sh study-model       Phase 4b: resolve + record the model. COMMIT the
-                             result BEFORE running traces.
-  ./run.sh study-run [flags] Phase 4b: run the traces (needs OPENAI_API_KEY)
+  ./run.sh study-model       Phase 4b: resolve + record provider, endpoint and
+                             model. COMMIT the result BEFORE running traces.
+                             Bedrock by default; needs AWS_BEARER_TOKEN_BEDROCK
+                             and AWS_REGION. Add -model <id> if the endpoint
+                             does not enumerate models.
+  ./run.sh study-run [flags] Phase 4b: run the 45 pre-declared traces
   ./run.sh verify-refund-evidence
                              Re-check the captured G1.6 allow-path evidence.
                              READ-ONLY: no network, no credentials, no refund.
@@ -354,7 +395,7 @@ case "${1:-help}" in
   operator-setup) cmd_operator_setup ;;
   study-verify) cmd_study_verify ;;
   study-dry) cmd_study_dry ;;
-  study-model) cmd_study_model ;;
+  study-model) shift; cmd_study_model "$@" ;;
   study-run) shift; cmd_study_run "$@" ;;
   verify-refund-evidence) cmd_verify_refund_evidence ;;
   live-block) cmd_live_block ;;

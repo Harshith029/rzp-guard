@@ -24,19 +24,21 @@ import (
 // worse than a real deployment for reasons unrelated to the guard -- inflating
 // the very count being measured. Chat Completions would likely also work; it is
 // simply worse-suited to this shape of task.
-const (
-	apiBase       = "https://api.openai.com/v1"
-	responsesPath = "/responses"
-	modelsPath    = "/models"
-)
+// Endpoint constants live in provider.go: the base URL is chosen at
+// resolve-model time, recorded in the freeze, and read back from there.
 
 type openAI struct {
-	key  string
-	http *http.Client
+	key     string
+	baseURL string
+	http    *http.Client
 }
 
-func newOpenAI(key string) *openAI {
-	return &openAI{key: key, http: &http.Client{Timeout: 180 * time.Second}}
+func newOpenAI(p *provider, key string) *openAI {
+	return &openAI{
+		key:     key,
+		baseURL: p.BaseURL,
+		http:    &http.Client{Timeout: 180 * time.Second},
+	}
 }
 
 func (c *openAI) do(method, path string, body any) ([]byte, int, error) {
@@ -48,7 +50,7 @@ func (c *openAI) do(method, path string, body any) ([]byte, int, error) {
 		}
 		rdr = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, apiBase+path, rdr)
+	req, err := http.NewRequest(method, c.baseURL+path, rdr)
 	if err != nil {
 		return nil, 0, err
 	}
