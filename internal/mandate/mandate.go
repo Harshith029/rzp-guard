@@ -212,30 +212,28 @@ func (m *Mandate) Literals() map[string]struct{} {
 // rejects a collision rather than preventing one.
 //
 // It stays deterministic: the same mandate and action always yield the same
-// receipt. VERIFIED 2026-08-25 against live Test Mode: replaying a refund with
-// an already-used receipt is REJECTED by Razorpay with "Duplicate receipt found
-// for this refund request." The receipt is therefore a real provider-side
-// idempotency key, not merely a local correlation tag.
+// receipt.
 //
-// That is defence in depth, and it is the layer that survives the guard's own
-// worst case. The primary control is the durable action ledger, which refuses a
-// replay locally (ACTION_CONSUMED). If that state were ever lost or rolled back
-// -- a restored backup, a wiped volume -- the determinism above means the
-// retry carries the SAME receipt, and the provider refuses it. Neither layer
-// depends on the other.
+// A one-off Test Mode observation (evidence/g16/RECEIPT_IDEMPOTENCY.md) suggests
+// Razorpay also rejects a duplicate receipt. That observation is NOT treated as
+// a verified layer: no raw response was captured, and reproducing it would
+// require sending a refund around the guard, which this repository deliberately
+// cannot do. Nothing here depends on it.
 //
-// Scope, stated precisely: what was tested is the case that matters here --
-// same receipt, same payment, same amount. Uniqueness scoping beyond that (for
-// example the same receipt against a DIFFERENT payment) was not tested and is
-// not claimed. The guard would not emit such a call anyway, because an action
-// is bound to one payment id.
+// WHAT REPLAY PROTECTION ACTUALLY RESTS ON: the durable action ledger, which
+// refuses a replay locally with ACTION_CONSUMED and forwards nothing. That is
+// proven by committed evidence.
 //
-// The 48-bit truncation fails SAFE against this backstop. A collision between
-// two distinct actions would make the provider reject the second refund -- an
-// unexpected denial a human then resolves, never a duplicate disbursement.
+// If the provider-side behaviour is real, it would only help when a retry
+// reproduces the IDENTICAL receipt -- which requires the identical mandate_id
+// and action_id. That holds when a mandate file is reloaded, and fails entirely
+// for anything minting fresh action ids per run.
 //
-// Live acceptance of a fresh receipt is asserted by gate G1.6
-// (./run.sh live-refund).
+// The 48-bit truncation fails SAFE either way. A collision between two distinct
+// actions can only cause a refund to be refused, never duplicated.
+//
+// Live acceptance of a fresh receipt is asserted by the captured G1.6 evidence
+// (./run.sh verify-refund-evidence).
 func ReceiptFor(mandateID, actionID string) (string, error) {
 	sum := sha256.Sum256([]byte(mandateID + "/" + actionID))
 	r := receiptPrefix + hex.EncodeToString(sum[:])[:receiptHashLen]

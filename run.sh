@@ -7,7 +7,30 @@
 # intermittently blocking freshly built test binaries.
 set -euo pipefail
 
-GOIMAGE="${GOIMAGE:-golang:1.26}"
+# THE TOOLCHAIN IS PINNED BY DIGEST, not by tag.
+#
+# This was golang:1.26. A tag is mutable: the same command six months from now
+# could pull a different compiler and produce different compilation and test
+# behaviour, while the repository still presented its gate output as
+# reproducible evidence. "Runnable today" is not the same claim as
+# "reproducible", and only a digest closes the gap.
+#
+# GOIMAGE/ALPINE_IMAGE remain overridable for development, but an override is
+# reported in gate output so no run can silently claim pinned provenance.
+GO_IMAGE_PINNED="golang@sha256:e2f96d803d39f4cb681fa82801be6eacad6337d9f00769918e1e21b5555723ea"
+ALPINE_IMAGE_PINNED="alpine@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b"
+GOIMAGE="${GOIMAGE:-$GO_IMAGE_PINNED}"
+ALPINE="${ALPINE:-$ALPINE_IMAGE_PINNED}"
+
+# Every gate prints this, so the artifacts that produced a result are recorded
+# with the result instead of being inferred from the shell environment later.
+provenance() {
+  echo "toolchain: $GOIMAGE"
+  echo "verifier:  $ALPINE"
+  if [ "$GOIMAGE" != "$GO_IMAGE_PINNED" ] || [ "$ALPINE" != "$ALPINE_IMAGE_PINNED" ]; then
+    echo "WARNING: image override in effect; this run is NOT pinned-reproducible" >&2
+  fi
+}
 MANDATE="${MANDATE:-examples/mandate.json}"
 cd "$(dirname "$0")"
 PWDW="$(pwd -W 2>/dev/null || pwd)"
@@ -80,9 +103,37 @@ need_openai_key() {
   fi
 }
 
+redact_evidence() {
+  # Rebuild the committed projection from raw/. Requires python3; the gate fails
+  # rather than publishing raw provider records.
+  # The repo venv first: on Windows a bare `python` resolves to the Microsoft
+  # Store alias, which prints an advert and exits 0 without redacting anything.
+  if [ -x .venv/Scripts/python.exe ]; then PY=.venv/Scripts/python.exe
+  elif [ -x .venv/bin/python ]; then PY=.venv/bin/python
+  elif command -v python3 >/dev/null 2>&1; then PY=python3
+  elif python -c "" >/dev/null 2>&1; then PY=python
+  else
+    echo "python is required to redact evidence before publishing it" >&2
+    exit 2
+  fi
+  for d in evidence/*/raw; do
+    [ -d "$d" ] || continue
+    for f in "$d"/*.txt; do
+      [ -f "$f" ] || continue
+      cp "$f" "$(dirname "$d")/$(basename "$f")"
+    done
+  done
+  "$PY" evidence/redact.py
+}
+
 cmd_live_block() {
+  provenance
   need_keys
-  mkdir -p evidence/linux; rm -f evidence/linux/* 2>/dev/null || true
+  # Raw provider responses go to a GITIGNORED raw/ directory; only a redacted
+  # projection is committed. Writing straight into evidence/linux/ meant every
+  # gate run silently republished a payment's contact details, card id and
+  # acquirer auth code -- and undid the redaction that had just been applied.
+  mkdir -p evidence/linux/raw; rm -f evidence/linux/raw/* 2>/dev/null || true
 
   # THE END-TO-END GATE, ON THE DECLARED DEPLOYMENT TARGET.
   #
@@ -124,13 +175,16 @@ cmd_live_block() {
      "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"pay_SYN99999999999\",\"amount\":90000}}}" \
      "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"fetch_all_payments\",\"arguments\":{\"count\":1}}}" \
     | ./.gotmp/linux/rzp-guard -mandate examples/mandate.json -state "$GATE/state.db" \
-        -child-tee evidence/linux/block_child_stdin.jsonl \
-        -decision-log evidence/linux/block_decisions.jsonl \
-        > evidence/linux/block_stdout.jsonl 2> evidence/linux/block_stderr.txt
+        -child-tee evidence/linux/raw/block_child_stdin.jsonl \
+        -decision-log evidence/linux/raw/block_decisions.jsonl \
+        > evidence/linux/raw/block_stdout.jsonl 2> evidence/linux/raw/block_stderr.txt
 
-    echo
-    ./.gotmp/linux/gate-verify block evidence/linux
   '
+
+  # Project, then assert on the projection -- never on the raw. If these two
+  # ever diverge, the committed evidence would not be what was verified.
+  redact_evidence
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$ALPINE"       ./.gotmp/linux/gate-verify block evidence/linux
 }
 
 # Process-boundary recovery. Deliberately NOT called "live": it exercises the
@@ -144,74 +198,40 @@ cmd_live_block() {
 #
 # Built with -tags testhook. The shipped binary has no arbitrary-child path, and
 # the stub is given NO Razorpay credentials.
-cmd_live_refund() {
-  # PURGED FROM HISTORY 2026-08-31. See FAILURES.md F18 and F26.
-  #
-  # This command took an arbitrary payment id and amount, wrote its OWN mandate
-  # authorizing exactly that refund, and executed it against the live API. F18
-  # records why that is offense-capable whatever the intent: a tool that
-  # authorizes itself is a refund launcher, not a test. It was removed from the
-  # tip in "Remove the refund launcher", and its body was purged from every
-  # reachable commit BEFORE the repository was ever published, because Track 2
-  # disqualifies anything offense-capable and history is part of a repository.
-  #
-  # The allow path is proven instead by fixture-backed lanes that move no money.
-  echo "live-refund was purged; the allow path is proven by the fixture lanes" >&2
-  echo "see FAILURES.md F18 (why) and F26 (the purge)" >&2
-  exit 2
-}
-JSON
-
+# cmd_live_refund WAS HERE AND HAS BEEN REMOVED.
+#
+# It took an arbitrary payment id and amount, GENERATED ITS OWN AUTHORIZING
+# MANDATE for them, and called Razorpay with whatever credentials were in the
+# environment. Whatever its intent, its shape was a reusable refund launcher:
+# anyone with keys could point it at any payment for any amount. A mandate the
+# tool writes for itself is not an authorization boundary.
+#
+# This repository is a DEFENCE. It must not also ship a generic money-moving
+# command, and a track that disqualifies offense-capable work is not the place
+# to argue the distinction.
+#
+# What replaces it:
+#   - the G1.6 refund was a ONE-OFF recorded run; its evidence is committed in
+#     redacted form under evidence/g16/
+#   - `./run.sh verify-refund-evidence` re-checks that captured evidence with
+#     gate-verify, which only ever READS json files and cannot move money
+#
+# Reproducing the refund itself requires deliberately writing a mandate by hand
+# and running the shipped guard. That is a considered act by an operator, not a
+# command this repo hands out.
+cmd_verify_refund_evidence() {
+  provenance
+  # READ-ONLY. Parses committed evidence and asserts. No network, no credentials,
+  # no child container, nothing that can move money.
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src -e CGO_ENABLED=0 \
-      -e GOOS=linux -e GOARCH=amd64 -e GOFLAGS=-buildvcs=false "$GOIMAGE" sh -c '
-    mkdir -p .gotmp/linux
-    go build -buildvcs=false -o .gotmp/linux/rzp-guard ./cmd/rzp-guard
-    go build -buildvcs=false -o .gotmp/linux/rzp-guard-operator ./cmd/rzp-guard-operator
-    go build -buildvcs=false -o .gotmp/linux/gate-verify ./cmd/gate-verify
-  '
-
-  MSYS_NO_PATHCONV=1 docker run --rm \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      -v "$PWDW":/src -w /src \
-      -e RAZORPAY_KEY_ID -e RAZORPAY_KEY_SECRET \
-      -e PAY="$PAY" -e AMT="$AMT" \
-      docker:cli sh -c '
-    set -e
-    GATE=$(mktemp -d)
-    trap "rm -rf $GATE" EXIT
-    M=evidence/g16/refund_mandate.json
-
-    ./.gotmp/linux/rzp-guard-operator -mandate "$M" \
-        -state "$GATE/state.db" init -out "$GATE/token" > /dev/null
-
-    # Authorized refund.
-    printf "%s\n" \
-     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"g16\",\"version\":\"1\"}}}" \
-     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}" \
-     "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"$PAY\",\"amount\":$AMT}}}" \
-    | ./.gotmp/linux/rzp-guard -mandate "$M" -state "$GATE/state.db" \
-        -child-tee evidence/g16/refund_child_stdin.jsonl \
-        -decision-log evidence/g16/refund_decisions.jsonl \
-        > evidence/g16/refund_stdout.jsonl 2> evidence/g16/refund_stderr.txt
-
-    # Replay of the SAME action, plus a permitted read as the alive control.
-    # Without the read, "nothing was forwarded" would also pass against a dead
-    # container or bad credentials.
-    printf "%s\n" \
-     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"g16\",\"version\":\"1\"}}}" \
-     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}" \
-     "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"$PAY\",\"amount\":$AMT}}}" \
-     "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"fetch_payment\",\"arguments\":{\"payment_id\":\"$PAY\"}}}" \
-    | ./.gotmp/linux/rzp-guard -mandate "$M" -state "$GATE/state.db" \
-        -child-tee evidence/g16/replay_child_stdin.jsonl \
-        > evidence/g16/replay_stdout.jsonl 2> evidence/g16/replay_stderr.txt
-
-    echo
-    ./.gotmp/linux/gate-verify refund evidence/g16
-  '
+      -e GOOS=linux -e GOARCH=amd64 -e GOFLAGS=-buildvcs=false "$GOIMAGE" \
+      go build -buildvcs=false -o .gotmp/linux/gate-verify ./cmd/gate-verify
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$ALPINE" \
+      ./.gotmp/linux/gate-verify refund evidence/g16
 }
 
 cmd_process_recover() {
+  provenance
   # Runs entirely INSIDE the golang container.
   #
   # Two reasons, both measured. The gate needs no Docker child -- it uses a
@@ -250,7 +270,7 @@ cmd_study_build() {
   # Phase 4b harness. The guard and operator are TEST-HOOK builds, which
   # substitute only the CHILD PROCESS -- policy, relay, ledger and storage are
   # the shipped code paths. The shipped binary against the REAL pinned
-  # container is proven separately by live-block and live-refund (G1.6).
+  # container is proven separately by live-block and the captured G1.6 evidence.
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src -e CGO_ENABLED=0 \
       -e GOOS=linux -e GOARCH=amd64 -e GOFLAGS=-buildvcs=false "$GOIMAGE" sh -c '
     mkdir -p .gotmp/linux
@@ -263,7 +283,7 @@ cmd_study_build() {
 
 cmd_study_verify() {
   cmd_study_build
-  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src alpine \
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$ALPINE" \
       ./.gotmp/linux/rzp-study verify-freeze
 }
 
@@ -272,7 +292,7 @@ cmd_study_dry() {
   # with a SCRIPTED fake model. No API key, no spend, and never a study result:
   # every trace it writes is stamped DRY-RUN-SCRIPTED-FAKE.
   cmd_study_build
-  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src alpine \
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$ALPINE" \
       ./.gotmp/linux/rzp-study run -dry-run -out .gotmp/dryrun -runs 1
 }
 
@@ -280,14 +300,14 @@ cmd_study_model() {
   need_openai_key
   cmd_study_build
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
-      -e OPENAI_API_KEY alpine ./.gotmp/linux/rzp-study resolve-model
+      -e OPENAI_API_KEY "$ALPINE" ./.gotmp/linux/rzp-study resolve-model
 }
 
 cmd_study_run() {
   need_openai_key
   cmd_study_build
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
-      -e OPENAI_API_KEY alpine ./.gotmp/linux/rzp-study run "$@"
+      -e OPENAI_API_KEY "$ALPINE" ./.gotmp/linux/rzp-study run "$@"
 }
 
 usage() {
@@ -309,11 +329,9 @@ rzp-guard
   ./run.sh study-model       Phase 4b: resolve + record the model. COMMIT the
                              result BEFORE running traces.
   ./run.sh study-run [flags] Phase 4b: run the traces (needs OPENAI_API_KEY)
-  ./run.sh live-refund <pay_id> [paise]
-                             LIVE ALLOW PATH (G1.6): an AUTHORIZED refund really
-                             executes, the guard's receipt round-trips, and the
-                             replay is refused. Needs a real captured Test Mode
-                             payment and moves Test Mode money.
+  ./run.sh verify-refund-evidence
+                             Re-check the captured G1.6 allow-path evidence.
+                             READ-ONLY: no network, no credentials, no refund.
   ./run.sh live-block        LIVE, ON LINUX: production guard + shipped operator
                              (no escape flags) -> official pinned container.
                              Proves BLOCKING ONLY, with an enforced alive-control.
@@ -338,8 +356,8 @@ case "${1:-help}" in
   study-dry) cmd_study_dry ;;
   study-model) cmd_study_model ;;
   study-run) shift; cmd_study_run "$@" ;;
+  verify-refund-evidence) cmd_verify_refund_evidence ;;
   live-block) cmd_live_block ;;
-  live-refund) shift; cmd_live_refund "$@" ;;
   process-recover) cmd_process_recover ;;
   help) usage ;;
   *) usage; exit 1 ;;

@@ -104,3 +104,85 @@ jobs:
   # live-block and process-recover need Razorpay Test Mode keys and a Docker
   # socket, so they are not run here. Their evidence is committed under
   # evidence/ and reproduced locally with ./run.sh live-block.
+
+  # THE COMBINED CONDITION -- the one that actually broke.
+  #
+  # Two jobs existed before this and neither reproduced the failure. The
+  # unreadable-.git job called Go directly, so it never exercised the wrapper.
+  # The wrapper job ran with normal VCS metadata, so it never exercised the
+  # stamping failure. The defect needed BOTH at once: the documented runner,
+  # under broken VCS metadata.
+  #
+  # Testing each half separately and calling the pair "covered" is how the
+  # original defect survived a green board.
+  runner-under-broken-vcs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26', cache: false }
+
+      - name: Break VCS metadata the way the real failure did
+        run: |
+          chmod -R a-r .git 2>/dev/null || true
+          mv .git .git-disabled
+          echo "not a git repo" > .git
+          git status 2>&1 | head -2 || true
+
+      - name: The DOCUMENTED runner must work anyway
+        env:
+          GOFLAGS: ""          # deliberately unset: the runner must supply it
+        run: |
+          bash ./run.sh test
+          bash ./run.sh lifecycle
+
+      - name: Restore
+        if: always()
+        run: rm -f .git && mv .git-disabled .git 2>/dev/null || true
+
+  # Provenance: the runner must name immutable image digests, not tags. A
+  # mutable tag means "runnable today", not reproducible six months from now.
+  toolchain-pinned-by-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: run.sh must pin images by digest
+        run: |
+          for var in GO_IMAGE_PINNED ALPINE_IMAGE_PINNED; do
+            line=$(grep -E "^${var}=" run.sh || true)
+            if [ -z "$line" ]; then echo "$var is not defined in run.sh" >&2; exit 1; fi
+            case "$line" in
+              *@sha256:*) echo "$var pinned by digest" ;;
+              *) echo "$var is not pinned by digest: $line" >&2; exit 1 ;;
+            esac
+          done
+
+  # Committed evidence must carry no provider fields beyond the allowlist, and
+  # must not have drifted from the raw capture it was projected from.
+  evidence-projection-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: python evidence/redact.py --check
+
+  # The repository must not ship a generic money-moving command.
+  no-money-moving-command:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: run.sh must expose no parameterised refund launcher
+        run: |
+          if grep -qE '^\s*live-refund\)|^cmd_live_refund' run.sh; then
+            echo "run.sh exposes a live-refund command; this repo is a defence" >&2
+            exit 1
+          fi
+          # A create_refund in the runner is only acceptable against a hardcoded
+          # non-resolvable synthetic id, never against a caller-supplied one.
+          if grep -n 'create_refund' run.sh | grep -vE 'pay_SYN[0-9]+' | grep -q 'create_refund'; then
+            echo "run.sh builds a create_refund against a non-synthetic payment id" >&2
+            grep -n 'create_refund' run.sh | grep -vE 'pay_SYN[0-9]+' >&2
+            exit 1
+          fi
+          echo "no money-moving command exposed"

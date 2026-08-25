@@ -407,3 +407,76 @@ The gate passed on good evidence, so I had no reason from normal use to doubt it
 **Re-verified:** 11 mutations of the captured evidence — tampered receipt, blanked provider id, inflated amount, rewired reply id, `isError` injected, replay actually forwarded, `ACTION_CONSUMED` removed, receipt truncated below the floor, fractional amount — all fail; unmutated evidence passes. Zero blind spots.
 
 **A second lesson, from the harness.** One mutation reported `PASSED (BAD)` and I nearly wrote it up as a second hole. It was not: the `sed` pattern contained a placeholder that did not exist in the file, so the mutation changed nothing and the gate correctly passed unmodified evidence. **A mutation that does not mutate is indistinguishable from a blind gate.** The harness now asserts the search pattern is present before substituting, and reports `VACUOUS (harness bug)` otherwise — which immediately caught a third case where `"isError":false` was absent because the MCP server omits the field when false.
+
+## F17 — I did it again: a blog summary repeated as an established fact
+
+Justifying the Responses API, I wrote that Chat Completions was legacy and that
+"its removal window closed in early 2026." I put it in the frozen protocol, in a
+source comment, and in a commit message.
+
+It is false. `/v1/chat/completions` is currently documented and supported. The
+2026 shutdown I was half-remembering is the **Assistants API** — a different
+endpoint entirely.
+
+The source was a snippet from a third-party gist and blog post returned in a web
+search. I read it, it matched something I vaguely believed, and I promoted it to
+a stated fact without opening OpenAI's own documentation. The reviewer checked
+and it took one fetch to disprove.
+
+**This is F4 repeating.** There, I quoted WebFetch's small-model summaries of
+Razorpay docs as if they were the source text, and asserted the docs contradicted
+each other. The instruction I was given after that was "check current docs before
+trusting memory." I did run a search this time — and then trusted the *search
+result's* paraphrase, which is the same error one layer out. Searching is not
+checking. The rule has to be: the claim comes from the vendor's own page, or it
+is not made.
+
+**The damage was worse than a wrong comment.** The false claim was doing
+*justificatory* work — it was the stated reason for an architectural choice in a
+pre-registered protocol. A reviewer who believed it would have accepted the
+endpoint decision on a premise that does not exist.
+
+**Fix:** retracted in `study/PROTOCOL.md` §4.1 and `cmd/rzp-study/openai.go`,
+both marked as retractions rather than silently edited. The endpoint choice
+stands on a narrower, checkable reason — reasoning-item preservation across turns
+for multi-step tool use — with the honest addition that Chat Completions would
+probably work too.
+
+## F18 — I shipped a refund launcher and called it a gate
+
+To make G1.6 reproducible I added `./run.sh live-refund <pay_id> [amount]`. It
+took an arbitrary payment id and amount, **generated its own authorizing mandate
+for them**, and called Razorpay with whatever credentials were in the
+environment.
+
+I wrote it while thinking about reproducibility, and reproducibility is a real
+concern — a one-off result I ran by hand is weaker evidence than a command a
+reviewer can re-run. The parameters existed so someone else could point it at
+*their* test payment.
+
+But look at what it actually was. Strip the framing and it is: *give me a payment
+id and an amount, and I will refund it.* The mandate it generated was not an
+authorization boundary, because the tool wrote it for itself. A mandate that the
+caller controls authorizes nothing.
+
+This repository is a **defence**, submitted to a track that disqualifies
+offense-capable work automatically. I put a generic money-moving command in it,
+in the runner, documented in the README, one commit after removing a Checkout
+page on exactly these grounds. I had already made this call correctly once and
+then failed to apply it to my own convenience.
+
+**What made it invisible to me:** every other gate is safe because its payment
+ids are hardcoded non-resolvable synthetics (`pay_SYN…`). I generalised the
+*pattern* (a runner command that drives the guard) without noticing that
+parameterising the payment id is what changes a fixture into a weapon. The
+danger was in the parameters, not the plumbing.
+
+**Fix:** the command is deleted. What remains is
+`./run.sh verify-refund-evidence`, which only reads committed JSON and cannot
+move money. The refund itself was a one-off recorded run, and its evidence is
+committed in redacted form. A CI job now fails the build if a `live-refund`
+command reappears, or if `run.sh` ever builds a `create_refund` against
+anything other than a hardcoded `pay_SYN…` id.
+
+**The general rule I should have applied:** in a defence repository, ask of every
+command not "what is this for?" but "what is this, if the framing is removed?"

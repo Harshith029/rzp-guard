@@ -12,12 +12,18 @@ import (
 
 // The Responses API, not Chat Completions.
 //
-// Chat Completions is legacy: its removal window closed in early 2026, and on
-// current models tool calling there is degraded (reasoning structure is not
-// preserved across turns, which causes repeated tool calls). Building this
-// harness against it from memory would have produced a study whose agent
-// behaved worse than a real deployment for reasons that had nothing to do with
-// the guard.
+// CORRECTION: an earlier version of this comment claimed Chat Completions was
+// legacy with a removal window closed in early 2026. That was FALSE and is
+// withdrawn -- /v1/chat/completions is current and supported; the 2026 shutdown
+// is the Assistants API. See FAILURES.md F17.
+//
+// The real reason to use Responses here is reasoning-item preservation: items
+// returned alongside a tool call are echoed back on the next turn, and dropping
+// them degrades multi-step tool use. This study is entirely multi-step, so an
+// agent losing its reasoning between turns would re-issue calls and behave
+// worse than a real deployment for reasons unrelated to the guard -- inflating
+// the very count being measured. Chat Completions would likely also work; it is
+// simply worse-suited to this shape of task.
 const (
 	apiBase       = "https://api.openai.com/v1"
 	responsesPath = "/responses"

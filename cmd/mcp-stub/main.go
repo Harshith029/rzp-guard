@@ -7,9 +7,9 @@
 // executing anything.
 //
 // The shipped binary running against the REAL pinned container is proven
-// separately and end to end by gates live-block and live-refund (G1.6),
-// including a real refund at Razorpay. The two claims are deliberately kept
-// apart, and this stub is never part of the second one.
+// separately and end to end by gate live-block and by the captured G1.6
+// allow-path evidence, which includes a real refund at Razorpay. The two claims
+// are deliberately kept apart, and this stub is never part of the second one.
 //
 // FIDELITY, and its limits:
 //

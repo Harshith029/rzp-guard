@@ -40,3 +40,7 @@ venv/
 *.db
 *.db-wal
 *.db-shm
+
+# Raw provider responses. Committed evidence is a redacted projection
+# built by evidence/redact.py; raw records stay local.
+evidence/*/raw/

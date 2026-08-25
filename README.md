@@ -3,7 +3,9 @@
 An authorization proxy that sits in front of Razorpay's **official, unmodified** MCP server and enforces a merchant-issued capability list over `create_refund`.
 
 > **Status — read this before anything else.**
-> This is a **tested Go authorization core with a live-verified block path**. It is **not** a detector, and **no precision, recall or false-positive numbers exist**. Test counts measure authorization and transport conformance, nothing more. The automatic *success* path is an explicitly unverified compatibility guess (§Known limits).
+> This is a **tested Go authorization core with live-verified block AND allow paths**. It is **not** a detector, and **no precision, recall or false-positive numbers exist yet** — the Phase 4b study that produces them is frozen and its harness is built, but it has not been run. Test counts measure authorization and transport conformance, nothing more.
+>
+> The automatic *success* path is **no longer** an unverified guess: G1.6 ran a real Test Mode refund and the envelope is pinned as a test fixture. The remaining limit is narrower and permanent — `COMMITTED` means the provider **created** the refund entity, never that money **settled** (§Known limits).
 
 ```bash
 ./run.sh operator-setup    # ONCE, before first start: create the recovery credential
@@ -122,18 +124,22 @@ The control matters: the container answered a legitimate read with a real Razorp
 | Gate | Platform | Provisioning | Proves |
 |---|---|---|---|
 | `live-block` | Linux (container, host Docker socket) | **shipped** operator, supported path, **no escape flags**, token mode `600` | An unauthorized `create_refund` never reaches the official pinned container's stdin, with an enforced alive-control |
-| `live-refund` <a id="allow-path-g16"></a> | Linux (container, host Docker socket) | **shipped** operator, supported path, **no escape flags** | An **authorized** `create_refund` really executes at Razorpay, the guard's injected receipt round-trips unchanged, the action is consumed, and the replay is refused — with an alive-control correlated by request id |
+| `verify-refund-evidence` <a id="allow-path-g16"></a> | read-only | — | Re-checks the captured G1.6 allow-path evidence: an **authorized** `create_refund` really executed at Razorpay, the guard's injected receipt round-tripped unchanged, the action was consumed, and the replay was refused — with an alive-control correlated by request id |
 | `process-recover` | Linux (container) | **shipped** operator, supported path | Child death leaves a durable `IN_DOUBT` that survives restart |
 
-`live-block` on its own is only half a result — a guard that blocked *everything* would pass it. `live-refund` (gate G1.6) is the other half, and it needs a **real captured Test Mode payment**, so it takes the id as an argument and really moves Test Mode money:
+`live-block` on its own is only half a result — a guard that blocked *everything* would pass it. Gate **G1.6** is the other half: an authorized refund really executing.
 
-```
-./run.sh live-refund pay_XXXXXXXXXXXXXX 100
+G1.6 was run **once**, against a real captured Test Mode payment, and its evidence is committed in redacted form. Re-check it any time — read-only, no network, no credentials:
+
+```bash
+./run.sh verify-refund-evidence
 ```
 
 Recorded run: payment `pay_TTwUH29tzhB4ME`, refund `rfnd_TTwsIoEmRPXnBa`, 14 assertions, evidence in `evidence/g16/`. Every assertion was mutation-tested — 11 corruptions of the captured evidence, each confirmed to fail the gate. **One of those mutations found a hole in the gate itself** (the alive-control was not correlated with the reply that verified it); it is fixed and recorded as F16.
 
-A second, independent layer was verified by direct probe: replaying a **used receipt** is rejected by Razorpay itself (`Duplicate receipt found for this refund request`), so the deterministic receipt is a genuine provider-side idempotency key, not just local bookkeeping — see [`evidence/g16/RECEIPT_IDEMPOTENCY.md`](evidence/g16/RECEIPT_IDEMPOTENCY.md). That is the layer that survives the guard's own state being lost.
+> **There is deliberately no command in this repository that issues a refund.** An earlier version shipped `./run.sh live-refund <pay_id> [amount]`, which took an arbitrary payment and amount, **generated its own authorizing mandate for them**, and called Razorpay. Whatever the intent, the shape was a reusable refund launcher, and a mandate a tool writes for itself is not an authorization boundary. It has been removed, and CI fails the build if anything like it returns. Reproducing G1.6 means writing a mandate by hand and running the shipped guard — a deliberate operator act, not a command this repo hands out.
+
+Replay protection rests on **one** verified layer: the guard's durable action ledger, which refuses the replay locally and forwards nothing. A one-off Test Mode observation suggesting Razorpay also rejects a duplicate receipt is recorded in [`evidence/g16/RECEIPT_IDEMPOTENCY.md`](evidence/g16/RECEIPT_IDEMPOTENCY.md) and is **explicitly not** counted as defence in depth — no raw response was captured, and reproducing it would need the refund launcher that was just removed.
 
 `process-recover` uses a local non-responding stub child, because against the real container Razorpay answers in well under a second and the death path would never be exercised — measured at 2s and 0.15s kills.
 

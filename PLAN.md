@@ -321,7 +321,7 @@ Committed at `e572d85` before any policy code existed — provable from `git log
 - **G1.3** Relay passes `initialize` + `tools/list` + a read call **byte-identically** vs. talking to the child directly. Diff must be empty.
 - **G1.4** *Highest-risk gate:* produce a **captured test-mode payment** (`pay_*`) so `create_refund` is exercisable live. **No fallback** — if it cannot be done it is reported as an unmet gate.
 - **G1.5** *Feasibility gate:* can the **unmodified** container be routed to a controlled upstream capture boundary? If not, the network-capture evidence claim is **dropped**, not kept as a promise.
-- **G1.6 ✅ DONE (2026-08-25).** **Runtime verification, replacing a documentation claim I got wrong.** Runner: `./run.sh live-refund <pay_id> [paise]`. Against real captured payment `pay_TTwUH29tzhB4ME`:
+- **G1.6 ✅ DONE (2026-08-25).** **Runtime verification, replacing a documentation claim I got wrong.** Re-check the captured evidence with `./run.sh verify-refund-evidence` (read-only). The runner that performed the refund has been REMOVED as offense-capable; see F18. Against real captured payment `pay_TTwUH29tzhB4ME`:
   - An **authorized** refund executes end to end through the shipped guard and the official pinned container → `rfnd_TTwsIoEmRPXnBa`. **14 assertions.**
   - The injected `rzpg_` receipt is **accepted by the live schema** and returned unchanged.
   - A **duplicate** receipt is **rejected by Razorpay**: `Duplicate receipt found for this refund request.` Scope tested: same receipt/payment/amount; wider uniqueness scoping not claimed.

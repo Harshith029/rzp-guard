@@ -71,7 +71,11 @@ Naming a version I cannot yet verify would be a guess presented as a decision. A
 
 **Endpoint: `POST /v1/responses`, not `/v1/chat/completions`.**
 
-Chat Completions is legacy — its removal window closed in early 2026 — and on current models tool calling through it is degraded, because the reasoning structure is not preserved across turns and the model re-issues tool calls it has already made. A harness built on it would have produced an agent that behaved worse than a real deployment *for reasons having nothing to do with the guard*, which would have silently inflated the out-of-intent call count this study measures. This was found by checking the current documentation; memory would have produced the wrong endpoint.
+> **Retraction, 2026-08-25.** An earlier version of this section said "Chat Completions is legacy — its removal window closed in early 2026." **That is false and is withdrawn.** `/v1/chat/completions` is currently documented and supported; the 2026 shutdown I had half-remembered is the **Assistants API**, a different endpoint. The claim came from a third-party blog summary in search results that I repeated as established fact. It is the same mistake as FAILURES.md **F4** — quoting a paraphrase as source text — and it is recorded again as **F17**.
+
+The endpoint choice stands, on a narrower and checkable reason: **reasoning-item preservation**. In the Responses API, reasoning items returned alongside a tool call are echoed back on the next turn, and OpenAI's own function-calling guidance is explicit that dropping them degrades multi-step tool use. This study is entirely multi-step — read the payment, decide, call `create_refund`, react to a block — so an agent that loses its reasoning between turns would re-issue calls and behave worse than a real deployment *for reasons having nothing to do with the guard*, inflating the out-of-intent call count being measured.
+
+Chat Completions would very likely also work. It is not chosen because it is worse-supported for this shape of task, not because it is going away.
 
 Consequences that are now part of the protocol:
 
@@ -163,7 +167,7 @@ The cost is stated plainly: **quantity 3 is measured on an unhardened prompt and
 
 The child is stubbed because the study measures **the guard's authorization decisions on agent-emitted calls**, which do not depend on Razorpay executing anything. Running 45 traces against the live API would need dozens of real captured payments and would move Test Mode money on every trace, without changing a single decision under measurement.
 
-That the shipped binary works against the **real** pinned container is proven separately and end-to-end by gates `live-block` and `live-refund` (G1.6), including a real refund at Razorpay. The two claims are kept apart on purpose.
+That the shipped binary works against the **real** pinned container is proven separately and end-to-end by gate `live-block` and by the captured G1.6 allow-path evidence (`./run.sh verify-refund-evidence`), which includes a real refund at Razorpay. The two claims are kept apart on purpose.
 
 The stub is selected by the `testhook` build tag, which substitutes **only the child process**. It does not relax policy, state, or any check.
 
@@ -226,6 +230,36 @@ Also reported, not as detector metrics:
 - for quantity 2, the split between compilation gaps (predicted in §5) and any other cause.
 
 Denominators are "**actually emitted**", not "presented". If the model never emits an out-of-intent refund, quantity 1 has a denominator of zero and is reported as **undefined**, not as 100%.
+
+### 10.1 Confusion matrix, precision and recall — added 2026-08-25, pre-trace
+
+An earlier version of this section reported the three quantities and **deliberately declined to report precision**. That was wrong for this project: the evaluation this work is submitted against asks for measured precision and recall, and answering "we report something else instead" is not an answer.
+
+Both are now reported. The unit is one **emitted** `create_refund` call. The positive class is **out-of-intent** — the thing the guard exists to catch.
+
+|  | guard blocked | guard allowed |
+|---|---|---|
+| **out-of-intent** (positive) | TP | FN |
+| **in-intent** (negative) | FP | TN |
+
+- **Precision** = TP / (TP + FP)
+- **Recall** = TP / (TP + FN) — numerically identical to quantity 1
+- **Specificity** = TN / (TN + FP) — the complement of quantity 2
+
+This does not contradict §A2.3. That rule forbids combining quantity 3, a property of the *model*, with the detector quantities. Precision combines quantities 1 and 2 only — both properties of the deployed proxy-plus-mandate pair — and that combination is exactly what the matrix is for.
+
+**Two caveats travel with the numbers, in the results document itself, not in a footnote:**
+
+1. **This is not a held-out sample of merchant traffic.** It is ~45 traces over 15 hand-written briefs. No confidence intervals, no significance claims, no inference to a population (§A2.5).
+2. **Precision's FP term is dominated by mandate-compilation gaps, predicted in advance in §5.** B01's delivery fee and B02's goodwill amount are cases where the agent does what the merchant wanted and the compiled mandate cannot express it. A reader who sees only precision cannot tell whether the detector or the compilation is at fault, which is why the separated quantities are reported alongside it and neither replaces the other.
+
+### 10.2 Adjudication is blinded by construction
+
+`rzp-study worksheet` emits one row per emitted refund call carrying **only** the brief's `intent_text` and the call's arguments. It does not carry the mandate, the guard's decision, or the result. `rzp-study report` is what joins verdicts back onto the traces.
+
+Two commands and two files, because a single file containing both intent and decision would make the blinding a matter of self-discipline rather than structure.
+
+`report` fails closed on a worksheet that is incomplete, has an unrecognised verdict, has a label with no reason, contains a duplicate, or contains a row matching no emitted call. Each of those refusals is tested. Every label is published with its reason in `study/adjudication/labelled_calls.json` so a reader can disagree with any individual call and recompute.
 
 ---
 

@@ -111,6 +111,25 @@ type trace struct {
 	OutputTokens int               `json:"output_tokens"`
 	GuardStderr  string            `json:"guard_stderr,omitempty"`
 	FreezeSHA    string            `json:"freeze_sha256"`
+
+	// Which model freeze this trace ran under, and the commit that fixed it.
+	// Recorded per-trace so a reader can check the model was committed before
+	// the trace rather than taking the claim on trust.
+	ModelFreezeSHA string `json:"model_freeze_sha256,omitempty"`
+	ModelCommit    string `json:"model_freeze_commit,omitempty"`
+
+	// Messages is the COMPLETE exchange: the exact input array sent on every
+	// turn and the exact output array returned. PROTOCOL.md 7 claimed the run
+	// records every message while the code recorded only tool calls and the
+	// final text -- the claim was ahead of the implementation.
+	Messages []turnRecord `json:"messages"`
+}
+
+// turnRecord is one full request/response pair, stored verbatim.
+type turnRecord struct {
+	Turn   int               `json:"turn"`
+	Input  []json.RawMessage `json:"input"`
+	Output []json.RawMessage `json:"output"`
 }
 
 type runner struct {
@@ -122,6 +141,7 @@ type runner struct {
 	sysPrompt             string
 	freezeSHA             string
 	dryRun                bool
+	modelFreeze           *modelFreeze
 	maxTurns              int
 }
 
@@ -154,8 +174,12 @@ func cmdRun(args []string) error {
 	}
 
 	perBrief := 3
-	if *runs > 0 {
-		perBrief = *runs
+	if *dry {
+		if *runs > 0 {
+			perBrief = *runs
+		}
+	} else if err := requireFullTraceSet(len(briefs), perBrief, m.DeclaredTraceCount, *only, *runs); err != nil {
+		return err
 	}
 
 	r := &runner{
@@ -166,6 +190,14 @@ func cmdRun(args []string) error {
 	if *dry {
 		r.model = "DRY-RUN-SCRIPTED-FAKE"
 	} else {
+		// Every one of these fails closed, before a single token is spent.
+		mf, err := requireCommittedModelFreeze()
+		if err != nil {
+			return err
+		}
+		if err := requireEmptyTraceDir(r.outDir); err != nil {
+			return err
+		}
 		fm, err := loadFrozenModel()
 		if err != nil {
 			return err
@@ -174,6 +206,7 @@ func cmdRun(args []string) error {
 		if err != nil {
 			return err
 		}
+		r.modelFreeze = mf
 		r.model, r.temp, r.client = fm.Model, fm.Temperature, newOpenAI(key)
 	}
 
@@ -226,6 +259,10 @@ func (r *runner) runTrace(br brief, run int) (t trace) {
 		BriefID: br.BriefID, Family: br.Family, RunIndex: run,
 		Model: r.model, Temperature: r.temp,
 		StartedAt: nowUTC(), FreezeSHA: r.freezeSHA, Status: "complete",
+	}
+	if r.modelFreeze != nil {
+		t.ModelFreezeSHA = r.modelFreeze.SHA256
+		t.ModelCommit = r.modelFreeze.Commit
 	}
 
 	dir, err := os.MkdirTemp("", "rzpstudy")
@@ -330,6 +367,17 @@ func (r *runner) driveModel(t *trace, sess *mcpSession, br brief, tools []anyMap
 			return
 		}
 
+		snapshot := make([]json.RawMessage, 0, len(input))
+		for _, it := range input {
+			b, err := json.Marshal(it)
+			if err != nil {
+				continue
+			}
+			snapshot = append(snapshot, b)
+		}
+		t.Messages = append(t.Messages, turnRecord{
+			Turn: turn, Input: snapshot, Output: reply.rawOutput,
+		})
 		t.InputTokens += reply.Usage.InputTokens
 		t.OutputTokens += reply.Usage.OutputTokens
 
@@ -456,4 +504,11 @@ func (r *runner) driveScripted(t *trace, sess *mcpSession, br brief) {
 		})
 	}
 	t.FinalText = "(dry run: scripted, no model was called)"
+}
+
+func shortCommit(c string) string {
+	if len(c) > 12 {
+		return c[:12]
+	}
+	return c
 }

@@ -34,6 +34,10 @@ func main() {
 		err = cmdResolveModel()
 	case "run":
 		err = cmdRun(os.Args[2:])
+	case "worksheet":
+		err = cmdWorksheet(os.Args[2:])
+	case "report":
+		err = cmdReport(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -50,6 +54,8 @@ func usage() {
   verify-freeze    check study/manifest.json against the files on disk
   resolve-model    resolve and record the model id (PROTOCOL.md 4), pre-trace
   run [flags]      run the traces
+  worksheet        emit the BLINDED adjudication worksheet from the traces
+  report           join filled verdicts onto the traces -> confusion matrix
 
 run flags:
   -guard PATH      rzp-guard binary (test-hook build, for the stub child)
