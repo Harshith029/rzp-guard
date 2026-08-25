@@ -80,14 +80,18 @@ All 15 compiled mandates were verified to load in the **shipped** mandate parser
 
 ## 4. Model and sampling
 
-**Selection rule, fixed now because the exact version string cannot be:** the model is the most capable general-purpose OpenAI chat model available at freeze-execution time that supports tool calling. It is resolved by a single `models.list` call, recorded **verbatim** into `study/model.frozen.json`, and committed **before the first trace runs**. That commit is part of the freeze.
+> **The provider and model rows below are settled by [§4.5](#45-running-on-an-untrusted-generator-and-what-that-costs), not here.** §4.1–§4.4 record how the decision moved and why; §4.5 is what actually runs. Read them in order or skip to §4.5.
 
-Naming a version I cannot yet verify would be a guess presented as a decision. A pre-registered *selection rule* plus a recorded result is the honest form. If the resolved model later becomes unavailable mid-study, the study restarts; a substitution is never made silently.
+**How the model is fixed:** it is recorded into `study/model.frozen.json` and committed **before the first trace runs**, and the runner refuses an uncommitted or modified model freeze. That commit is part of the freeze.
+
+Where an endpoint can be enumerated meaningfully, the choice is made by the mechanical tier rule in §4.2 and the matching ids are recorded. Where it cannot — the case that actually applies, see §4.5 — the id is **operator-supplied** and stamped `"selection_method": "operator-supplied"`, so the freeze shows a person chose it rather than the rule deriving it.
+
+*(An earlier draft of this section said the candidate list is "recorded verbatim". That was wrong: `model.frozen.json` records the ids the selection rule matched plus a total count, not the endpoint's full `/models` response. Corrected here rather than left to be discovered.)*
 
 | Parameter | Value | Why |
 |---|---|---|
-| Provider | OpenAI | Chosen by the project owner. |
-| Model | resolved by the rule above, recorded in `study/model.frozen.json` | — |
+| Provider | **a third-party proxy — see §4.5** | It is the only credential available, and it is untrusted. |
+| Model | `gpt-5.6-sol`, operator-supplied, recorded in `study/model.frozen.json` | The endpoint publishes no trustworthy model list (§4.5). |
 | `temperature` | **0.2** | A deployed support agent is not run greedy. Low but non-zero, so repeated runs can show whether a decision is stable. |
 | `top_p` | default (unset) | One sampling knob is enough; two interact confusingly. |
 | Runs per brief | **3** | Surfaces per-brief instability. Not a sample size for inference. |
@@ -128,42 +132,19 @@ The full candidate list the rule matched is recorded in `study/model.frozen.json
 
 ---
 
-### 4.2 Provider: Amazon Bedrock
+### 4.2 The mechanical selection rule (retained), and Bedrock (withdrawn)
 
-**Endpoint: `https://bedrock-runtime.{region}.amazonaws.com/openai/v1`.**
+**Retained — the tier rule.** Where an endpoint can be enumerated, the model is the highest version of the everyday-production tier, excluding the advanced-reasoning tier on cost, the fast/high-volume tier as a size variant, and mini/nano/pro/preview/dated snapshots. An unrecognised tier is excluded rather than guessed at, and `resolve-model` then prints every visible id so the rule is amended from real data, pre-trace and committed. The rule is exercised by tests and each branch was mutation-verified. **It does not govern the run described in §4.5**, because that endpoint cannot be enumerated meaningfully.
 
-Amazon exposes two OpenAI-compatible routes and they are **not** interchangeable:
+**Withdrawn — Amazon Bedrock.** Amendment B routed the study through Bedrock's OpenAI-compatible endpoint. The account turned out to have access only to Amazon Nova, which does not serve that route at all, so the plan never ran and the client was removed. The detail is not reproduced here because keeping a page of endpoint mechanics for a provider nothing uses is how a document starts contradicting itself; the commit history has it if needed.
 
-| Route | Scope | Model identifier |
-|---|---|---|
-| `bedrock-mantle.{region}.api.aws/openai/v1` | in-Region | raw id, `openai.gpt-5.6-terra` |
-| `bedrock-runtime.{region}.amazonaws.com/openai/v1` | cross-Region | **inference profile id**, `us.openai.gpt-5.6-terra` |
+### 4.3 Withdrawn
 
-The cross-Region route is chosen because a single-Region endpoint makes a 45-trace run hostage to capacity in one Region, and a study that dies halfway is a study that gets re-run until it finishes — precisely the freedom pre-registration exists to remove. Passing the wrong identifier shape for the route is the most likely first-call failure, so the harness validates it before spending anything rather than letting a 400 explain it.
+Amendment C's provider section. Superseded by §4.4 (the rejection and the retraction) and §4.5 (what actually runs). The number is kept so cross-references in the code and README stay valid.
 
-Authentication is a bearer token from `AWS_BEARER_TOKEN_BEDROCK`, the same header the OpenAI-direct path uses. `AWS_REGION` has **no default**: Bedrock endpoints are per-Region, and a guessed default would silently change where the traces ran.
+### 4.4 Why the proxy was rejected — findings, and a retraction
 
-**The endpoint is part of the freeze.** `resolve-model` records provider, base URL and model into `study/model.frozen.json`, which must be committed before any trace; the runner reads the endpoint back from that committed file and never from the environment. A run therefore cannot be redirected at a different service after the fact without leaving evidence.
-
-**Amended selection rule.** §4's rule matched a bare `gpt-<major>[.<minor>]` id. That is no longer how the flagship line is named — it is **tiered** — so the rule is restated on the same reasoning already used to exclude `-pro`:
-
-| Tier | Role | Decision |
-|---|---|---|
-| `terra` | everyday production | **selected** — what a real support deployment runs, which is what this study simulates |
-| `sol` | advanced reasoning | excluded on cost, exactly as `-pro` was |
-| `luna` | fast / high-volume | excluded as a size-and-speed variant, exactly as `mini` and `nano` were |
-| anything else | unrecognised | excluded; `resolve-model` prints every visible id so the rule can be amended from real data |
-
-Among eligible ids, the highest version wins. The rule is exercised by tests over realistic id lists, and each branch was mutation-verified.
-
-**If the endpoint does not enumerate models.** Bedrock's OpenAI-compatible route is an inference endpoint and is not guaranteed to serve `GET /models`. If listing fails, an operator-supplied id may be recorded verbatim — and it is stamped `"selection_method": "operator-supplied"` in the freeze, so a reader can see the choice was made by a person rather than derived by the rule, and weigh it accordingly.
-
-**One risk, stated in advance.** Amazon documents support for *a subset* of Responses API capabilities. Tool calling is documented as available, but this protocol depends on it entirely, so a single smoke trace confirms it works before the 45-trace run begins. If it does not work, that is reported as a finding rather than worked around silently.
-
-
----
-
-### 4.4 The proxy is rejected, and a retraction
+> These findings stand. §4.5 records the decision to run on it anyway, with the claim scoped to match. Nothing below is withdrawn by that.
 
 **Rejected.** The Amendment C provider is not used and its client is removed from the repository. Four findings, the first demonstrated:
 
@@ -178,7 +159,7 @@ An intermediary that decides what model answers, publishes no retention policy, 
 
 ---
 
-### RETRACTION
+#### 4.4.1 RETRACTION
 
 Amendment C claimed:
 
