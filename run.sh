@@ -34,6 +34,28 @@ provenance() {
 MANDATE="${MANDATE:-examples/mandate.json}"
 cd "$(dirname "$0")"
 PWDW="$(pwd -W 2>/dev/null || pwd)"
+
+# WHERE RAW PROVIDER RECORDS GO -- and it is not here.
+#
+# They used to go to gitignored evidence/*/raw/. That is wrong for this
+# repository in a way gitignore cannot fix: the working tree is OneDrive-backed,
+# so a file that is never committed is still uploaded. Three raw files under
+# evidence/ were found holding a live email address, phone number, card
+# last-four and acquirer auth code while sitting in a synced directory. The same
+# mistake was already recorded for operator credentials (FAILURES.md F12).
+#
+# Default is the OS temp directory, which on this host resolves outside
+# OneDrive. Overridable, but redact.py refuses any path inside the repo.
+RAW_ROOT="${RZP_RAW_EVIDENCE_DIR:-${TMPDIR:-/tmp}/rzp-guard-raw}"
+mkdir -p "$RAW_ROOT"
+RAW_ROOT_W="$(cd "$RAW_ROOT" && (pwd -W 2>/dev/null || pwd))"
+case "$RAW_ROOT_W" in
+  "$PWDW"*)
+    echo "RAW_ROOT ($RAW_ROOT_W) is inside the workspace." >&2
+    echo "This tree is cloud-synced; raw provider records must live outside it." >&2
+    exit 2
+    ;;
+esac
 EV=evidence/live
 
 # GOFLAGS carries -buildvcs=false into every build the container performs,
@@ -149,24 +171,28 @@ redact_evidence() {
     echo "python is required to redact evidence before publishing it" >&2
     exit 2
   fi
-  for d in evidence/*/raw; do
-    [ -d "$d" ] || continue
-    for f in "$d"/*.txt; do
-      [ -f "$f" ] || continue
-      cp "$f" "$(dirname "$d")/$(basename "$f")"
-    done
-  done
-  "$PY" evidence/redact.py
+  # NOTHING is copied out of raw verbatim.
+  #
+  # This used to `cp` every raw/*.txt straight into the published directory
+  # before running the redactor -- and the redactor only inspected .jsonl, and
+  # returned any non-JSON line unchanged. A provider error or diagnostic
+  # carrying a payment record would have been republished having passed through
+  # no check at all. Text projections are not worth that risk: the .jsonl
+  # projection carries every field the gates assert on, and redact.py now scans
+  # every file under evidence/ regardless of extension.
+  RZP_RAW_EVIDENCE_DIR="$RAW_ROOT" "$PY" evidence/redact.py
 }
 
 cmd_live_block() {
   provenance
   need_keys
-  # Raw provider responses go to a GITIGNORED raw/ directory; only a redacted
-  # projection is committed. Writing straight into evidence/linux/ meant every
-  # gate run silently republished a payment's contact details, card id and
-  # acquirer auth code -- and undid the redaction that had just been applied.
-  mkdir -p evidence/linux/raw; rm -f evidence/linux/raw/* 2>/dev/null || true
+  # Raw provider responses go OUTSIDE the workspace (see RAW_ROOT above); only a
+  # redacted projection is written under evidence/. Writing straight into
+  # evidence/linux/ meant every gate run silently republished a payment's
+  # contact details, card id and acquirer auth code -- and undid the redaction
+  # that had just been applied. Putting them in a gitignored subdirectory of a
+  # cloud-synced tree fixed the commit and not the exposure.
+  mkdir -p "$RAW_ROOT/linux"; rm -f "$RAW_ROOT/linux"/* 2>/dev/null || true
 
   # THE END-TO-END GATE, ON THE DECLARED DEPLOYMENT TARGET.
   #
@@ -190,6 +216,7 @@ cmd_live_block() {
   MSYS_NO_PATHCONV=1 docker run --rm \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -v "$PWDW":/src -w /src \
+      -v "$RAW_ROOT_W":/raw \
       -e RAZORPAY_KEY_ID -e RAZORPAY_KEY_SECRET \
       docker:cli sh -c '
     set -e
@@ -208,9 +235,9 @@ cmd_live_block() {
      "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"pay_SYN99999999999\",\"amount\":90000}}}" \
      "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"fetch_all_payments\",\"arguments\":{\"count\":1}}}" \
     | ./.gotmp/linux/rzp-guard -mandate examples/mandate.json -state "$GATE/state.db" \
-        -child-tee evidence/linux/raw/block_child_stdin.jsonl \
-        -decision-log evidence/linux/raw/block_decisions.jsonl \
-        > evidence/linux/raw/block_stdout.jsonl 2> evidence/linux/raw/block_stderr.txt
+        -child-tee /raw/linux/block_child_stdin.jsonl \
+        -decision-log /raw/linux/block_decisions.jsonl \
+        > /raw/linux/block_stdout.jsonl 2> /raw/linux/block_stderr.txt
 
   '
 

@@ -480,3 +480,54 @@ anything other than a hardcoded `pay_SYN…` id.
 
 **The general rule I should have applied:** in a defence repository, ask of every
 command not "what is this for?" but "what is this, if the framing is removed?"
+
+## F19 — I fixed the commit and left the exposure
+
+The evidence redaction work moved raw provider records into gitignored
+`evidence/*/raw/` directories and called the problem solved. It was not. This
+working tree is OneDrive-backed, so **a file that is never committed is still
+uploaded.** Gitignore governs git; it does not govern the sync client.
+
+Found by scanning the directories rather than reasoning about them:
+
+```
+evidence/g16/raw/fetch_stdout.jsonl     email, phone, card last4, auth_code, acquirer_data
+evidence/g16/raw/replay_stdout.jsonl    email, phone, card last4, auth_code, acquirer_data
+evidence/linux/raw/block_stdout.jsonl   email, phone, card last4, auth_code, acquirer_data
+```
+
+Ten raw files, three carrying a real Test Mode payment's contact record, sitting
+in a synced directory.
+
+**This is F12 one directory over.** F12 was operator credentials written into
+OneDrive-backed `evidence/live/`, and its lesson was written down at the time:
+"gitignore is not a confidentiality control." I then applied that lesson to
+credentials only, and reintroduced the identical failure for provider records —
+while writing a comment in `run.sh` that said the token goes to a temp dir
+"never into this OneDrive-backed tree", directly above code writing payment
+records into that tree.
+
+**A second defect in the same path.** `redact_evidence()` copied every
+`raw/*.txt` into the published directory *before* running the redactor, and the
+redactor inspected only `.jsonl` and returned any non-JSON line verbatim. A
+provider error or diagnostic containing a payment record would have been
+republished having passed through no check at all.
+
+**Fix.** Raw capture moves outside the workspace entirely (`RAW_ROOT`, default
+under the OS temp dir); both `run.sh` and `redact.py` **refuse** a raw root that
+resolves inside the repository, rather than warning. No file is copied out of
+raw verbatim. The leak scan now walks **every** file under `evidence/`
+regardless of extension, and applies two independent rules: a dropped field is a
+leak inside a provider entity, and a personal-data-shaped *value* is a leak
+under any key anywhere.
+
+Getting that scan right took two corrections, both false positives worth
+recording because a noisy check is one people learn to ignore: matching field
+*names* flagged Razorpay's published tool schemas, which legitimately declare
+parameters called `email` and `contact`; and matching PII-shaped *values*
+flagged `"For example, 9876543210"` in a schema description — the Indian
+equivalent of 555-0100.
+
+**What the fix does not do.** Deleting the files now does not undo any sync that
+already happened. Those records may exist in OneDrive's cloud copy and version
+history, and no change in this repository can retract them.
