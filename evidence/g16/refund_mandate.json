@@ -1,0 +1,9 @@
+{
+  "mandate_id": "mnd_g16_refund",
+  "expires_at": "2027-01-01T00:00:00Z",
+  "allowed_tools": ["fetch_payment", "create_refund"],
+  "authorized_refund_actions": [
+    { "action_id": "rfa_1787649080", "payment_id": "pay_TTwUH29tzhB4ME", "amount_paise": 100 }
+  ],
+  "global": { "max_cumulative_paise": 100, "max_calls_per_minute": 20 }
+}

@@ -105,7 +105,7 @@ The header is unreachable because `razorpay-go`'s signature is `Refund(paymentID
 
 `receipt` is **optional** in the tool schema, so **a refund with no `receipt` has no duplicate protection.** §3.5 closes that.
 
-**What is verified vs. assumed:** the source facts above are verified — I read them. The exact runtime behaviour of a duplicate `receipt` (status code, error text, whether it applies per-payment) is **not**; my earlier attempt to establish it from documentation produced a false claim (see the standing correction above). **G1.6 observes it directly before anything depends on it.**
+**What is verified vs. assumed:** the source facts above are verified — I read them. Duplicate-`receipt` behaviour was **not**, and my earlier attempt to establish it from documentation produced a false claim (see the standing correction above). **G1.6 has now observed it directly (2026-08-25, Test Mode):** replaying a used receipt is rejected by Razorpay with `Duplicate receipt found for this refund request.` The receipt is a real provider-side idempotency key. Scope actually tested — same receipt, same payment, same amount; uniqueness scoping beyond that is **not** claimed. Full record: `evidence/g16/RECEIPT_IDEMPOTENCY.md`.
 
 **Consequence for §3.4:** a duplicate `receipt` is expected to *reject* rather than *replay the original result*, so a timed-out refund cannot be resolved by retrying — a retry teaches nothing about whether the first attempt landed.
 
@@ -246,7 +246,7 @@ Releasing on timeout would fail open: Razorpay may have processed the refund whi
 
 The proxy injects a deterministic receipt into every forwarded refund, rejecting calls that supply a conflicting one.
 
-**Format:** `rzpg_` + `action_id` — e.g. `rzpg_rfa_001` (12 chars), satisfying the ≥10-character floor and the alphanumeric/underscore/hyphen constraint. *(v3's worked example used the bare 7-character `rfa_001`, an untested length assumption sitting in a code sample.)* Verified against the live schema in **G1.6**, not assumed.
+**Format:** `rzpg_` + 12 hex digits of `sha256(mandate_id, action_id)` — e.g. `rzpg_de130f321d86`, satisfying the ≥10-character floor and the alphanumeric/underscore/hyphen constraint. *(v3's worked example used the bare 7-character `rfa_001`, an untested length assumption sitting in a code sample.)* **Verified accepted by the live API in G1.6** — `rzpg_6b8602afde6b` and `rzpg_de130f321d86` were both accepted and returned unchanged — not assumed.
 
 **What it is:** a second, provider-side barrier so a duplicate is rejected even if the proxy's action-consumption check is bypassed.
 **What it is not:** the `X-Refund-Idempotency` mechanism — no safe-retry semantics, and unreachable from a stdio proxy (§2.6).
@@ -321,7 +321,13 @@ Committed at `e572d85` before any policy code existed — provable from `git log
 - **G1.3** Relay passes `initialize` + `tools/list` + a read call **byte-identically** vs. talking to the child directly. Diff must be empty.
 - **G1.4** *Highest-risk gate:* produce a **captured test-mode payment** (`pay_*`) so `create_refund` is exercisable live. **No fallback** — if it cannot be done it is reported as an unmet gate.
 - **G1.5** *Feasibility gate:* can the **unmodified** container be routed to a controlled upstream capture boundary? If not, the network-capture evidence claim is **dropped**, not kept as a promise.
-- **G1.6** **Runtime verification, replacing a documentation claim I got wrong:** send a real duplicate `receipt` in test mode and record the actual status, error text and scope; confirm the `rzpg_`-prefixed format is accepted by the live schema.
+- **G1.6 ✅ DONE (2026-08-25).** **Runtime verification, replacing a documentation claim I got wrong.** Runner: `./run.sh live-refund <pay_id> [paise]`. Against real captured payment `pay_TTwUH29tzhB4ME`:
+  - An **authorized** refund executes end to end through the shipped guard and the official pinned container → `rfnd_TTwsIoEmRPXnBa`. **14 assertions.**
+  - The injected `rzpg_` receipt is **accepted by the live schema** and returned unchanged.
+  - A **duplicate** receipt is **rejected by Razorpay**: `Duplicate receipt found for this refund request.` Scope tested: same receipt/payment/amount; wider uniqueness scoping not claimed.
+  - Replay through the guard is refused locally (`ACTION_CONSUMED`), forwarding zero calls, with an alive-control correlated by request id.
+  - The real success envelope is pinned as a fixture (`internal/relay/testdata/live_refund_result.json`) and asserted by unit tests, so the commit predicate cannot silently regress.
+  - **Newly recorded limit:** the envelope was `status: "pending"` at decision time and only settled to `processed` afterwards. `COMMITTED` therefore means *the provider created the refund entity*, never *the money settled*. See FAILURES.md **F16** for the hole mutation-testing found in this gate itself.
 
 ### Phase 2 — Mandate + provenance (Days 3–4)
 

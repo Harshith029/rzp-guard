@@ -33,3 +33,10 @@ venv/
 /rzp-guard-operator.exe
 /rzp-guard-operator-testhook
 /rzp-guard-operator-testhook.exe
+
+# State files hold an Argon2id operator verifier. Credential-derived material
+# never belongs in a public repo, and this tree is OneDrive-backed (F12).
+# Gates write state to an OS temp dir; nothing here needs a committed .db.
+*.db
+*.db-wal
+*.db-shm

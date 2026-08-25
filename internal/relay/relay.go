@@ -389,14 +389,19 @@ func isToolError(result json.RawMessage) bool {
 // refundEntityMatches reports whether a tool result carries a refund entity for
 // exactly the payment, amount and receipt this relay authorized.
 //
-// UNVERIFIED COMPATIBILITY PATH. The expected shape is Razorpay's *documented*
-// refund entity; no live MCP success envelope has been captured yet. Automatic
-// COMMITTED is therefore a compatibility guess, not demonstrated product
-// behaviour, and must not be presented as the latter until gate G1.6 records a
-// real Test Mode response.
+// VERIFIED against a real Test Mode envelope (gate G1.6, 2026-08-25): payment
+// pay_TTwUH29tzhB4ME, 100 paise, refund rfnd_TTwf8Hhbx0sjZQ. The exact bytes the
+// provider returned are pinned in testdata/live_refund_result.json and asserted
+// by TestLiveRefundEnvelopeCommits, so this is no longer a compatibility guess.
 //
-// Only the fallback is demonstrated: an unrecognised success shape yields
-// IN_DOUBT and an operator look, never a wrong COMMIT.
+// status is deliberately NOT read. The live envelope came back "pending" and
+// only became "processed" asynchronously, after the MCP reply had been sent, so
+// no synchronous reply can prove settlement. COMMITTED therefore means "the
+// provider created the refund entity" -- enough to consume a single-use action
+// and prevent a replay -- and never "the money has landed".
+//
+// An unrecognised success shape still yields IN_DOUBT and an operator look,
+// never a wrong COMMIT.
 func refundEntityMatches(result json.RawMessage, p pending) bool {
 	var wrapper struct {
 		Content []struct {

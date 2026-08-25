@@ -18,7 +18,8 @@ type rpc struct {
 	ID     json.RawMessage `json:"id"`
 	Method string          `json:"method"`
 	Params struct {
-		Name string `json:"name"`
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
 	} `json:"params"`
 	Result *struct {
 		Content []struct {
@@ -88,7 +89,7 @@ func check(ok bool, format string, args ...any) {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: gate-verify (block|recover) <dir>")
+		fmt.Fprintln(os.Stderr, "usage: gate-verify (block|recover|refund) <dir>")
 		os.Exit(2)
 	}
 	mode, dir := os.Args[1], "evidence/live"
@@ -100,6 +101,8 @@ func main() {
 		verifyBlock(dir)
 	case "recover":
 		verifyRecover(dir)
+	case "refund":
+		verifyRefund(dir)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown mode %q\n", mode)
 		os.Exit(2)
@@ -243,6 +246,145 @@ func verifyRecover(dir string) {
 	} else {
 		check(true, "no recovery token was ever written into the repo tree")
 	}
+}
+
+// verifyRefund is the allow-path gate (G1.6). The block gate proves an
+// unauthorized refund never reaches the provider; this proves the converse --
+// that an AUTHORIZED one does, that the guard's own idempotency token survives
+// the round trip, and that the action is then consumed.
+//
+// It needs a real captured Test Mode payment, so unlike the block gate it
+// cannot run against a synthetic id.
+func verifyRefund(dir string) {
+	tee, err := readJSONL(dir + "/refund_child_stdin.jsonl")
+	must(err)
+	out, err := readJSONL(dir + "/refund_stdout.jsonl")
+	must(err)
+	replayTee, err := readJSONL(dir + "/replay_child_stdin.jsonl")
+	must(err)
+	replayOut, err := readJSONL(dir + "/replay_stdout.jsonl")
+	must(err)
+
+	fmt.Println("Live allow-path gate (G1.6)")
+
+	// What the guard actually handed the provider.
+	var fwd []rpc
+	for _, m := range tee {
+		if m.Method == "tools/call" && m.Params.Name == "create_refund" {
+			fwd = append(fwd, m)
+		}
+	}
+	check(len(fwd) == 1, "exactly one create_refund reached the child (saw %d)", len(fwd))
+	if len(fwd) != 1 {
+		return
+	}
+
+	var args struct {
+		PaymentID string      `json:"payment_id"`
+		Amount    json.Number `json:"amount"`
+		Receipt   string      `json:"receipt"`
+	}
+	must(json.Unmarshal(fwd[0].Params.Arguments, &args))
+
+	// The receipt is injected by the guard. The agent never sends one, so its
+	// presence in the forwarded call is what binds this dispatch to one
+	// authorized action.
+	check(strings.HasPrefix(args.Receipt, "rzpg_"), "guard injected a receipt (%q)", args.Receipt)
+	check(len(args.Receipt) >= len("rzpg_")+12,
+		"injected receipt clears the 12-hex-digit floor (%q, %d chars after prefix)",
+		args.Receipt, len(args.Receipt)-len("rzpg_"))
+
+	// create_refund declares amount as type:number, so a fractional value is
+	// accepted by the schema. The guard must forward a canonical integer.
+	if _, ferr := args.Amount.Int64(); ferr != nil {
+		check(false, "forwarded amount is a canonical integer (got %q)", args.Amount.String())
+	} else {
+		check(!strings.ContainsAny(args.Amount.String(), ".eE"),
+			"forwarded amount is a canonical integer (%s paise)", args.Amount.String())
+	}
+
+	// The provider's answer.
+	var resp rpc
+	for _, m := range out {
+		if m.Result != nil && strings.Contains(text(m), "\"entity\":\"refund\"") {
+			resp = m
+		}
+	}
+	if resp.Result == nil {
+		check(false, "provider returned a refund entity")
+		return
+	}
+	check(!resp.Result.IsError, "provider accepted the authorized refund (not an error)")
+
+	var ent struct {
+		ID        string      `json:"id"`
+		Entity    string      `json:"entity"`
+		PaymentID string      `json:"payment_id"`
+		Amount    json.Number `json:"amount"`
+		Receipt   string      `json:"receipt"`
+		Status    string      `json:"status"`
+	}
+	must(json.Unmarshal([]byte(text(resp)), &ent))
+
+	check(strings.HasPrefix(ent.ID, "rfnd_"),
+		"provider assigned a real refund id (%s)", ent.ID)
+	check(ent.PaymentID == args.PaymentID,
+		"refund is against the authorized payment (%s)", ent.PaymentID)
+	check(ent.Amount.String() == args.Amount.String(),
+		"provider refunded exactly the authorized amount (%s paise)", ent.Amount.String())
+
+	// The round trip that matters: the token the guard minted comes back
+	// unchanged, so the provider-side record is bound to our authorization.
+	check(ent.Receipt == args.Receipt,
+		"guard's receipt survived the round trip unchanged (%s)", ent.Receipt)
+
+	// Honest scope: a synchronous reply cannot prove settlement.
+	check(ent.Status != "",
+		"envelope carries a status (%q) -- COMMITTED means the entity was created, not that money settled",
+		ent.Status)
+
+	// The action is single-use. A second identical request must die at the guard.
+	blocked := false
+	for _, m := range replayOut {
+		if strings.Contains(text(m), "ACTION_CONSUMED") {
+			blocked = true
+		}
+	}
+	check(blocked, "replay of the same authorized action is refused (ACTION_CONSUMED)")
+
+	replayFwd := 0
+	aliveID := ""
+	for _, m := range replayTee {
+		if m.Method != "tools/call" {
+			continue
+		}
+		if m.Params.Name == "create_refund" {
+			replayFwd++
+			continue
+		}
+		// The alive control is a NAMED read, correlated by request id below.
+		//
+		// An earlier version counted any non-refund tools/call and looked for a
+		// payment entity anywhere in the output. Those two halves were never
+		// tied together, so renaming the forwarded tool to garbage still passed:
+		// the unrelated reply kept the second half true. Mutation testing the
+		// gate itself is what surfaced it.
+		if m.Params.Name == "fetch_payment" {
+			aliveID = id(m)
+		}
+	}
+	check(replayFwd == 0, "the replay reached the provider zero times (saw %d)", replayFwd)
+
+	// Without this, "nothing was forwarded" would also pass against a dead
+	// container or bad credentials -- the very cases the gate exists to exclude.
+	check(aliveID != "", "alive-control: a permitted fetch_payment did reach the child")
+	if aliveID == "" {
+		return
+	}
+	reply, ok := find(replayOut, aliveID)
+	check(ok && reply.Result != nil && !reply.Result.IsError &&
+		strings.Contains(text(reply), "\"entity\":\"payment\""),
+		"alive-control: request %s came back as a real payment entity from the provider", aliveID)
 }
 
 func must(err error) {

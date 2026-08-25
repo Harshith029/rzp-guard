@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"acquirer_data\":{\"arn\":null},\"amount\":100,\"base_amount\":100,\"batch_id\":null,\"created_at\":1787648362,\"currency\":\"INR\",\"entity\":\"refund\",\"id\":\"rfnd_TTwf8Hhbx0sjZQ\",\"notes\":[],\"payment_id\":\"pay_TTwUH29tzhB4ME\",\"receipt\":\"rzpg_6b8602afde6b\",\"speed_processed\":\"normal\",\"speed_requested\":\"normal\",\"status\":\"pending\"}"
+    }
+  ]
+}

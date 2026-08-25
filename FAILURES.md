@@ -375,3 +375,35 @@ live-block  PASS (15 assertions)   process-recover  PASS (6 assertions)
 **CI was also testing the wrong thing.** The reproducibility job ran `go test` directly after corrupting `.git` — it caught the VCS defect but would have missed this one entirely, along with any regression in `gorun`, Docker mounting, or script quoting. It now exercises `./run.sh` itself, adds a Windows/Git-Bash job that clones with `autocrlf=true` and fails if `run.sh` contains a CR, and runs the wrapper's own lanes.
 
 Two defects in a row (F14's VCS stamping, this one) were in the **runner**, not the product. For a project whose whole claim is reproducible evidence, that is the more damaging place for them to be.
+
+**Addendum — the fix was also incomplete, in the same shape.** `.gitattributes` plus `git add --renormalize` fixes the *index*, and I verified the result by taking a **fresh clone**. It never rewrote the working tree I actually develop in. Three tracked files kept CRLF there: `cmd/rzp-guard/lifecycle_test.go`, `cmd/rzp-guard-operator/main_test.go`, and `evidence/tools_list.json`. `file` had not reported the last one as "CRLF line terminators", so an earlier spot-check using `file` came back clean and I believed it.
+
+I verified the artefact I produced (the clone) rather than the environment the defect actually lived in — which is the identical mistake one level down. Found only when a widened check ran over every tracked file. Fixed by re-checkout; the CI job now greps **every tracked text file** for CR instead of just `run.sh`, and adds a `gofmt -l` check, which is what surfaced the two `.go` files.
+
+## F16 — I wrote a gate to prove the allow path, and the gate had a hole
+
+G1.6 needs an alive-control. Without one, "the replay reached the provider zero times" also passes when the container is dead or the credentials are wrong — precisely the cases the gate exists to exclude. So the gate asserted that a permitted read *did* reach the child, and that a real payment entity came back.
+
+Those were two separate assertions over two separate files, and nothing tied them together:
+
+```go
+if m.Params.Name == "create_refund" { replayFwd++ } else { aliveControl = true }
+...
+for _, m := range replayOut {
+    if ... strings.Contains(text(m), "\"entity\":\"payment\"") { readOK = true }
+}
+```
+
+Any non-refund tool call satisfied the first. Any payment entity anywhere in the output satisfied the second. Renaming the forwarded tool to `nope_tool` left both true:
+
+```
+alive-control read stripped                -> PASSED (BAD - gate is blind to this)
+```
+
+The gate passed on good evidence, so I had no reason from normal use to doubt it. **I only found this because I mutated the captured evidence and required the gate to fail** — the same discipline applied to product code, turned on the verifier itself. A gate is code, and an assertion that has never been observed failing has not been tested.
+
+**Fix:** capture the alive-control's request id from the forwarded stream and require *that specific id* to come back as a non-error payment entity. The two halves are now one correlated claim.
+
+**Re-verified:** 11 mutations of the captured evidence — tampered receipt, blanked provider id, inflated amount, rewired reply id, `isError` injected, replay actually forwarded, `ACTION_CONSUMED` removed, receipt truncated below the floor, fractional amount — all fail; unmutated evidence passes. Zero blind spots.
+
+**A second lesson, from the harness.** One mutation reported `PASSED (BAD)` and I nearly wrote it up as a second hole. It was not: the `sed` pattern contained a placeholder that did not exist in the file, so the mutation changed nothing and the gate correctly passed unmodified evidence. **A mutation that does not mutate is indistinguishable from a blind gate.** The harness now asserts the search pattern is present before substituting, and reports `VACUOUS (harness bug)` otherwise — which immediately caught a third case where `"isError":false` was absent because the MCP server omits the field when false.

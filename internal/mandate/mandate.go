@@ -212,10 +212,30 @@ func (m *Mandate) Literals() map[string]struct{} {
 // rejects a collision rather than preventing one.
 //
 // It stays deterministic: the same mandate and action always yield the same
-// receipt, which is what makes a duplicate detectable at Razorpay.
+// receipt. VERIFIED 2026-08-25 against live Test Mode: replaying a refund with
+// an already-used receipt is REJECTED by Razorpay with "Duplicate receipt found
+// for this refund request." The receipt is therefore a real provider-side
+// idempotency key, not merely a local correlation tag.
 //
-// The generated value is validated here, not assumed. Live acceptance is
-// verified separately by gate G1.6.
+// That is defence in depth, and it is the layer that survives the guard's own
+// worst case. The primary control is the durable action ledger, which refuses a
+// replay locally (ACTION_CONSUMED). If that state were ever lost or rolled back
+// -- a restored backup, a wiped volume -- the determinism above means the
+// retry carries the SAME receipt, and the provider refuses it. Neither layer
+// depends on the other.
+//
+// Scope, stated precisely: what was tested is the case that matters here --
+// same receipt, same payment, same amount. Uniqueness scoping beyond that (for
+// example the same receipt against a DIFFERENT payment) was not tested and is
+// not claimed. The guard would not emit such a call anyway, because an action
+// is bound to one payment id.
+//
+// The 48-bit truncation fails SAFE against this backstop. A collision between
+// two distinct actions would make the provider reject the second refund -- an
+// unexpected denial a human then resolves, never a duplicate disbursement.
+//
+// Live acceptance of a fresh receipt is asserted by gate G1.6
+// (./run.sh live-refund).
 func ReceiptFor(mandateID, actionID string) (string, error) {
 	sum := sha256.Sum256([]byte(mandateID + "/" + actionID))
 	r := receiptPrefix + hex.EncodeToString(sum[:])[:receiptHashLen]

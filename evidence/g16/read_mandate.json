@@ -1,0 +1,7 @@
+{
+  "mandate_id": "mnd_g16_read",
+  "expires_at": "2027-01-01T00:00:00Z",
+  "allowed_tools": ["fetch_payment", "fetch_all_payments", "fetch_multiple_refunds_for_payment"],
+  "authorized_refund_actions": [],
+  "global": { "max_cumulative_paise": 0, "max_calls_per_minute": 20 }
+}

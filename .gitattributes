@@ -9,8 +9,14 @@
 # The index was already LF; nothing enforced it on checkout. Every commit in
 # this repo printed "LF will be replaced by CRLF" and it was treated as noise.
 
-# Default: let git normalize text in the index, decide checkout per-rule below.
-* text=auto
+# Default: LF in the index AND in the working tree, for every text file.
+#
+# This was `* text=auto`, which normalizes the index but leaves checkout to
+# core.autocrlf -- so each rule below only protected the extensions someone had
+# thought of. Adding evidence/*.txt immediately produced the same
+# "LF will be replaced by CRLF" warning that caused F15 in the first place.
+# Enumerating extensions is whack-a-mole; the default closes the class.
+* text=auto eol=lf
 
 # Anything executed by a shell MUST be LF on every platform.
 *.sh            text eol=lf
@@ -32,3 +38,12 @@ go.sum   text eol=lf
 *.json   text eol=lf
 *.md     text eol=lf
 *.py     text eol=lf
+*.txt    text eol=lf
+
+# Binaries must be exempt from the eol=lf default above.
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary
+*.ico binary
+*.db  binary

@@ -49,17 +49,40 @@ jobs:
         run: |
           git config --global core.autocrlf true
           git clone --depth 1 "https://github.com/${GITHUB_REPOSITORY}.git" repo
-      - name: run.sh must be LF, not CRLF
+      # Scoped to run.sh at first. That was too narrow: .gitattributes was added
+      # and verified against a fresh clone, while two .go files kept CRLF in an
+      # existing working tree. Check EVERY tracked text file, not just the one
+      # that happened to break.
+      - name: No tracked text file may contain CR
         working-directory: repo
         run: |
-          if grep -qU $'\r' run.sh; then
-            echo "run.sh contains CR characters; a Git-Bash checkout will refuse it" >&2
+          bad=0
+          for f in $(git ls-files); do
+            case "$f" in *.png|*.jpg|*.gif|*.pdf|*.ico) continue ;; esac
+            if [ -f "$f" ] && grep -qU $'\r' "$f"; then
+              echo "CR found in $f" >&2
+              bad=1
+            fi
+          done
+          if [ "$bad" -ne 0 ]; then
+            echo "CRLF in a checkout breaks the documented runner (FAILURES.md F15)" >&2
             exit 1
           fi
-          echo "run.sh is LF"
+          echo "all tracked text files are LF"
       - name: The documented entry point must execute
         working-directory: repo
         run: bash ./run.sh help
+
+      - name: Go sources must be gofmt-clean
+        working-directory: repo
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "not gofmt-clean:" >&2
+            echo "$out" >&2
+            exit 1
+          fi
+          echo "gofmt clean"
 
   # The wrapper's own plumbing: gorun, docker mounting, script quoting.
   runner-wrapper:

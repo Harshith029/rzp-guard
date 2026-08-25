@@ -1,0 +1,1 @@
+{"allowed":true,"at":"2026-08-25T09:11:49.826146459Z","authorized_paise":100,"jsonrpc_id":"5","matched_action_id":"rfa_1787649080","reason":"matches rfa_1787649080 (exactly 100 paise on pay_TTwUH29tzhB4ME); reserved 100 paise (0 remaining of 100)","receipt":"rzpg_de130f321d86","rule":"ALLOWED","tool":"create_refund"}

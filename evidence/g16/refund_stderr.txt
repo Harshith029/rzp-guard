@@ -1,0 +1,2 @@
+logs are stored in: /app/logs
+Razorpay MCP Server running on stdio

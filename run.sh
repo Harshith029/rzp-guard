@@ -135,6 +135,73 @@ cmd_live_block() {
 #
 # Built with -tags testhook. The shipped binary has no arbitrary-child path, and
 # the stub is given NO Razorpay credentials.
+cmd_live_refund() {
+  # PURGED FROM HISTORY 2026-08-31. See FAILURES.md F18 and F26.
+  #
+  # This command took an arbitrary payment id and amount, wrote its OWN mandate
+  # authorizing exactly that refund, and executed it against the live API. F18
+  # records why that is offense-capable whatever the intent: a tool that
+  # authorizes itself is a refund launcher, not a test. It was removed from the
+  # tip in "Remove the refund launcher", and its body was purged from every
+  # reachable commit BEFORE the repository was ever published, because Track 2
+  # disqualifies anything offense-capable and history is part of a repository.
+  #
+  # The allow path is proven instead by fixture-backed lanes that move no money.
+  echo "live-refund was purged; the allow path is proven by the fixture lanes" >&2
+  echo "see FAILURES.md F18 (why) and F26 (the purge)" >&2
+  exit 2
+}
+JSON
+
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src -e CGO_ENABLED=0 \
+      -e GOOS=linux -e GOARCH=amd64 -e GOFLAGS=-buildvcs=false "$GOIMAGE" sh -c '
+    mkdir -p .gotmp/linux
+    go build -buildvcs=false -o .gotmp/linux/rzp-guard ./cmd/rzp-guard
+    go build -buildvcs=false -o .gotmp/linux/rzp-guard-operator ./cmd/rzp-guard-operator
+    go build -buildvcs=false -o .gotmp/linux/gate-verify ./cmd/gate-verify
+  '
+
+  MSYS_NO_PATHCONV=1 docker run --rm \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v "$PWDW":/src -w /src \
+      -e RAZORPAY_KEY_ID -e RAZORPAY_KEY_SECRET \
+      -e PAY="$PAY" -e AMT="$AMT" \
+      docker:cli sh -c '
+    set -e
+    GATE=$(mktemp -d)
+    trap "rm -rf $GATE" EXIT
+    M=evidence/g16/refund_mandate.json
+
+    ./.gotmp/linux/rzp-guard-operator -mandate "$M" \
+        -state "$GATE/state.db" init -out "$GATE/token" > /dev/null
+
+    # Authorized refund.
+    printf "%s\n" \
+     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"g16\",\"version\":\"1\"}}}" \
+     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}" \
+     "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"$PAY\",\"amount\":$AMT}}}" \
+    | ./.gotmp/linux/rzp-guard -mandate "$M" -state "$GATE/state.db" \
+        -child-tee evidence/g16/refund_child_stdin.jsonl \
+        -decision-log evidence/g16/refund_decisions.jsonl \
+        > evidence/g16/refund_stdout.jsonl 2> evidence/g16/refund_stderr.txt
+
+    # Replay of the SAME action, plus a permitted read as the alive control.
+    # Without the read, "nothing was forwarded" would also pass against a dead
+    # container or bad credentials.
+    printf "%s\n" \
+     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"g16\",\"version\":\"1\"}}}" \
+     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}" \
+     "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"create_refund\",\"arguments\":{\"payment_id\":\"$PAY\",\"amount\":$AMT}}}" \
+     "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"fetch_payment\",\"arguments\":{\"payment_id\":\"$PAY\"}}}" \
+    | ./.gotmp/linux/rzp-guard -mandate "$M" -state "$GATE/state.db" \
+        -child-tee evidence/g16/replay_child_stdin.jsonl \
+        > evidence/g16/replay_stdout.jsonl 2> evidence/g16/replay_stderr.txt
+
+    echo
+    ./.gotmp/linux/gate-verify refund evidence/g16
+  '
+}
+
 cmd_process_recover() {
   # Runs entirely INSIDE the golang container.
   #
@@ -183,6 +250,11 @@ rzp-guard
   ./run.sh build             build all three binaries
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
+  ./run.sh live-refund <pay_id> [paise]
+                             LIVE ALLOW PATH (G1.6): an AUTHORIZED refund really
+                             executes, the guard's receipt round-trips, and the
+                             replay is refused. Needs a real captured Test Mode
+                             payment and moves Test Mode money.
   ./run.sh live-block        LIVE, ON LINUX: production guard + shipped operator
                              (no escape flags) -> official pinned container.
                              Proves BLOCKING ONLY, with an enforced alive-control.
@@ -204,6 +276,7 @@ case "${1:-help}" in
   build) cmd_build ;;
   operator-setup) cmd_operator_setup ;;
   live-block) cmd_live_block ;;
+  live-refund) shift; cmd_live_refund "$@" ;;
   process-recover) cmd_process_recover ;;
   help) usage ;;
   *) usage; exit 1 ;;

@@ -1,0 +1,3 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"g16","version":"1"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"id":5,"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{"amount":100,"payment_id":"pay_TTwUH29tzhB4ME","receipt":"rzpg_de130f321d86"},"name":"create_refund"}}

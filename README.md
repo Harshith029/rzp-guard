@@ -111,7 +111,7 @@ The control matters: the container answered a legitimate read with a real Razorp
 ## Known limits — stated, not buried
 
 1. **No detector metric exists.** No precision, recall or false-positive cost. The conformance corpus in `corpus/` cannot supply them: its labels are computed from the same predicate the policy matches on, so scoring against it measures conformance to the spec, not detection ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)). The real measurement needs agent traces with intent specified independently of the mandate, and it has not been run.
-2. **Automatic `COMMITTED` is an unverified compatibility path.** The expected refund-entity shape comes from Razorpay's documentation; no live success envelope has been captured, because that needs a real captured payment via Checkout. The failure mode is fail-closed — an unrecognised success shape yields `IN_DOUBT`, never a wrong COMMIT — but the success path itself is not demonstrated.
+2. **`COMMITTED` means the refund entity was created, not that money settled.** *(This limit previously read "automatic `COMMITTED` is an unverified compatibility path." G1.6 has since run against a real Test Mode payment, so the compatibility question is closed — see [Allow path](#allow-path-g16). What remains is narrower and permanent.)* The live envelope came back `status: "pending"` and only became `processed` asynchronously, after the MCP reply had already been sent. No synchronous reply can prove settlement, so the guard does not read `status`: it commits on provider-assigned refund id + payment + amount + receipt. A refund that is created and later fails settlement will show as `COMMITTED` here. That is the correct call for **replay protection** — the entity exists, so the single-use action must be consumed — but it is not a settlement record, and nothing in this repo should be read as one.
 3. **Recovery is an availability gap, not just an inconvenience.** Stop → check Razorpay → resolve → restart means a window with no guard and no forwarding service. There is **no measured recovery drill**: outage duration, what blocks new requests meanwhile, and how the correct state file and operator identity are selected are all unanswered. The CLI does not address them.
 4. **The threat model assumes a protected service account and state directory.** The guard's refusal to run unprovisioned closes the ordinary first-writer race, but it does not protect against someone who can create or modify the state directory *before* provisioning. **The operator token is not an independent security boundary** — it is a second factor on top of filesystem ownership. `-out` verifies the file actually landed at `0600` and **refuses otherwise, with no bypass in shipped builds** — Windows lands `0666`, measured, so `-out` simply does not work there. The escape hatch exists only under `-tags testhook`, for gates writing to throwaway directories.
 
@@ -122,9 +122,20 @@ The control matters: the container answered a legitimate read with a real Razorp
 | Gate | Platform | Provisioning | Proves |
 |---|---|---|---|
 | `live-block` | Linux (container, host Docker socket) | **shipped** operator, supported path, **no escape flags**, token mode `600` | An unauthorized `create_refund` never reaches the official pinned container's stdin, with an enforced alive-control |
+| `live-refund` <a id="allow-path-g16"></a> | Linux (container, host Docker socket) | **shipped** operator, supported path, **no escape flags** | An **authorized** `create_refund` really executes at Razorpay, the guard's injected receipt round-trips unchanged, the action is consumed, and the replay is refused — with an alive-control correlated by request id |
 | `process-recover` | Linux (container) | **shipped** operator, supported path | Child death leaves a durable `IN_DOUBT` that survives restart |
 
-Neither gate proves a **successful** refund: see G1.6 under Known limits. `process-recover` uses a local non-responding stub child, because against the real container Razorpay answers in well under a second and the death path would never be exercised — measured at 2s and 0.15s kills.
+`live-block` on its own is only half a result — a guard that blocked *everything* would pass it. `live-refund` (gate G1.6) is the other half, and it needs a **real captured Test Mode payment**, so it takes the id as an argument and really moves Test Mode money:
+
+```
+./run.sh live-refund pay_XXXXXXXXXXXXXX 100
+```
+
+Recorded run: payment `pay_TTwUH29tzhB4ME`, refund `rfnd_TTwsIoEmRPXnBa`, 14 assertions, evidence in `evidence/g16/`. Every assertion was mutation-tested — 11 corruptions of the captured evidence, each confirmed to fail the gate. **One of those mutations found a hole in the gate itself** (the alive-control was not correlated with the reply that verified it); it is fixed and recorded as F16.
+
+A second, independent layer was verified by direct probe: replaying a **used receipt** is rejected by Razorpay itself (`Duplicate receipt found for this refund request`), so the deterministic receipt is a genuine provider-side idempotency key, not just local bookkeeping — see [`evidence/g16/RECEIPT_IDEMPOTENCY.md`](evidence/g16/RECEIPT_IDEMPOTENCY.md). That is the layer that survives the guard's own state being lost.
+
+`process-recover` uses a local non-responding stub child, because against the real container Razorpay answers in well under a second and the death path would never be exercised — measured at 2s and 0.15s kills.
 
 **Declared deployment target: Linux (or a container).** Windows cannot honour `0600` and cannot fsync a directory, so there is no supported credential-delivery path there and provisioning simply fails — by design, since the alternative is a silent lockout. There is no shipped flag to override either check; the escapes exist only under `-tags testhook`. A Windows deployment would need a real DACL/secret-store implementation, which this does not have.
 
