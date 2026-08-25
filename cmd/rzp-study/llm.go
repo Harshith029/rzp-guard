@@ -36,7 +36,12 @@ type agentToolResult struct {
 // trace auditable: a reader can see exactly what the model was sent and exactly
 // what it returned, rather than this program's interpretation of either.
 type agentReply struct {
-	Text         string
+	Text string
+	// ServedModel and ResponseID are the endpoint's own account of what
+	// answered. Recorded per TURN, not per trace: an alias can be repointed
+	// mid-run, and a trace storing only the requested name could not show it.
+	ServedModel  string
+	ResponseID   string
 	Calls        []agentCall
 	InputTokens  int
 	OutputTokens int

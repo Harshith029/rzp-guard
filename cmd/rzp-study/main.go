@@ -54,7 +54,7 @@ func usage() {
 
   verify-freeze    check study/manifest.json against the files on disk
   resolve-model    resolve and record provider+endpoint+model (PROTOCOL.md 4),
-                   pre-trace. Flags: -provider proxy|openai, -model <id>
+                   pre-trace. Flags: -provider openai, -model <id>
   run [flags]      run the traces
   worksheet        emit the BLINDED adjudication worksheet from the traces
   report           join filled verdicts onto the traces -> confusion matrix
@@ -268,9 +268,6 @@ func pickModel(models []modelInfo) (string, []string) {
 // endpointFor records the concrete URL a run will POST to, so the freeze names
 // an address rather than a base.
 func endpointFor(p *provider) string {
-	if p.API == apiMessages {
-		return p.BaseURL + "/v1/messages"
-	}
 	return p.BaseURL + responsesPath
 }
 
@@ -293,8 +290,7 @@ func ruleFor(method string) string {
 
 func cmdResolveModel(args []string) error {
 	fs := flag.NewFlagSet("resolve-model", flag.ExitOnError)
-	providerName := fs.String("provider", providerProxy,
-		"proxy | openai")
+	providerName := fs.String("provider", providerOpenAI, "openai")
 	explicit := fs.String("model", "",
 		"record this model id verbatim instead of enumerating (required when the "+
 			"endpoint does not expose a model list)")

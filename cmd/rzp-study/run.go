@@ -111,10 +111,10 @@ type trace struct {
 	// study. It is written into the file itself so a stray trace can never be
 	// mistaken for a result.
 	Smoke bool `json:"smoke,omitempty"`
-	// ServedModel is the model id the endpoint reported, as distinct from the
-	// one requested. Recorded because the study runs through a third-party proxy
-	// that has been observed substituting models, so "which model produced this
-	// trace" must be evidenced rather than assumed.
+	// ServedModel is the model the endpoint said answered, as distinct from the
+	// alias that was requested. An alias is a pointer and pointers move, so
+	// "which model produced this trace" is evidenced rather than assumed. Per
+	// turn as well, in Messages.
 	ServedModel  string `json:"served_model,omitempty"`
 	InputTokens  int    `json:"input_tokens"`
 	OutputTokens int    `json:"output_tokens"`
@@ -136,9 +136,13 @@ type trace struct {
 
 // turnRecord is one full request/response pair, stored verbatim.
 type turnRecord struct {
-	Turn   int               `json:"turn"`
-	Input  []json.RawMessage `json:"input"`
-	Output []json.RawMessage `json:"output"`
+	Turn int `json:"turn"`
+	// The endpoint's account of this specific exchange. Recorded per turn so a
+	// mid-run alias repoint is visible in the evidence rather than invisible.
+	ServedModel string            `json:"served_model,omitempty"`
+	ResponseID  string            `json:"response_id,omitempty"`
+	Input       []json.RawMessage `json:"input"`
+	Output      []json.RawMessage `json:"output"`
 }
 
 type runner struct {
@@ -269,17 +273,9 @@ func cmdRun(args []string) error {
 		}
 		r.modelFreeze = mf
 		r.model, r.temp = fm.Model, fm.Temperature
-		switch prov.API {
-		case apiMessages:
-			ac := newAnthropicClient(prov.BaseURL, key)
-			r.newSession = func(system, task string, tools []mcpTool) llmSession {
-				return newAnthropicSession(ac, r.model, system, task, r.temp, tools)
-			}
-		default:
-			oc := newOpenAI(prov, key)
-			r.newSession = func(system, task string, tools []mcpTool) llmSession {
-				return newOpenAISession(oc, r.model, system, task, r.temp, tools)
-			}
+		oc := newOpenAI(prov, key)
+		r.newSession = func(system, task string, tools []mcpTool) llmSession {
+			return newOpenAISession(oc, r.model, system, task, r.temp, tools)
 		}
 		fmt.Printf("endpoint %s\n", fm.Endpoint)
 		fmt.Printf("provider %s (%s)\n", prov.Name, fm.Endpoint)
@@ -434,13 +430,14 @@ func (r *runner) driveModel(t *trace, sess *mcpSession, br brief, tools []mcpToo
 		// PROTOCOL.md 4.1 contingency fired. Recorded per-trace so the fallback
 		// is visible rather than assumed.
 		t.Temperature = conv.Temperature()
-		if sm, ok := conv.(interface{ ServedModel() string }); ok {
-			t.ServedModel = sm.ServedModel()
-		}
 
 		t.Messages = append(t.Messages, turnRecord{
-			Turn: turn, Input: reply.RawInput, Output: reply.RawOutput,
+			Turn: turn, ServedModel: reply.ServedModel, ResponseID: reply.ResponseID,
+			Input: reply.RawInput, Output: reply.RawOutput,
 		})
+		if reply.ServedModel != "" {
+			t.ServedModel = reply.ServedModel
+		}
 		t.InputTokens += reply.InputTokens
 		t.OutputTokens += reply.OutputTokens
 		if reply.Text != "" {

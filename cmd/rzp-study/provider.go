@@ -14,31 +14,28 @@ import (
 // silently point at a different service than the protocol names and the traces
 // would carry no evidence of it.
 //
-// Two providers, speaking two DIFFERENT wire formats -- this is not a base-URL
-// switch:
+// ONE PROVIDER, AND IT MUST BE A DIRECT ACCOUNT.
 //
-//	proxy    Anthropic Messages API, third-party endpoint    apiMessages
-//	openai   OpenAI Responses API, api.openai.com            apiResponses
+// A third-party API proxy was tried and REJECTED (PROTOCOL.md 4.4). It
+// substituted models silently -- a request for gpt-5.6 was served by grok-4.6,
+// deterministically, while gpt-5.6 sat in its own advertised catalogue -- named
+// no operator, published no retention policy, and offered no way to verify what
+// actually answered.
 //
-// `proxy` is the default because it is what this project has credentials for.
+// That is not merely a caveat on one metric. Every quantity this study reports
+// has a denominator counting calls the agent ACTUALLY EMITTED, which is a
+// sample from one model's behaviour. A backend free to swap the model is free
+// to move every one of those numbers while the guard stands still. So an
+// intermediary is not acceptable instrumentation here, and no proxy client
+// remains in this repository.
 
 const (
-	providerProxy  = "proxy"
 	providerOpenAI = "openai"
 
-	apiMessages  = "messages"
 	apiResponses = "responses"
 
 	openAIBase   = "https://api.openai.com/v1"
 	openAIKeyEnv = "OPENAI_API_KEY"
-
-	// The proxy speaks the Anthropic Messages format but is NOT Anthropic. Its
-	// key deliberately does not reuse ANTHROPIC_API_KEY: that variable belongs
-	// to the operator's own tooling, and borrowing it risks billing or leaking
-	// the wrong credential.
-	proxyKeyEnv     = "NIHAL_CUSTOM_KEY"
-	proxyBaseEnv    = "RZP_STUDY_PROXY_BASE"
-	proxyDefaultURL = "https://api.a6api.com"
 
 	responsesPath = "/responses"
 	modelsPath    = "/models"
@@ -53,21 +50,14 @@ type provider struct {
 
 func resolveProvider(name string) (*provider, error) {
 	switch name {
-	case providerProxy:
-		base := strings.TrimSpace(os.Getenv(proxyBaseEnv))
-		if base == "" {
-			base = proxyDefaultURL
-		}
-		return &provider{Name: providerProxy, API: apiMessages,
-			BaseURL: strings.TrimRight(base, "/"), KeyEnv: proxyKeyEnv}, nil
-
 	case providerOpenAI:
 		return &provider{Name: providerOpenAI, API: apiResponses,
 			BaseURL: openAIBase, KeyEnv: openAIKeyEnv}, nil
-
 	default:
-		return nil, fmt.Errorf("unknown provider %q; expected %s or %s",
-			name, providerProxy, providerOpenAI)
+		return nil, fmt.Errorf("unknown provider %q; only %q is supported. "+
+			"A third-party proxy was rejected as instrumentation (PROTOCOL.md 4.4): "+
+			"it substituted models silently, so it could move every measured rate "+
+			"without the guard changing at all", name, providerOpenAI)
 	}
 }
 
@@ -79,12 +69,12 @@ func providerFromFrozen(fm *frozenModel) (*provider, error) {
 		return nil, fmt.Errorf("study/model.frozen.json records no provider/base_url/api; " +
 			"re-run resolve-model and commit the result")
 	}
-	keyEnv := proxyKeyEnv
-	if fm.Provider == providerOpenAI {
-		keyEnv = openAIKeyEnv
+	if fm.Provider != providerOpenAI {
+		return nil, fmt.Errorf("model freeze names provider %q, which is not supported; "+
+			"re-resolve against a direct provider account", fm.Provider)
 	}
 	return &provider{Name: fm.Provider, API: fm.API,
-		BaseURL: fm.BaseURL, KeyEnv: keyEnv}, nil
+		BaseURL: fm.BaseURL, KeyEnv: openAIKeyEnv}, nil
 }
 
 func (p *provider) credential() (string, error) {
@@ -96,20 +86,8 @@ func (p *provider) credential() (string, error) {
 }
 
 // enumerates reports whether the mechanical selection rule can be applied.
-//
-// It cannot against the proxy. A third-party endpoint's model list is a claim
-// about what it will route, not a guarantee of what it serves -- and this one
-// demonstrably substitutes: asking for "gpt-5.6" returned "grok-4.6". Picking
-// the "highest" id off such a list would be theatre. There the model is
-// operator-supplied, recorded as such, and verified per response instead.
 func (p *provider) enumerates() bool { return p.API == apiResponses }
 
-// validateModelID rejects an identifier that cannot work, before any spend.
-//
-// For the proxy there is nothing useful to check up front -- any string may or
-// may not route. The real control is downstream: every response's `model` field
-// is compared with what was requested, and a substitution is an error, not a
-// warning. See anthropic_messages.go.
 func validateModelID(p *provider, id string) error {
 	if strings.TrimSpace(id) == "" {
 		return fmt.Errorf("empty model id")

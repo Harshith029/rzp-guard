@@ -18,6 +18,7 @@ type openaiSession struct {
 	tools  []anyMap
 	temp   *float64
 	input  []any
+	served string
 }
 
 func newOpenAISession(c *openAI, model, system, task string,
@@ -33,6 +34,7 @@ func newOpenAISession(c *openAI, model, system, task string,
 }
 
 func (s *openaiSession) Temperature() *float64 { return s.temp }
+func (s *openaiSession) ServedModel() string   { return s.served }
 
 func (s *openaiSession) Next() (*agentReply, error) {
 	reply, err := s.client.respond(responsesRequest{
@@ -51,6 +53,8 @@ func (s *openaiSession) Next() (*agentReply, error) {
 		return nil, err
 	}
 
+	s.served = reply.Model
+
 	snapshot := make([]json.RawMessage, 0, len(s.input))
 	for _, it := range s.input {
 		if b, err := json.Marshal(it); err == nil {
@@ -66,6 +70,8 @@ func (s *openaiSession) Next() (*agentReply, error) {
 	}
 
 	out := &agentReply{
+		ServedModel:  reply.Model,
+		ResponseID:   reply.ID,
 		InputTokens:  reply.Usage.InputTokens,
 		OutputTokens: reply.Usage.OutputTokens,
 		RawInput:     snapshot,

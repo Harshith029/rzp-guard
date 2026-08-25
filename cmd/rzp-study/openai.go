@@ -120,6 +120,7 @@ type outputItem struct {
 
 type responsesReply struct {
 	ID     string       `json:"id"`
+	Model  string       `json:"model"`
 	Status string       `json:"status"`
 	Output []outputItem `json:"output"`
 	Usage  struct {
@@ -131,6 +132,21 @@ type responsesReply struct {
 }
 
 var errTemperatureUnsupported = fmt.Errorf("model rejected the temperature parameter")
+
+// errModelDrift fires when the endpoint answers with a model other than the one
+// requested.
+//
+// A trace stores the model ALIAS that was asked for. An alias is a pointer, and
+// pointers move: a provider can repoint one mid-study, and across 45 calls that
+// would be invisible in a trace recording only what was requested. Worse, a
+// rejected third-party proxy demonstrated the extreme form of this, serving
+// grok-4.6 for a gpt-5.6 request.
+//
+// This matters to every number the study reports, not just the model-specific
+// one. Each denominator counts calls the agent ACTUALLY EMITTED, so a change of
+// model changes the call distribution and moves the measured rates while the
+// guard stands still. Drift is therefore a hard error, not a note.
+var errModelDrift = fmt.Errorf("endpoint answered with a different model than requested")
 
 func (c *openAI) respond(req responsesRequest) (*responsesReply, error) {
 	raw, code, err := c.do(http.MethodPost, responsesPath, req)
@@ -150,6 +166,10 @@ func (c *openAI) respond(req responsesRequest) (*responsesReply, error) {
 	var r responsesReply
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	if r.Model != "" && r.Model != req.Model {
+		return nil, fmt.Errorf("%w: requested %q, answered %q (response %s)",
+			errModelDrift, req.Model, r.Model, r.ID)
 	}
 	// Keep the raw items so they can be replayed into the next turn without
 	// lossy round-tripping through our own struct.
