@@ -1,54 +1,83 @@
 name: reproducibility
 
-# Runs the documented commands from a source tree with UNUSABLE VCS metadata.
+# Tests the DOCUMENTED RUNNER, not go test directly.
 #
-# A reviewer reported that ./run.sh all failed in a clean containerised run:
-# eleven operator tests died before reaching a single assertion with
-# "error obtaining VCS status: exit status 128". Go stamps VCS metadata when it
-# finds a repo, and a repo it can find but not read -- a CI export, a shallow
-# tree, mismatched ownership inside a container -- fails the build. The product
-# was fine; the shipped runner was not, which is worse for a project whose whole
-# claim is reproducible evidence.
+# Two reviewer-found defects motivate every job here, and the previous version
+# of this file would have caught neither:
 #
-# This job reproduces that condition deliberately so it cannot regress.
+#   1. VCS stamping. A .git that Go can find but not read fails every build a
+#      test spawns: "error obtaining VCS status: exit status 128". Eleven tests
+#      died before reaching an assertion.
+#   2. CRLF. run.sh claims Git-Bash support, but a Windows checkout with
+#      core.autocrlf=true rewrote it and bash rejected it at line 8:
+#      "set: pipefail\r: invalid option name". Every commit printed
+#      "LF will be replaced by CRLF" and it was dismissed as noise.
+#
+# So: exercise ./run.sh itself, on both platforms, under both conditions.
 
 on: [push, pull_request]
 
 jobs:
-  no-vcs-metadata:
+  # The runner must work from a tree whose VCS metadata is unusable.
+  runner-no-vcs-metadata:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Break VCS metadata (reproduce the reported failure condition)
-        run: |
-          rm -rf .git
-          mkdir -p .git
-          echo corrupt > .git/HEAD
-
+      - name: Break VCS metadata
+        run: rm -rf .git && mkdir -p .git && echo corrupt > .git/HEAD
       - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26'
-          cache: false
+        with: { go-version: '1.26', cache: false }
 
-      # Deliberately NOT setting GOFLAGS here: the point is that the repository's
-      # own build invocations must work without help from the environment.
-      - name: go build
-        run: go build ./...
-
-      - name: default lane
-        run: go test ./...
-
-      - name: lifecycle lane
-        run: go test -tags testhook ./cmd/rzp-guard/
-
-      - name: race, default lane
-        run: go test -race ./...
-
-      - name: race, lifecycle lane
-        run: go test -race -tags testhook ./cmd/rzp-guard/
-
-      # The live gates need Docker plus Razorpay Test Mode keys, so they are not
-      # run here. What CI covers is the reproducibility defect itself.
+      # Deliberately NO GOFLAGS: the repository's own invocations must work
+      # unaided. The container runner sets it internally; these run on the host,
+      # so the -buildvcs=false flags in the source are what is under test.
+      - run: go build -buildvcs=false ./...
+      - run: go test -buildvcs=false ./...
+      - run: go test -buildvcs=false -tags testhook ./cmd/rzp-guard/
+      - run: go test -buildvcs=false -race ./...
+      - run: go test -buildvcs=false -race -tags testhook ./cmd/rzp-guard/
       - name: gofmt
         run: test -z "$(gofmt -l ./cmd ./internal)"
+
+  # The runner must survive a Windows checkout. This is the CRLF regression.
+  runner-windows-git-bash:
+    runs-on: windows-latest
+    defaults:
+      run: { shell: bash }
+    steps:
+      - name: Checkout with autocrlf=true (the condition that broke it)
+        run: |
+          git config --global core.autocrlf true
+          git clone --depth 1 "https://github.com/${GITHUB_REPOSITORY}.git" repo
+      - name: run.sh must be LF, not CRLF
+        working-directory: repo
+        run: |
+          if grep -qU $'\r' run.sh; then
+            echo "run.sh contains CR characters; a Git-Bash checkout will refuse it" >&2
+            exit 1
+          fi
+          echo "run.sh is LF"
+      - name: The documented entry point must execute
+        working-directory: repo
+        run: bash ./run.sh help
+
+  # The wrapper's own plumbing: gorun, docker mounting, script quoting.
+  runner-wrapper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shell syntax
+        run: bash -n run.sh
+      - name: unknown command must exit non-zero
+        run: |
+          if bash ./run.sh definitely-not-a-command; then
+            echo "unknown command exited 0" >&2; exit 1
+          fi
+      - name: ./run.sh test  (exercises gorun and the container mount)
+        run: bash ./run.sh test
+      - name: ./run.sh lifecycle
+        run: bash ./run.sh lifecycle
+
+  # live-block and process-recover need Razorpay Test Mode keys and a Docker
+  # socket, so they are not run here. Their evidence is committed under
+  # evidence/ and reproduced locally with ./run.sh live-block.
