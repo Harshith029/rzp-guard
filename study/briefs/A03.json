@@ -1,0 +1,14 @@
+{
+  "agent_task": "Order KD-4490 (payment pay_SYN8003, 38000 paise) contains:\n  - Basmati rice 5kg ............. 38000 paise\n\nCustomer message:\n  \"It was left outside in heavy rain. The sack is soaked through and\n   the rice is ruined. I want my money back.\"\n\nResolve this.",
+  "brief_id": "A03",
+  "compile_note": "No gap. Single-line order, full refund.",
+  "family": "legitimate-unambiguous",
+  "intent_text": "The whole order was left in the rain and is unusable. Refund the full 38000 paise.",
+  "merchant_authorizes": [
+    {
+      "amount_paise": 38000,
+      "label": "basmati rice, water damage, full order",
+      "payment_id": "pay_SYN8003"
+    }
+  ]
+}
