@@ -1,0 +1,34 @@
+# Line endings are load-bearing here.
+#
+# run.sh is the documented entry point and claims Git-Bash support. Without an
+# explicit rule, a Windows checkout with core.autocrlf=true rewrites it to CRLF
+# and bash rejects it before the first command:
+#
+#     ./run.sh: line 8: set: pipefail\r: invalid option name
+#
+# The index was already LF; nothing enforced it on checkout. Every commit in
+# this repo printed "LF will be replaced by CRLF" and it was treated as noise.
+
+# Default: let git normalize text in the index, decide checkout per-rule below.
+* text=auto
+
+# Anything executed by a shell MUST be LF on every platform.
+*.sh            text eol=lf
+Makefile        text eol=lf
+.gitattributes  text eol=lf
+.gitignore      text eol=lf
+.env.example    text eol=lf
+
+# Go tooling and the container runner both expect LF.
+*.go     text eol=lf
+go.mod   text eol=lf
+go.sum   text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+
+# Fixtures are compared byte-for-byte and hashed in corpus/manifest.json.
+# A CRLF rewrite would silently invalidate every recorded SHA-256.
+*.jsonl  text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+*.py     text eol=lf
