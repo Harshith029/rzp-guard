@@ -344,3 +344,34 @@ The previous fix deleted the gate's recovery token after use and asserted its ab
 **Fix:** `init-ephemeral` (test-hook only) derives a verifier from a token that is generated and immediately **discarded**. No usable recovery secret is ever created, so there is nothing to leak. The resulting state file is deliberately unrecoverable, which is correct for a throwaway fixture and wrong for anything else — hence the build tag.
 
 While moving this, Windows Application Control began persistently refusing to execute the `-tags testhook` guard binary (F9 again), including from a fresh output path, while shipped builds ran fine. `process-recover` needs no Docker child, so it now runs entirely inside the golang container — which is where everything else already runs.
+
+---
+
+## F15 — The warning was printing on every commit and I called it noise
+
+`run.sh` claims Git-Bash support. On a Windows checkout with `core.autocrlf=true` it was rewritten to CRLF, and bash rejected it before the first command ran:
+
+```
+./run.sh: line 8: set: pipefail\r: invalid option name
+```
+
+The index held LF, but nothing enforced it on checkout, so `git clone` on Windows produced a script that could not execute. Every single commit in this repository printed:
+
+```
+warning: in the working copy of 'run.sh', LF will be replaced by CRLF the next time Git touches it
+```
+
+I read that line dozens of times and dismissed it as environmental noise. It was the defect, announcing itself, continuously. Nothing was verifying the *shipped entry point* on the platform it claimed to support — my own runs used a working tree that happened to be fine.
+
+**Fix:** `.gitattributes` pinning `eol=lf` for shell, Go, YAML, and — importantly — the `.jsonl`/`.json` fixtures, whose SHA-256 values are recorded in `corpus/manifest.json`. A CRLF rewrite there would have silently invalidated every hash in the pre-registration.
+
+**Verified** from a clone made with `core.autocrlf=true`:
+
+```
+test  PASS   lifecycle  PASS   race  PASS   lifecycle-race  PASS
+live-block  PASS (15 assertions)   process-recover  PASS (6 assertions)
+```
+
+**CI was also testing the wrong thing.** The reproducibility job ran `go test` directly after corrupting `.git` — it caught the VCS defect but would have missed this one entirely, along with any regression in `gorun`, Docker mounting, or script quoting. It now exercises `./run.sh` itself, adds a Windows/Git-Bash job that clones with `autocrlf=true` and fails if `run.sh` contains a CR, and runs the wrapper's own lanes.
+
+Two defects in a row (F14's VCS stamping, this one) were in the **runner**, not the product. For a project whose whole claim is reproducible evidence, that is the more damaging place for them to be.
