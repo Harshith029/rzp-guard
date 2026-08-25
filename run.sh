@@ -71,6 +71,15 @@ cmd_build() {
 # The earlier version printed its control and exited 0 whenever the blocked call
 # was simply absent from the tee -- which also passes against a dead container
 # or invalid credentials, the exact cases the control exists to rule out.
+need_openai_key() {
+  if [ -z "${OPENAI_API_KEY:-}" ]; then
+    echo "OPENAI_API_KEY is not set." >&2
+    echo "Put it in .env (which is gitignored) and re-run:" >&2
+    echo "  set -a && . ./.env && set +a && ./run.sh study-run" >&2
+    exit 2
+  fi
+}
+
 cmd_live_block() {
   need_keys
   mkdir -p evidence/linux; rm -f evidence/linux/* 2>/dev/null || true
@@ -237,6 +246,50 @@ cmd_process_recover() {
   '
 }
 
+cmd_study_build() {
+  # Phase 4b harness. The guard and operator are TEST-HOOK builds, which
+  # substitute only the CHILD PROCESS -- policy, relay, ledger and storage are
+  # the shipped code paths. The shipped binary against the REAL pinned
+  # container is proven separately by live-block and live-refund (G1.6).
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src -e CGO_ENABLED=0 \
+      -e GOOS=linux -e GOARCH=amd64 -e GOFLAGS=-buildvcs=false "$GOIMAGE" sh -c '
+    mkdir -p .gotmp/linux
+    go build -buildvcs=false -tags testhook -o .gotmp/linux/rzp-guard-th ./cmd/rzp-guard
+    go build -buildvcs=false -tags testhook -o .gotmp/linux/rzp-guard-operator-th ./cmd/rzp-guard-operator
+    go build -buildvcs=false -o .gotmp/linux/mcp-stub ./cmd/mcp-stub
+    go build -buildvcs=false -o .gotmp/linux/rzp-study ./cmd/rzp-study
+  '
+}
+
+cmd_study_verify() {
+  cmd_study_build
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src alpine \
+      ./.gotmp/linux/rzp-study verify-freeze
+}
+
+cmd_study_dry() {
+  # Exercises provisioning, guard, stub, decision logging and trace recording
+  # with a SCRIPTED fake model. No API key, no spend, and never a study result:
+  # every trace it writes is stamped DRY-RUN-SCRIPTED-FAKE.
+  cmd_study_build
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src alpine \
+      ./.gotmp/linux/rzp-study run -dry-run -out .gotmp/dryrun -runs 1
+}
+
+cmd_study_model() {
+  need_openai_key
+  cmd_study_build
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
+      -e OPENAI_API_KEY alpine ./.gotmp/linux/rzp-study resolve-model
+}
+
+cmd_study_run() {
+  need_openai_key
+  cmd_study_build
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
+      -e OPENAI_API_KEY alpine ./.gotmp/linux/rzp-study run "$@"
+}
+
 usage() {
   cat <<'EOF'
 rzp-guard
@@ -250,6 +303,12 @@ rzp-guard
   ./run.sh build             build all three binaries
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
+  ./run.sh study-verify      Phase 4b: check the frozen protocol is intact
+  ./run.sh study-dry         Phase 4b: whole harness on a scripted fake model
+                             (no API key, no spend, never a study result)
+  ./run.sh study-model       Phase 4b: resolve + record the model. COMMIT the
+                             result BEFORE running traces.
+  ./run.sh study-run [flags] Phase 4b: run the traces (needs OPENAI_API_KEY)
   ./run.sh live-refund <pay_id> [paise]
                              LIVE ALLOW PATH (G1.6): an AUTHORIZED refund really
                              executes, the guard's receipt round-trips, and the
@@ -275,6 +334,10 @@ case "${1:-help}" in
   vet) cmd_vet ;;
   build) cmd_build ;;
   operator-setup) cmd_operator_setup ;;
+  study-verify) cmd_study_verify ;;
+  study-dry) cmd_study_dry ;;
+  study-model) cmd_study_model ;;
+  study-run) shift; cmd_study_run "$@" ;;
   live-block) cmd_live_block ;;
   live-refund) shift; cmd_live_refund "$@" ;;
   process-recover) cmd_process_recover ;;

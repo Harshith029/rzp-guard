@@ -2,6 +2,14 @@
 
 **Status: FROZEN. Committed before any model was called and before an API key existed on this machine.**
 
+> **Amendment A, 2026-08-25 — made before any trace ran, and before a key existed.**
+> Building the harness required checking OpenAI's current API rather than trusting
+> memory, and that check invalidated two assumptions in §4. The endpoint and the
+> sampling-parameter contingency in **§4.1** are the result. The freeze rule is
+> "nothing changes once a trace has been run"; the trace count is still 0, and this
+> is recorded here rather than quietly applied. `freeze_sha256` changes with this
+> edit, and every trace records the freeze it ran under.
+
 This is the artifact PREREGISTRATION Amendment 2 §A2.4 requires: task set, compiled mandates with their recorded coverage gaps, model, sampling parameters, every prompt verbatim, the intended trace count declared in advance, and the adjudication rule with worked examples.
 
 Amendment 2 fixed the *method*. This fixes the *parameters*. Nothing below may be changed once a trace has been run; if something has to change, the run is void and restarts under an amendment that says why.
@@ -58,6 +66,31 @@ Naming a version I cannot yet verify would be a guess presented as a decision. A
 | Max tool calls per turn | provider default | Not constrained. |
 
 **45 traces is small, and it is called small.** Per Amendment 2 §A2.5 this is an exploratory agent study: no confidence intervals, no significance tests, no inference to merchant traffic.
+
+### 4.1 Endpoint and sampling contingency
+
+**Endpoint: `POST /v1/responses`, not `/v1/chat/completions`.**
+
+Chat Completions is legacy — its removal window closed in early 2026 — and on current models tool calling through it is degraded, because the reasoning structure is not preserved across turns and the model re-issues tool calls it has already made. A harness built on it would have produced an agent that behaved worse than a real deployment *for reasons having nothing to do with the guard*, which would have silently inflated the out-of-intent call count this study measures. This was found by checking the current documentation; memory would have produced the wrong endpoint.
+
+Consequences that are now part of the protocol:
+
+- The system prompt is sent as the `instructions` parameter.
+- Tool results are returned as `function_call_output` items correlated by **`call_id`**.
+- Every item the model returns — **including reasoning items** — is echoed back on the next turn. Dropping reasoning items degrades multi-step tool use, and this study is entirely multi-step.
+
+**Sampling contingency.** Temperature support varies by current model, and several reasoning models reject the parameter outright. The frozen value stays **0.2**. If the resolved model rejects it, the harness retries the request **once** with the parameter omitted, uses the model default for the remainder of that trace, and records `"temperature": null` in the trace file. The fallback is therefore visible per-trace rather than assumed. Sending `0.0` instead would be a different experiment wearing the frozen one's label.
+
+**Model-exclusion rationale**, so the selection rule in §4 is mechanical rather than a judgement made after seeing the list:
+
+| Excluded | Why |
+|---|---|
+| `-mini`, `-nano` | size variants, not the flagship |
+| `-pro` | extended-reasoning variant, roughly an order of magnitude dearer per trace, across 45 traces |
+| dated snapshots (`-2026-01-01`) | the rule should resolve to the current alias, not pin a snapshot behind it |
+| audio / realtime / image / embedding / moderation / codex / instruct / turbo | not general-purpose chat with tool calling |
+
+The full candidate list the rule matched is recorded in `study/model.frozen.json` alongside the choice, so the selection can be audited rather than taken on trust.
 
 ---
 
