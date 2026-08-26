@@ -6,6 +6,22 @@ Date: 2026-08-24 · Deadline: 2026-09-05 (12 days)
 
 **Version 6**, after five rounds of adversarial review — see [REVIEW_LOG.md](REVIEW_LOG.md). **The plan has shrunk every round.** v5's change is the largest: the headline metric claim is withdrawn from the fixture corpus entirely and rebuilt on real agent traces (Phase 4b).
 
+> **Two things in this plan were not built, and the plan is left standing rather
+> than quietly edited to match what shipped.**
+>
+> **The dashboard is cut.** Every mention below of a dashboard, its templates, or
+> its CSP describes a component that does not exist. Resolving an `IN_DOUBT`
+> action is CLI-only. It was cut for scope: a web surface on a money path needs
+> its own authentication, session handling and XSS review to be worth shipping,
+> and none of that would have strengthened the authorization claim this project
+> is actually making.
+>
+> **The false-positive cost curve is not priced in rupees.** §Phase 4 planned one.
+> What exists instead is the measured false-block rate (8 of 49) and a
+> parameterised cost in [study/FINDINGS.md](study/FINDINGS.md), because putting a
+> ₹ figure on a support ticket would have meant inventing the input that
+> dominates the answer.
+
 Claims withdrawn across all rounds:
 
 | Withdrawn | Why | Now |
@@ -161,14 +177,14 @@ MCP client ──stdio──► rzp-guard ──stdio (ALLOW only)──► razo
                           ├─ reserve action + budget atomically
                           ├─ inject deterministic receipt
                           ├─ record provenance chain   (forensic only)
-                          └─ decision log (JSONL, masked) ──► dashboard (FastAPI, CSP)
+                          └─ decision log (JSONL, masked) ──► [dashboard: CUT, see banner]
 ```
 
 **Decision A — relay at the JSON-RPC line level.** Parse newline-delimited JSON, intercept only `tools/call`, observe results, forward everything else byte-for-byte. Blocking synthesizes a response with the same `id`.
 
 **This claim is now literally true.** v3 had the proxy issuing its own reconciliation reads through the child, which would have required it to become an MCP client — internal id generation, two-way multiplexing, response suppression, collision handling — and would have falsified byte-for-byte relay. That is cut (§3.4). The proxy never originates a JSON-RPC request.
 
-**Decision B — Go 1.24+ is the sole runtime.** Relay, mandate compiler, policy, lifecycle, durable state, dashboard and operator command are all Go; the dashboard is `net/http` with embedded templates. Razorpay's MCP server is Go, so the product matches the ecosystem it plugs into, ships as one static binary, and gets `go test -race` for the concurrency claims the Python prototype asserted without exercising ([FAILURES.md F3](FAILURES.md)).
+**Decision B — Go 1.24+ is the sole runtime.** Relay, mandate compiler, policy, lifecycle, durable state and operator command are all Go. *(The dashboard named in earlier versions was cut; there is no HTTP server in the product.)* Razorpay's MCP server is Go, so the product matches the ecosystem it plugs into, ships as one static binary, and gets `go test -race` for the concurrency claims the Python prototype asserted without exercising ([FAILURES.md F3](FAILURES.md)).
 
 The Python package is **frozen as a behavioural reference** in `prototype/python/` — its 28 tests pin the decision semantics the port must reproduce, and the six defects found in it are required test cases. There are deliberately **not** two production implementations.
 
@@ -214,7 +230,7 @@ v2 called this the core mechanism and v3 still denied on it at pipeline step 4 w
 
 **It is now out of the deny path entirely, because it is provably redundant.** To reach the old step 4, a refund must already have matched an action in `authorized_refund_actions` — which means its `payment_id` *is* a mandate literal, i.e. `USER_MANDATED` by definition. The gate could never fire on a call that passed the capability match. Removed as dead code, not as a risk trade.
 
-What it still does, because the dashboard deliverable requires it and it is nearly free:
+What it still does, because it is nearly free *(the dashboard that originally motivated it was cut)*:
 
 - Values in tool results are indexed with **all** their JSON paths, so an id appearing in canonical `id` *and later* in `notes` stays visible rather than resolving silently in the agent's favour.
 - Paths carry a source-trust class: `SYSTEM_AUTHORITATIVE` (`id`, `entity`, `amount`, `status`, `order_id`, `created_at`) vs `PARTY_SUPPLIED` (`notes.*`, `description`, `customer_name`, `receipt`, `email`, `contact`).
@@ -238,7 +254,7 @@ The governing rule: **release only on confirmed provider rejection; anything amb
 
 Releasing on timeout would fail open: Razorpay may have processed the refund while the proxy lost the response, handing back budget for money that already left. Equally, a request that never reached the provider must not permanently burn a legitimate merchant authorization — hence release on *confirmed* rejection, and only that.
 
-**No automatic reconciliation.** v3 had the proxy calling `fetch_multiple_refunds_for_payment` itself, which would have made it an MCP client to its own child and falsified §3.1. Cut. `IN_DOUBT` requires a human, via a dashboard action or CLI running **outside the relay path** with its own credentials. The injected receipt is the correlation key the operator looks the refund up by, so the workflow is intact with a person in it — arguably correct where money may already have moved.
+**No automatic reconciliation.** v3 had the proxy calling `fetch_multiple_refunds_for_payment` itself, which would have made it an MCP client to its own child and falsified §3.1. Cut. `IN_DOUBT` requires a human, via the CLI running **outside the relay path** with its own credentials. The injected receipt is the correlation key the operator looks the refund up by, so the workflow is intact with a person in it — arguably correct where money may already have moved.
 
 **Absence is not evidence.** Eventual consistency, a pending refund, or a failed fetch all produce "not found" without meaning "did not happen." Only two automatic transitions are ever safe: confirmed rejection → release, matching receipt found → commit. `IN_DOUBT → AVAILABLE` on a missing record is forbidden in the proxy and in the operator tooling.
 
@@ -292,13 +308,13 @@ The impressive dependency is Razorpay's official server; the guard should be bor
 | Database, queue, agent framework, React app | No requirement reaches for them |
 | A fork of Razorpay's server | Forfeits "real, unmodified server" for a marginal gain (§2.6) |
 
-### 3.8 Log and dashboard security
+### 3.8 Log security *(the dashboard half is CUT — see banner)*
 
 The proxy ingests attacker-controlled text, logs it, and renders it in a browser.
 
 - **Masking at write time**, not render time: `contact`, `email`, card fields and tokens are hashed/masked before touching disk.
 - Field-level redaction allowlist; **text-node rendering only, never `innerHTML`**; restrictive CSP; stated retention rule.
-- **Test:** a fixture carrying `<script>` and `<img onerror=...>` in a `notes` field cannot execute in the dashboard.
+- ~~**Test:** a fixture carrying `<script>` and `<img onerror=...>` in a `notes` field cannot execute in the dashboard.~~ **Withdrawn with the dashboard.** Nothing renders these fields as HTML, so there is no surface to test. The masking in the decision log stands and is exercised.
 
 ---
 
@@ -363,13 +379,30 @@ The metric claim needs ground truth **not derived from the mandate**, which mean
 
 **4b — Agent-trace evaluation (the actual metric claim)**
 
-**Protocol frozen in [PREREGISTRATION.md Amendment 2](PREREGISTRATION.md) before any trace is run.** 4b may not report a number until that commit exists — it now does.
+**Protocol frozen in [PREREGISTRATION.md Amendment 2](PREREGISTRATION.md) before any trace was run.**
+
+**✅ RUN, 2026-08-26.** 45 traces, 49 emitted refund calls, adjudicated blind.
+Results in [study/RESULTS.md](study/RESULTS.md), interpretation in
+[study/FINDINGS.md](study/FINDINGS.md).
+
+The outcome is not the one this section anticipated, and that is worth stating
+plainly: **the agent emitted no out-of-intent refund at all**, so the positive
+class is empty, `TP=0 FP=8 TN=41 FN=0`, precision and recall are degenerate, and
+the guard was never given a hostile call to block. The informative number is the
+false-block rate, 8/49. G4.7's three quantities are reported separately as
+planned; quantity 1 is `undefined` on a zero denominator rather than reported as
+100%.
 
 - **G4.5** Ground truth is the **task brief**, not the observed calls. The agent's output is what is being measured, not the standard it is measured against.
+  - ✅ Ground truth was the brief; the worksheet never showed the mandate or the guard's decision.
 - **G4.6** Documented **compile/review boundary**: briefs authored and hash-committed first in natural language; the mandate produced from a brief by a reviewable `compile_mandate(brief)`; coverage gaps recorded at compile time. Separate files alone would not make them independent.
+  - ✅ `compile_mandate` reads `merchant_authorizes` and never `intent_text`; two gaps were predicted in writing, and B01's materialised while B02's did not.
 - **G4.7** Three quantities, **reported separately and never combined**: blocking rate given an out-of-intent refund was emitted; operational false-block rate given an in-intent refund was emitted; induced-misuse rate, which is a property of the **model** and says nothing about the detector.
+  - ✅ Reported separately. Quantity 1 undefined (zero denominator), quantity 2 = 0.163, quantity 3 = 0/15.
 - **G4.8** Frozen before the first trace: task set, intent statements, compiled mandates, model/version/temperature/prompts, **declared trace count**, adjudication rule with worked examples.
+  - ✅ Frozen and hash-committed; the runner refuses a modified freeze or an uncommitted model choice.
 - **G4.9** Reported as an **exploratory agent study** — no intervals, no significance, no inference. Single-adjudicator limitation stated; every adjudicated call published with its reason so a reader can disagree with any of them.
+  - ✅ No intervals, no significance. Every one of the 49 calls published with its verdict and reason.
 
 **False-positive cost model:** a blocked legitimate refund costs a support ticket plus a delayed customer refund, priced in ₹ and ops-minutes with assumptions inline, presented as a cost curve.
 
@@ -417,7 +450,7 @@ rzp-guard/
 │   ├── lifecycle.py       # one state machine: action + budget, fail-closed
 │   ├── provenance.py      # field-path index — forensic only
 │   ├── decision_log.py    # append-only JSONL, masked at write time
-│   └── dashboard/         # FastAPI, CSP, text-node rendering only
+│   └── (dashboard/)       # CUT — never built
 ├── corpus/                # DATA + scorer only — never an executor
 │   ├── templates/  tuning/  heldout/  manifest.json  labels.jsonl
 │   └── score.py           # hard guard: no subprocess, no sockets

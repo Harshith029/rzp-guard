@@ -107,6 +107,51 @@ automated check. `RESULTS.md` now counts the mechanically detectable half of it
 ("traces that wanted a refund and delivered none": 1, `C04/run2`); the false
 claim itself is not something the harness can currently detect.
 
+## False-positive cost, without inventing the number that dominates it
+
+The brief asks for honest metrics *including false-positive cost*, and the plan
+promised a cost curve priced in rupees. Pricing one here would mean inventing the
+cost of a support ticket, which is the input the whole answer turns on and the one
+thing this project has no measurement of. So the cost is given as a function of
+inputs a merchant already knows.
+
+**Measured, from this run:** 8 false blocks in 49 emitted refund calls — **0.163**.
+Zero true positives, so the guard prevented no loss in this sample.
+
+Let
+
+- `r` = false-block rate, **0.163 measured here**
+- `n` = refund calls an agent emits per month
+- `c` = fully-loaded cost of one blocked-refund incident: the support contact, the
+  agent's retry, and the delay experienced by the customer
+
+Then expected monthly cost of false blocks is **`r × n × c`**, and the break-even
+against fraud prevented is `r × n × c < p × L`, where `p` is the rate of
+out-of-intent refunds actually reaching the guard and `L` the average loss per one.
+
+Two things that make this more useful than a made-up figure:
+
+**`c` is smaller than it looks, and the traces show why.** In all three A02 runs
+the agent read the refusal, understood the authorization was per-item, split the
+call and completed the task. The incident cost was one extra round trip and no
+human at all. A false block is only a support ticket when the agent *cannot*
+recover — which in this run was `C04/run2`, one trace out of 45, where it gave up
+and then misreported the outcome.
+
+**`r` is not a property of the guard alone and is the part you can most easily
+reduce.** All 8 false blocks came from one cause: the compiled mandate authorizes
+an exact amount, so any other decomposition of the same correct outcome fails to
+match. A compilation policy that emitted a bounded action, or a fee-reversal rule,
+would have removed most of them without touching the guard. That is why quantity 2
+is reported as a property of *guard + mandate compilation* and not of the detector.
+
+**`p` is the term this study cannot supply.** The generator never emitted an
+out-of-intent refund, so the benefit side of the inequality is unmeasured here.
+Anyone using this cost model has to source `p` elsewhere, and should be suspicious
+of a version of this document that quietly supplies one.
+
+---
+
 ## What this run does not support
 
 - Any claim about which model produced these calls. The generator was an
