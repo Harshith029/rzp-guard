@@ -110,6 +110,15 @@ The control matters: the container answered a legitimate read with a real Razorp
    BLOCKED [ACTION_CONSUMED]: ... already used (rfa_demo_001=IN_DOUBT); treated as a replay
 ```
 
+> **On git history.** Four early commits contained pre-redaction provider records
+> — real email addresses and identifiers from a Test Mode payment. History was
+> rewritten with `git filter-repo` to replace those six values, verified four
+> ways: zero occurrences across every commit, `REDACTED` present instead, every
+> file at `HEAD` byte-identical to before the rewrite, and all 52 commits and
+> messages preserved. Recorded as **FAILURES.md F21**. Note what that does *not*
+> undo: those objects sat in a cloud-synced `.git` for about a day, and no local
+> rewrite retracts an upload that already happened.
+
 ## Known limits — stated, not buried
 
 1. **No detector metric exists.** No precision, recall or false-positive cost. The conformance corpus in `corpus/` cannot supply them: its labels are computed from the same predicate the policy matches on, so scoring against it measures conformance to the spec, not detection ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)). The real measurement needs agent traces with intent specified independently of the mandate, and it has not been run.

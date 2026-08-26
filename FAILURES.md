@@ -577,3 +577,51 @@ sibling: making the check conditional on something the caller controls.
 Verified in four directions, and the bypass is now a regression test: a partial
 real set is refused with the flag and without it; scripted traces still work
 outside `study/`; scripted traces are still refused into `study/`.
+
+## F21 — Deleting the file did not delete the file
+
+F19 moved raw provider records out of the workspace and rebuilt the committed
+evidence as a redacted projection. The working tree was clean. The leak scan
+passed. That fixed the present and did nothing about the past: **four commits
+still carried the pre-redaction blobs**, and a blob in git history is published
+the moment the repository is.
+
+```
+77e08af  75b4b0f  37a3782  9a8dd07
+  evidence/g16/fetch_stdout.jsonl
+  evidence/g16/replay_stdout.jsonl
+  evidence/linux/block_stdout.jsonl
+```
+
+Six distinct values across them — email addresses and provider identifiers from a
+real Test Mode payment.
+
+The mistake is the same one twice over. F19 was "gitignored is not unpublished";
+this is "deleted from the working tree is not deleted from the repository". Both
+times I fixed the copy I could see.
+
+**Fix.** `git filter-repo --replace-text` over all 52 commits, replacing the six
+values with `REDACTED`. Content-level replacement rather than path removal,
+because those three paths still hold the current redacted projections and
+removing the paths would have deleted live evidence along with the history.
+
+Taken before touching anything: a full mirror backup outside the repository and
+outside OneDrive.
+
+**Verified, not assumed** — all four checks:
+
+| Check | Result |
+|---|---|
+| Each of the six values, searched across every commit | 0 occurrences |
+| `REDACTED` present in the historical blobs instead | yes |
+| Every file at `HEAD` vs. the pre-rewrite `f24fcd1` | byte-identical |
+| Commit count and messages | 52, preserved |
+
+Tests, freeze verification and the evidence leak scan all pass afterwards, and
+the freeze hash is unchanged, so the committed traces remain valid.
+
+**What this still does not undo.** The pre-rewrite objects existed in an
+OneDrive-synced `.git` directory for roughly a day. Rewriting local history does
+not retract anything the sync client already uploaded, and no change in this
+repository can. What it does guarantee is that **publishing this repository does
+not publish those records** — which was the actual blocker.
