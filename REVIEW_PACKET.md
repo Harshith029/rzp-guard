@@ -1,3 +1,11 @@
+> **This is the review-packet TEMPLATE, not a current description of the project.**
+> Each round's packet was assembled from the repository as it stood that day, and
+> the rounds are recorded in [REVIEW_LOG.md](REVIEW_LOG.md) with every accept and
+> reject. The text below is the most recent one and predates the Phase 4b study,
+> the provider change and several corrections. For the current state read
+> [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
+> [study/RESULTS.md](study/RESULTS.md).
+
 You are reviewing a security-critical Go component as an adversarial staff engineer at a company that moves other people's money. Be skeptical by default. Your job is to find what is wrong with this, not to validate it. Prior rounds of your review have found a fail-open budget release, an authorization gap where a fractional amount was authorized as its truncation and forwarded as the original, a circular evaluation corpus, a JSON-RPC correlation bug that let a `tools/list` reply settle a refund, and a hung-process bug. Assume there are more.
 
 ## What the project is
