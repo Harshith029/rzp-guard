@@ -186,3 +186,92 @@ jobs:
             exit 1
           fi
           echo "no money-moving command exposed"
+
+  # The pre-registration is only a control if something checks it. Editing a
+  # brief or the protocol without re-freezing would silently invalidate every
+  # committed trace, and nothing would have said so.
+  study-freeze-intact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+
+      - name: The frozen protocol must match its manifest
+        run: python study/freeze.py verify
+
+      - name: Every committed trace must belong to the CURRENT freeze
+        run: |
+          python - <<'EOF'
+          import glob, json, sys
+
+          manifest = json.load(open("study/manifest.json", encoding="utf-8"))
+          want = manifest["freeze_sha256"]
+          declared = manifest["declared_trace_count"]
+
+          traces = [json.load(open(f, encoding="utf-8"))
+                    for f in sorted(glob.glob("study/traces/*.json"))]
+          if not traces:
+              print("no traces committed yet; nothing to check")
+              sys.exit(0)
+
+          bad = []
+          if len(traces) != declared:
+              bad.append("%d traces committed, freeze declares %d" % (len(traces), declared))
+          for t in traces:
+              key = "%s/run%s" % (t["brief_id"], t["run_index"])
+              if t.get("freeze_sha256") != want:
+                  bad.append("%s ran under freeze %.12s, current is %.12s"
+                             % (key, t.get("freeze_sha256"), want))
+              if t.get("smoke"):
+                  bad.append("%s is a smoke trace and must not be in study/traces" % key)
+              if t.get("status") == "void":
+                  bad.append("%s is void" % key)
+
+          served = {t.get("served_model") for t in traces if t.get("served_model")}
+          if len(served) > 1:
+              bad.append("traces report more than one served model: %s" % sorted(served))
+
+          if bad:
+              print("COMMITTED TRACES DO NOT MATCH THE FREEZE:")
+              for b in bad:
+                  print("  " + b)
+              sys.exit(1)
+          print("%d traces, one freeze, one served model: %s"
+                % (len(traces), sorted(served) or ["(none recorded)"]))
+          EOF
+
+      - name: A published result must be reproducible from the committed labels
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+
+          labels_path = "study/adjudication/labelled_calls.json"
+          if not os.path.exists(labels_path):
+              print("no published labels yet; nothing to check")
+              sys.exit(0)
+
+          labels = json.load(open(labels_path, encoding="utf-8"))
+          cells = {}
+          for l in labels:
+              cells[l["cell"]] = cells.get(l["cell"], 0) + 1
+          tp, fp = cells.get("TP", 0), cells.get("FP", 0)
+          tn, fn = cells.get("TN", 0), cells.get("FN", 0)
+
+          results = open("study/RESULTS.md", encoding="utf-8").read()
+          expected = "| **out-of-intent** (positive) | TP = %d | FN = %d |" % (tp, fn)
+          if expected not in results:
+              print("RESULTS.md does not match the committed labels.")
+              print("  labels give TP=%d FP=%d TN=%d FN=%d" % (tp, fp, tn, fn))
+              print("  expected row: " + expected)
+              sys.exit(1)
+
+          # Every label must carry a reason. A published verdict without one
+          # cannot be disagreed with, which is the point of publishing it.
+          missing = [l["key"] for l in labels if not str(l.get("reason", "")).strip()]
+          if missing:
+              print("labels with no reason: %s" % missing[:5])
+              sys.exit(1)
+
+          print("RESULTS.md matches %d labels; every one carries a reason" % len(labels))
+          EOF
