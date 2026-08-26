@@ -27,6 +27,8 @@ Only `live-block` drives the official container. `process-recover` is named hone
 
 ---
 
+**[ARCHITECTURE.md](ARCHITECTURE.md)** walks the design: the request path, the authorization model and why it is a capability list rather than a policy range, the lifecycle state machine, and what the guard deliberately does not do.
+
 ## Problem taste
 
 A merchant gives an AI agent real Razorpay credentials. The agent is then induced — by injected content, by scope drift, or by retry logic — into moving money the merchant never authorized. **Every existing control passes**: the API key is valid, the signature checks out, the IP is allowlisted. Authentication was never the gap. Authorization of *intent* is.
