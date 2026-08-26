@@ -246,8 +246,13 @@ func (l *Ledger) InDoubtActions() []string {
 	return out
 }
 
-// resolveInDoubt is unexported. Console is the only caller, so nothing on the
-// request-handling path can reach it.
+// resolveInDoubt is unexported, so nothing on the request-handling path can
+// reach it. The only exported route in is ResolveInDoubt, which demands an
+// opauth.Grant.
+//
+// (An earlier comment here said "Console is the only caller". That type was
+// removed when authentication moved into opauth; the guarantee no longer
+// depends on a single caller behaving, it depends on the signature.)
 func (l *Ledger) resolveInDoubt(actionID string, refundLanded bool, store ResolveStore,
 	actor, reason string) error {
 	l.mu.Lock()

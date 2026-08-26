@@ -243,10 +243,9 @@ func (g *Guard) RestoreRateWindow(now time.Time) error { return g.rate.restore(n
 
 // NewWithLedger composes a Guard over a caller-owned Ledger.
 //
-// This is how main wires the operator console: it builds the Ledger, hands it
-// to both this Guard and lifecycle.NewConsole, and keeps the operator token to
-// itself. The relay receives only the Guard, which has no way to reach the
-// Ledger or the resolution path.
+// This is how main wires the operator path: it builds the Ledger and hands it
+// to both this Guard and lifecycle.ResolveInDoubt. The relay receives only the
+// Guard, which has no way to reach the Ledger or the resolution path.
 func NewWithLedger(m *mandate.Mandate, l *lifecycle.Ledger) *Guard {
 	return &Guard{
 		mandate: m,
@@ -265,9 +264,10 @@ func (g *Guard) Restore(states map[string]string, amounts map[string]int64) {
 // --- narrow relay interface ---------------------------------------------
 //
 // The relay gets exactly these three outcome transitions plus read-only views.
-// It cannot reach resolveInDoubt, which is reserved for lifecycle.Console. The
-// previous revision exposed the whole Ledger through a Ledger() accessor, which
-// made "operator-only" a convention rather than a boundary.
+// It cannot reach resolveInDoubt, whose only exported route is
+// lifecycle.ResolveInDoubt and which demands an opauth.Grant. The previous
+// revision exposed the whole Ledger through a Ledger() accessor, which made
+// "operator-only" a convention rather than a boundary.
 
 func (g *Guard) Commit(actionID string) error { return g.ledger.Commit(actionID) }
 func (g *Guard) ReleaseConfirmedRejection(actionID string) error {

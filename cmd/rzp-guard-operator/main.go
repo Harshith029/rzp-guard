@@ -432,10 +432,10 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate, grant opauth.Grant,
 		return err
 	}
 
-	// Rebuild the ledger from durable state and go through the SAME Console the
-	// unit tests exercise, so the token check, the state-machine guard and the
-	// atomic audit write are the tested code paths rather than a second
-	// implementation.
+	// Rebuild the ledger from durable state and go through the SAME
+	// lifecycle.ResolveInDoubt the unit tests exercise, so the grant check, the
+	// state-machine guard and the atomic audit write are the tested code paths
+	// rather than a second implementation.
 	snap, err := store.Snapshot()
 	if err != nil {
 		return err

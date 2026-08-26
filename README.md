@@ -178,16 +178,24 @@ cmd/rzp-guard/      the executable: bootstrap → relay → pinned child contain
                     (child fixed at the pinned digest; no runtime override)
 cmd/gate-verify/    enforces the live gates' assertions from captured JSON
 cmd/rzp-guard-operator/  init / rotate / list / audit / resolve for IN_DOUBT refunds
+cmd/rzp-study/      Phase 4b harness: drives an agent THROUGH the guard, then
+                    worksheet → adjudication → confusion matrix
+cmd/mcp-stub/       synthetic MCP child for the study; serves the REAL captured
+                    Razorpay tool schemas and never refuses a refund, so every
+                    block in a trace is the guard's
 internal/opauth     operator credential: generation, Argon2id verifier, verification
 internal/mandate    capability list, receipt derivation
 internal/policy     default-deny decision pipeline
-internal/lifecycle  action + budget state machine, operator console
+internal/lifecycle  action + budget state machine; resolution requires an
+                    opauth.Grant, which only successful authentication mints
 internal/storage    durable SQLite state, exclusive ownership
 internal/relay      transparent JSON-RPC stdio interposer
 internal/bootstrap  ordered startup: ownership → recovery → restore
+study/              Phase 4b: frozen protocol, briefs, compiled mandates, the 45
+                    traces, adjudicated labels, RESULTS.md and FINDINGS.md
 corpus/             conformance fixtures (data + scorer, never an executor)
 evidence/           captured output backing every claim in this file
-prototype/python/   FROZEN reference prototype — not the product
+prototype/python/   FROZEN reference prototype — superseded, not a specification
 ```
 
 Defense-only: fixtures are recorded JSON-RPC data with non-resolvable synthetic identifiers; forbidden-tool fixtures carry no payload; the corpus scorer cannot spawn a process or open a socket; test-mode keys only.
