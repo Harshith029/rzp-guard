@@ -3,7 +3,11 @@
 An authorization proxy that sits in front of Razorpay's **official, unmodified** MCP server and enforces a merchant-issued capability list over `create_refund`.
 
 > **Status — read this before anything else.**
-> This is a **tested Go authorization core with live-verified block AND allow paths**. It is **not** a detector, and **no precision, recall or false-positive numbers exist yet** — the Phase 4b study that produces them is frozen and its harness is built, but it has not been run. When it is, it will run against an **unverified third-party endpoint** — no direct provider account is available — so it will publish every emitted call and will **not** claim to know which model produced them (limits 2 and 3). Test counts measure authorization and transport conformance, nothing more.
+> This is a **tested Go authorization core with live-verified block AND allow paths**. It is **not** a detector.
+>
+> **The Phase 4b study has now run** — 45 pre-registered traces, 49 emitted refund calls ([study/RESULTS.md](study/RESULTS.md)). Read the result carefully, because the headline is not a ratio: **the agent never emitted a refund outside the merchant's intent**, so the positive class is empty, precision reads `0/8` for an arithmetic reason and recall is undefined. The informative number is the **false-block rate, 8/49**, and its cause is the guard's exact-amount matching, not the model. The guard was therefore **never given a genuinely hostile call** — the thing it exists for went untested by this run.
+>
+> The generator was an **unverified third-party endpoint** (no direct provider account is available), measured serving a different model than requested. The study publishes every emitted call and does **not** claim to know which model produced them (limits 2 and 3).
 >
 > The automatic *success* path is **no longer** an unverified guess: G1.6 ran a real Test Mode refund and the envelope is pinned as a test fixture. The remaining limit is narrower and permanent — `COMMITTED` means the provider **created** the refund entity, never that money **settled** (§Known limits).
 
@@ -123,7 +127,7 @@ The control matters: the container answered a legitimate read with a real Razorp
 
 ## Known limits — stated, not buried
 
-1. **No detector metric exists.** No precision, recall or false-positive cost. The conformance corpus in `corpus/` cannot supply them: its labels are computed from the same predicate the policy matches on, so scoring against it measures conformance to the spec, not detection ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)). The real measurement needs agent traces with intent specified independently of the mandate, and it has not been run.
+1. **There is a measurement, and its positive class is empty.** [study/RESULTS.md](study/RESULTS.md) reports the confusion matrix over 49 emitted calls: `TP=0 FP=8 TN=41 FN=0`. Because the agent emitted no out-of-intent refund, precision and recall are degenerate and must not be quoted as detector scores — **the guard's ability to stop a hostile refund is not measured by this run.** What is measured is the false-block rate, 8/49. Separately, the conformance corpus in `corpus/` still cannot supply detector metrics at all: its labels are computed from the same predicate the policy matches on ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)).
 
 2. **When it is run, every number will be conditional on the model — including the ones that sound like properties of the guard.** An earlier draft of the protocol claimed blocking rate and false-block rate were model-independent, because the guard's decision on a *fixed call* is deterministic. That was wrong and is retracted ([PROTOCOL.md §4.4](study/PROTOCOL.md)). Those quantities are **rates**, and their denominators count calls the agent *actually emitted* — a sample from one model's behaviour under one prompt. Change the model and the denominators move while the guard stands still. Nothing here will transfer to another model, another prompt, or merchant traffic.
 
