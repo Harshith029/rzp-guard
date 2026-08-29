@@ -366,8 +366,9 @@ cmd_study_model() {
   cmd_study_build
   study_docker ./.gotmp/linux/rzp-study resolve-model -provider "$RZP_STUDY_PROVIDER" "$@"
   echo ""
-  echo "Now COMMIT study/model.frozen.json. The runner refuses an uncommitted or"
-  echo "modified model freeze: a promise nobody can fail is not a control."
+  echo "Now COMMIT the model freeze that was just written (the path is printed"
+  echo "above). The runner refuses an uncommitted or modified model freeze:"
+  echo "a promise nobody can fail is not a control."
 }
 
 cmd_study_smoke() {
