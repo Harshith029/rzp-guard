@@ -21,7 +21,10 @@
       "worksheet": "adjudication/worksheet-armB.json",
       "labels": "adjudication/labelled_calls-armB.json",
       "results": "RESULTS-armB.md",
-      "status": "declared",
+      "freeze_sha256": "92900c58a7665a7adcd321c0e87815c2b17771ed28c6f98bbd3d0ca8b95720b2",
+      "model_freeze_sha256": "342f407df9eabe600d56bb9e8632cf35a529c15dfac7fb62f585708c71981288",
+      "served_model": "gpt-4o",
+      "status": "complete",
       "note": "Pre-registered by PROTOCOL.md Amendment F before any arm B trace ran. Same frozen task set, weaker generator (gpt-4o). Never pooled with arm A."
     }
   ]
