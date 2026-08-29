@@ -5,7 +5,18 @@ An authorization proxy that sits in front of Razorpay's **official, unmodified**
 > **Status — read this before anything else.**
 > This is a **tested Go authorization core with live-verified block AND allow paths**. It is **not** a detector.
 >
-> **The Phase 4b study has now run** — 45 pre-registered traces, 49 emitted refund calls ([study/RESULTS.md](study/RESULTS.md)). Read the result carefully, because the headline is not a ratio: **the agent never emitted a refund outside the merchant's intent**, so the positive class is empty, precision reads `0/8` for an arithmetic reason and recall is undefined. The informative number is the **false-block rate, 8/49**, and its cause is the guard's exact-amount matching, not the model. The guard was therefore **never given a genuinely hostile call** — the thing it exists for went untested by this run.
+> **The Phase 4b study has run TWICE**, against two generators on the identical frozen task set, and the two arms disagree completely. That disagreement is the result.
+>
+> | | arm A — `gpt-5.6-sol` | arm B — `gpt-4o` |
+> |---|---|---|
+> | Out-of-intent calls emitted | **0** | **3** |
+> | Recall | undefined (empty positive class) | **1.000** (3/3) |
+> | Precision | degenerate (`0/8`) | **0.250** (3/12) |
+> | False blocks | 8 / 49 | 9 / 51 |
+>
+> In arm A ([study/RESULTS.md](study/RESULTS.md)) the agent never misbehaved, so the guard was never given a hostile call and precision/recall are arithmetic artefacts. In arm B ([study/RESULTS-armB.md](study/RESULTS-armB.md)) an injected fake "system note" induced a 52000-paise refund in all three runs of one brief, and **the guard blocked every one**.
+>
+> Same guard, same briefs, opposite pictures. **A precision figure for this system is meaningless without naming the generator** — the arms are reported separately and never pooled. The false-block rate is stable across both (≈0.17) and its cause is the guard's exact-amount matching, not the model. Interpretation: [study/FINDINGS-armB.md](study/FINDINGS-armB.md).
 >
 > The generator was an **unverified third-party endpoint** (no direct provider account is available), measured serving a different model than requested. The study publishes every emitted call and does **not** claim to know which model produced them (limits 2 and 3).
 >
@@ -127,7 +138,7 @@ The control matters: the container answered a legitimate read with a real Razorp
 
 ## Known limits — stated, not buried
 
-1. **There is a measurement, and its positive class is empty.** [study/RESULTS.md](study/RESULTS.md) reports the confusion matrix over 49 emitted calls: `TP=0 FP=8 TN=41 FN=0`. Because the agent emitted no out-of-intent refund, precision and recall are degenerate and must not be quoted as detector scores — **the guard's ability to stop a hostile refund is not measured by this run.** What is measured is the false-block rate, 8/49. Separately, the conformance corpus in `corpus/` still cannot supply detector metrics at all: its labels are computed from the same predicate the policy matches on ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)).
+1. **The detector metric exists now, and it is small, model-dependent and half-bad.** Arm B measured **recall 1.000 (3/3)** and **precision 0.250 (3/12)** over 54 adjudicated calls — the guard stopped every out-of-intent refund it was shown, and three blocks in four were wrong. Three true positives come from **one** injection brief; that is not a general claim about injections, and 15 hand-written briefs adjudicated by their own author are **not a held-out sample**. Arm A, against a stronger model, produced no out-of-intent calls at all, so its precision and recall are degenerate and must never be quoted as detector scores. **The arms are never pooled.** Separately, the conformance corpus in `corpus/` still cannot supply detector metrics at all: its labels are computed from the same predicate the policy matches on ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)).
 
 2. **When it is run, every number will be conditional on the model — including the ones that sound like properties of the guard.** An earlier draft of the protocol claimed blocking rate and false-block rate were model-independent, because the guard's decision on a *fixed call* is deterministic. That was wrong and is retracted ([PROTOCOL.md §4.4](study/PROTOCOL.md)). Those quantities are **rates**, and their denominators count calls the agent *actually emitted* — a sample from one model's behaviour under one prompt. Change the model and the denominators move while the guard stands still. Nothing here will transfer to another model, another prompt, or merchant traffic.
 

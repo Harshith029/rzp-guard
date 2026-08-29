@@ -190,88 +190,146 @@ jobs:
   # The pre-registration is only a control if something checks it. Editing a
   # brief or the protocol without re-freezing would silently invalidate every
   # committed trace, and nothing would have said so.
+  # The pre-registration is only a control if something checks it. Editing a
+  # brief or the protocol without re-freezing would silently invalidate the
+  # committed traces, and nothing would have said so.
+  #
+  # Checks are PER ARM. Each arm is validated against the freeze it actually ran
+  # under, recorded in study/arms.json, not against whatever the protocol says
+  # today -- pre-registering a later arm changes freeze_sha256, and that must not
+  # retroactively invalidate an earlier arm's traces.
   study-freeze-intact:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
 
       - name: The frozen protocol must match its manifest
         run: python study/freeze.py verify
 
-      - name: Every committed trace must belong to the CURRENT freeze
+      - name: Each arm's traces must match the freeze that arm ran under
         run: |
           python - <<'EOF'
-          import glob, json, sys
+          import glob, json, subprocess, sys
 
           manifest = json.load(open("study/manifest.json", encoding="utf-8"))
-          want = manifest["freeze_sha256"]
           declared = manifest["declared_trace_count"]
+          reg = json.load(open("study/arms.json", encoding="utf-8"))
 
-          traces = [json.load(open(f, encoding="utf-8"))
-                    for f in sorted(glob.glob("study/traces/*.json"))]
-          if not traces:
-              print("no traces committed yet; nothing to check")
-              sys.exit(0)
+          # Every freeze hash ever committed. An arm claiming one that never
+          # existed would mean arms.json was edited by hand.
+          real = set()
+          revs = subprocess.run(["git", "rev-list", "--all"],
+                                capture_output=True, text=True).stdout.split()
+          for rev in revs:
+              r = subprocess.run(["git", "show", "%s:study/manifest.json" % rev],
+                                 capture_output=True, text=True)
+              if r.returncode == 0:
+                  try:
+                      real.add(json.loads(r.stdout)["freeze_sha256"])
+                  except Exception:
+                      pass
 
           bad = []
-          if len(traces) != declared:
-              bad.append("%d traces committed, freeze declares %d" % (len(traces), declared))
-          for t in traces:
-              key = "%s/run%s" % (t["brief_id"], t["run_index"])
-              if t.get("freeze_sha256") != want:
-                  bad.append("%s ran under freeze %.12s, current is %.12s"
-                             % (key, t.get("freeze_sha256"), want))
-              if t.get("smoke"):
-                  bad.append("%s is a smoke trace and must not be in study/traces" % key)
-              if t.get("status") == "void":
-                  bad.append("%s is void" % key)
+          for a in reg["arms"]:
+              name = a["arm"]
+              if a.get("status") != "complete":
+                  print("arm %s: declared, not yet run -- skipped" % name)
+                  continue
 
-          served = {t.get("served_model") for t in traces if t.get("served_model")}
-          if len(served) > 1:
-              bad.append("traces report more than one served model: %s" % sorted(served))
+              want = a.get("freeze_sha256", "")
+              if want not in real:
+                  bad.append("arm %s claims freeze %.12s, which appears in no "
+                             "committed manifest" % (name, want))
+
+              files = sorted(glob.glob("study/%s/*.json" % a["traces"]))
+              traces = [json.load(open(f, encoding="utf-8")) for f in files]
+              if len(traces) != declared:
+                  bad.append("arm %s has %d traces, freeze declares %d"
+                             % (name, len(traces), declared))
+
+              served = set()
+              for t in traces:
+                  key = "%s/run%s" % (t["brief_id"], t["run_index"])
+                  if t.get("freeze_sha256") != want:
+                      bad.append("arm %s %s ran under %.12s, arm records %.12s"
+                                 % (name, key, t.get("freeze_sha256"), want))
+                  if t.get("smoke"):
+                      bad.append("arm %s %s is a smoke trace" % (name, key))
+                  if t.get("status") == "void":
+                      bad.append("arm %s %s is void" % (name, key))
+                  if t.get("served_model"):
+                      served.add(t["served_model"])
+              if len(served) > 1:
+                  bad.append("arm %s reports %d served models: %s"
+                             % (name, len(served), sorted(served)))
+              elif served and a.get("served_model") not in served:
+                  bad.append("arm %s records served model %r but its traces say %s"
+                             % (name, a.get("served_model"), sorted(served)))
+              else:
+                  print("arm %s: %d traces, freeze %.12s, served %s"
+                        % (name, len(traces), want, a.get("served_model")))
 
           if bad:
-              print("COMMITTED TRACES DO NOT MATCH THE FREEZE:")
+              print("ARM/TRACE MISMATCH:")
               for b in bad:
                   print("  " + b)
               sys.exit(1)
-          print("%d traces, one freeze, one served model: %s"
-                % (len(traces), sorted(served) or ["(none recorded)"]))
           EOF
 
-      - name: A published result must be reproducible from the committed labels
+      - name: Each arm's published result must be reproducible from its labels
         run: |
           python - <<'EOF'
           import json, os, sys
 
-          labels_path = "study/adjudication/labelled_calls.json"
-          if not os.path.exists(labels_path):
-              print("no published labels yet; nothing to check")
-              sys.exit(0)
+          reg = json.load(open("study/arms.json", encoding="utf-8"))
+          bad = []
+          for a in reg["arms"]:
+              if a.get("status") != "complete":
+                  continue
+              lp = "study/" + a["labels"]
+              rp = "study/" + a["results"]
+              if not os.path.exists(lp):
+                  print("arm %s: no published labels yet" % a["arm"])
+                  continue
 
-          labels = json.load(open(labels_path, encoding="utf-8"))
-          cells = {}
-          for l in labels:
-              cells[l["cell"]] = cells.get(l["cell"], 0) + 1
-          tp, fp = cells.get("TP", 0), cells.get("FP", 0)
-          tn, fn = cells.get("TN", 0), cells.get("FN", 0)
+              labels = json.load(open(lp, encoding="utf-8"))
+              cells = {}
+              for l in labels:
+                  cells[l["cell"]] = cells.get(l["cell"], 0) + 1
+              tp, fn = cells.get("TP", 0), cells.get("FN", 0)
 
-          results = open("study/RESULTS.md", encoding="utf-8").read()
-          expected = "| **out-of-intent** (positive) | TP = %d | FN = %d |" % (tp, fn)
-          if expected not in results:
-              print("RESULTS.md does not match the committed labels.")
-              print("  labels give TP=%d FP=%d TN=%d FN=%d" % (tp, fp, tn, fn))
-              print("  expected row: " + expected)
+              results = open(rp, encoding="utf-8").read()
+              expected = "| **out-of-intent** (positive) | TP = %d | FN = %d |" % (tp, fn)
+              if expected not in results:
+                  bad.append("%s does not match %s (expected row: %s)"
+                             % (rp, lp, expected))
+
+              missing = [l["key"] for l in labels
+                         if not str(l.get("reason", "")).strip()]
+              if missing:
+                  bad.append("arm %s labels with no reason: %s"
+                             % (a["arm"], missing[:5]))
+              if not bad:
+                  print("arm %s: %s matches %d labels, every one with a reason"
+                        % (a["arm"], rp, len(labels)))
+
+          # The arms must never be pooled into one number.
+          for a in reg["arms"]:
+              rp = "study/" + a["results"]
+              if os.path.exists(rp):
+                  text = open(rp, encoding="utf-8").read().lower()
+                  for phrase in ("across both arms", "combined confusion",
+                                 "pooled", "across 90 traces"):
+                      if phrase in text:
+                          bad.append("%s pools the arms (%r); PROTOCOL.md 4.6 "
+                                     "forbids it" % (rp, phrase))
+
+          if bad:
+              print("PUBLISHED RESULT DOES NOT MATCH ITS LABELS:")
+              for b in bad:
+                  print("  " + b)
               sys.exit(1)
-
-          # Every label must carry a reason. A published verdict without one
-          # cannot be disagreed with, which is the point of publishing it.
-          missing = [l["key"] for l in labels if not str(l.get("reason", "")).strip()]
-          if missing:
-              print("labels with no reason: %s" % missing[:5])
-              sys.exit(1)
-
-          print("RESULTS.md matches %d labels; every one carries a reason" % len(labels))
           EOF
