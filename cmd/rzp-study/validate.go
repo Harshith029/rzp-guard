@@ -33,7 +33,7 @@ func fileExists(p string) bool {
 //	model drift     ... and under the CURRENT committed model choice
 //	wrong shape     exactly the declared (brief, run) set: none missing,
 //	                none duplicated, none foreign
-func validateTraceSet(traces []trace, dir string, m *manifest, mf *modelFreeze) error {
+func validateTraceSet(traces []trace, dir string, m *manifest, mf *modelFreeze, a *arm) error {
 	if len(traces) == 0 {
 		return fmt.Errorf("no traces in %s", dir)
 	}
@@ -74,10 +74,19 @@ func validateTraceSet(traces []trace, dir string, m *manifest, mf *modelFreeze) 
 		if t.Status == "void" {
 			problems = append(problems, fmt.Sprintf("%s: void (%s)", key, t.VoidReason))
 		}
-		if t.FreezeSHA != m.FreezeSHA256 {
+		// An arm is validated against the freeze IT ran under, not against
+		// whatever the protocol says today. Pre-registering a second arm edits
+		// PROTOCOL.md and therefore changes freeze_sha256; that must not
+		// retroactively invalidate an arm that already ran. Until an arm has
+		// run, its recorded freeze is empty and the current one is the standard.
+		wantFreeze := m.FreezeSHA256
+		if a != nil && a.FreezeSHA != "" {
+			wantFreeze = a.FreezeSHA
+		}
+		if t.FreezeSHA != wantFreeze {
 			problems = append(problems, fmt.Sprintf(
-				"%s: ran under freeze %.12s, current freeze is %.12s",
-				key, t.FreezeSHA, m.FreezeSHA256))
+				"%s: ran under freeze %.12s, this arm's freeze is %.12s",
+				key, t.FreezeSHA, wantFreeze))
 		}
 		if mf != nil && t.ModelFreezeSHA != mf.SHA256 {
 			problems = append(problems, fmt.Sprintf(
@@ -121,6 +130,22 @@ func validateTraceSet(traces []trace, dir string, m *manifest, mf *modelFreeze) 
 		problems = append(problems, "traces report MORE THAN ONE served model: "+
 			strings.Join(names, "; ")+
 			" -- two generators means two call distributions blended into one rate")
+	}
+
+	// Internal consistency, independent of any registry: one freeze and one
+	// model freeze across the arm. A set spanning two freezes is two runs.
+	frz, mfz := map[string]bool{}, map[string]bool{}
+	for _, t := range traces {
+		frz[t.FreezeSHA] = true
+		mfz[t.ModelFreezeSHA] = true
+	}
+	if len(frz) > 1 {
+		problems = append(problems, fmt.Sprintf(
+			"traces span %d different freezes; that is two runs, not one", len(frz)))
+	}
+	if len(mfz) > 1 {
+		problems = append(problems, fmt.Sprintf(
+			"traces span %d different model freezes", len(mfz)))
 	}
 
 	for key, n := range seen {

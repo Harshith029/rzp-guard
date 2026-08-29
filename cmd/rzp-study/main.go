@@ -35,6 +35,8 @@ func main() {
 		err = cmdResolveModel(os.Args[2:])
 	case "run":
 		err = cmdRun(os.Args[2:])
+	case "arms":
+		err = cmdArms(os.Args[2:])
 	case "worksheet":
 		err = cmdWorksheet(os.Args[2:])
 	case "report":
@@ -56,6 +58,7 @@ func usage() {
   resolve-model    resolve and record provider+endpoint+model (PROTOCOL.md 4),
                    pre-trace. Flags: -provider proxy|openai, -model <id>
   run [flags]      run the traces
+  arms             list the study arms; "arms record <A|B>" stamps what one ran under
   worksheet        emit the BLINDED adjudication worksheet from the traces
   report           join filled verdicts onto the traces -> confusion matrix
 
@@ -294,6 +297,8 @@ func ruleFor(method string) string {
 func cmdResolveModel(args []string) error {
 	fs := flag.NewFlagSet("resolve-model", flag.ExitOnError)
 	providerName := fs.String("provider", providerProxy, "proxy | openai")
+	outPath := fs.String("out", "", "where to write the model freeze "+
+		"(default study/model.frozen.json; use study/model.<arm>.frozen.json for another arm)")
 	explicit := fs.String("model", "",
 		"record this model id verbatim instead of enumerating (required when the "+
 			"endpoint does not expose a model list)")
@@ -385,7 +390,10 @@ func cmdResolveModel(args []string) error {
 		Endpoint: endpointFor(p),
 	}
 	b, _ := json.MarshalIndent(fm, "", "  ")
-	path := filepath.Join(studyDir(), "model.frozen.json")
+	path := *outPath
+	if path == "" {
+		path = filepath.Join(studyDir(), "model.frozen.json")
+	}
 	if err := os.WriteFile(path, append(b, '\n'), 0o644); err != nil {
 		return err
 	}
@@ -403,17 +411,17 @@ func cmdResolveModel(args []string) error {
 	return nil
 }
 
-func loadFrozenModel() (*frozenModel, error) {
-	b, err := os.ReadFile(filepath.Join(studyDir(), "model.frozen.json"))
+func loadFrozenModel(path string) (*frozenModel, error) {
+	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("model not resolved yet; run: rzp-study resolve-model (%w)", err)
+		return nil, fmt.Errorf("model not resolved yet for this arm; run: rzp-study resolve-model (%w)", err)
 	}
 	var fm frozenModel
 	if err := json.Unmarshal(b, &fm); err != nil {
 		return nil, err
 	}
 	if fm.Model == "" {
-		return nil, fmt.Errorf("study/model.frozen.json names no model")
+		return nil, fmt.Errorf("%s names no model", path)
 	}
 	return &fm, nil
 }

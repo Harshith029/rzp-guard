@@ -114,8 +114,9 @@ func refundCalls(t trace) []toolCallRecord {
 
 func cmdWorksheet(args []string) error {
 	fs := flag.NewFlagSet("worksheet", flag.ExitOnError)
-	dir := fs.String("traces", "study/traces", "trace directory")
-	out := fs.String("out", "study/adjudication/worksheet.json", "worksheet path")
+	armName := fs.String("arm", "A", "which study arm (see study/arms.json)")
+	dir := fs.String("traces", "", "trace directory (default: the arm's)")
+	out := fs.String("out", "", "worksheet path (default: the arm's)")
 	allowDry := fs.Bool("allow-dry", false, "permit dry-run traces (tooling test; cannot write under study/)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -124,11 +125,23 @@ func cmdWorksheet(args []string) error {
 	if err != nil {
 		return err
 	}
+	a, err := armOrNil(*armName, *allowDry)
+	if err != nil {
+		return err
+	}
+	if a != nil {
+		if *dir == "" {
+			*dir = a.tracePath()
+		}
+		if *out == "" {
+			*out = a.sheetPath()
+		}
+	}
 	traces, err := loadTraces(*dir)
 	if err != nil {
 		return err
 	}
-	if err := gateAdjudication(traces, *dir, m, *allowDry, *out); err != nil {
+	if err := gateAdjudication(traces, *dir, m, a, *allowDry, *out); err != nil {
 		return err
 	}
 	if err := refuseOverwrite(*out); err != nil {
@@ -265,7 +278,7 @@ func blockRule(text string) string {
 //	                                  apply because this is not the study
 //	no scripted traces             -> validateTraceSet ALWAYS runs, whatever
 //	                                  flags were passed
-func gateAdjudication(traces []trace, dir string, m *manifest, allowDry bool, outputs ...string) error {
+func gateAdjudication(traces []trace, dir string, m *manifest, a *arm, allowDry bool, outputs ...string) error {
 	scripted := 0
 	for _, t := range traces {
 		if t.Model == dryRunModel || t.Smoke {
@@ -292,11 +305,15 @@ func gateAdjudication(traces []trace, dir string, m *manifest, allowDry bool, ou
 
 	// Real traces. -allow-dry buys nothing here: a partial, duplicated, foreign
 	// or stale set is not the registered study whatever flag was passed.
-	mf, err := requireCommittedModelFreeze()
+	modelPath := filepath.Join(studyDir(), "model.frozen.json")
+	if a != nil {
+		modelPath = a.modelPath()
+	}
+	mf, err := requireCommittedModelFreeze(modelPath)
 	if err != nil {
 		return err
 	}
-	return validateTraceSet(traces, dir, m, mf)
+	return validateTraceSet(traces, dir, m, mf, a)
 }
 
 // authorizedActionCount reports how many refunds a brief's compiled mandate
@@ -319,10 +336,11 @@ func authorizedActionCount(briefID string) (int, error) {
 
 func cmdReport(args []string) error {
 	fs := flag.NewFlagSet("report", flag.ExitOnError)
-	dir := fs.String("traces", "study/traces", "trace directory")
-	ws := fs.String("worksheet", "study/adjudication/worksheet.json", "filled worksheet")
-	out := fs.String("out", "study/RESULTS.md", "report path")
-	labels := fs.String("labels", "study/adjudication/labelled_calls.json", "published per-call labels")
+	armName := fs.String("arm", "A", "which study arm (see study/arms.json)")
+	dir := fs.String("traces", "", "trace directory (default: the arm's)")
+	ws := fs.String("worksheet", "", "filled worksheet (default: the arm's)")
+	out := fs.String("out", "", "report path (default: the arm's)")
+	labels := fs.String("labels", "", "published per-call labels (default: the arm's)")
 	allowDry := fs.Bool("allow-dry", false, "permit dry-run traces (tooling test; cannot write under study/)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -331,11 +349,29 @@ func cmdReport(args []string) error {
 	if err != nil {
 		return err
 	}
+	a, err := armOrNil(*armName, *allowDry)
+	if err != nil {
+		return err
+	}
+	if a != nil {
+		if *dir == "" {
+			*dir = a.tracePath()
+		}
+		if *ws == "" {
+			*ws = a.sheetPath()
+		}
+		if *out == "" {
+			*out = a.reportPath()
+		}
+		if *labels == "" {
+			*labels = a.labelPath()
+		}
+	}
 	traces, err := loadTraces(*dir)
 	if err != nil {
 		return err
 	}
-	if err := gateAdjudication(traces, *dir, m, *allowDry, *out, *labels); err != nil {
+	if err := gateAdjudication(traces, *dir, m, a, *allowDry, *out, *labels); err != nil {
 		return err
 	}
 	if err := refuseOverwrite(*out, *labels); err != nil {
@@ -536,4 +572,24 @@ func summaryLine(c counts, n int) string {
 		"  precision %s\n  recall    %s\n",
 		n, c.TP, c.FP, c.TN, c.FN,
 		ratio(c.TP, c.TP+c.FP), ratio(c.TP, c.TP+c.FN))
+}
+
+// armOrNil resolves the named arm. A tooling test on scripted traces has no arm
+// and supplies its own paths, so -allow-dry makes the registry optional.
+func armOrNil(name string, allowDry bool) (*arm, error) {
+	r, err := loadArms()
+	if err != nil {
+		if allowDry {
+			return nil, nil
+		}
+		return nil, err
+	}
+	a, err := r.find(name)
+	if err != nil {
+		if allowDry {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return a, nil
 }

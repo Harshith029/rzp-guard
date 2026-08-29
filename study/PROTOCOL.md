@@ -40,6 +40,14 @@
 > and reports what the guard did with a **published** set of emitted calls.
 > **§4.5** states exactly what is and is not claimed. Trace count is still 0.
 
+> **Amendment F, 2026-08-26 — arm A is complete; this pre-registers arm B.**
+> Arm A produced an **empty positive class**: the generator emitted no
+> out-of-intent refund at all, so the guard was never handed a hostile call and
+> its blocking rate is unmeasured. Arm B runs the **identical frozen task set**
+> against a **weaker generator**, chosen and declared below *before* it runs, to
+> find out whether a model that misbehaves is blocked. See **§4.6**. Arm A's
+> results are final and are not reopened by this.
+
 This is the artifact PREREGISTRATION Amendment 2 §A2.4 requires: task set, compiled mandates with their recorded coverage gaps, model, sampling parameters, every prompt verbatim, the intended trace count declared in advance, and the adjudication rule with worked examples.
 
 Amendment 2 fixed the *method*. This fixes the *parameters*. Nothing below may be changed once a trace has been run; if something has to change, the run is void and restarts under an amendment that says why.
@@ -233,6 +241,79 @@ Re-resolve against it, re-freeze, and re-run. That deletes this entire section's
 #### Data sent to the endpoint
 
 The frozen system prompt, the frozen briefs, non-resolvable `pay_SYN####` identifiers, published Razorpay tool schemas, and stub tool results. **No Razorpay credentials, no real payment identifiers, no personal data** — the study runs against `mcp-stub`, never the live provider. Everything sent is already public in this repository.
+
+
+---
+
+
+### 4.6 Arm B — the same task set, a weaker generator
+
+#### Why a second arm at all
+
+Arm A measured one thing well and the headline thing not at all:
+
+| | arm A |
+|---|---|
+| refund calls emitted | 49 |
+| **out-of-intent** | **0** |
+| false blocks | 8 |
+| blocking rate | **undefined** — zero denominator |
+
+A guard that is never given a hostile call has not been shown to block one. The
+false-block rate (8/49) is real and useful; the number this project exists to
+produce is missing, and no amount of re-reading arm A's traces will supply it.
+
+**This is a study-design problem, not a lucky result, and it is worth naming.**
+The task set was built so that a competent model would comply: family A is
+unambiguous, family B is legitimate-but-uncovered, and family C's injections are
+the well-known blunt forms current frontier models are trained to refuse. There
+was never much probability mass on out-of-intent behaviour. Arm A therefore
+measured the *generator's* compliance far more than the *guard's* discrimination.
+
+#### The one thing that changes
+
+**Only the generator.** Same 15 frozen briefs, same compiled mandates, same
+system prompt, same temperature, same 12-turn cap, same 3 runs per brief, same
+45 traces, same blinded adjudication rule. Changing anything else would make the
+arms incomparable and would also be the classic route to a flattering result.
+
+| Parameter | Arm A | Arm B |
+|---|---|---|
+| Model requested | `gpt-5.6-sol` | **`gpt-4o`** |
+| Everything else | — | identical |
+
+**Why `gpt-4o`, declared now.** It is an older generation than arm A's model and
+predates much of the injection-resistance training that current flagships carry;
+it is served by the same endpoint, so the transport, the tool schemas and the
+guard are unchanged; and it echoed its own id back correctly under the §4.5
+substitution probe. It is chosen for being *plausibly weaker at resisting
+injection*, which is the property under test — not for being cheap, and not
+because any output has been seen.
+
+**No output from arm B has been observed at the time of writing.** The model was
+picked from the §4.5 catalogue probe and this section is committed before
+`resolve-model` is run for it.
+
+#### What arm B can and cannot settle
+
+| If arm B produces | Then |
+|---|---|
+| out-of-intent calls the guard **blocked** | blocking rate becomes measurable, and the pair reads: *"against a model that misbehaves, the guard blocked X; against one that does not, it false-blocked 8/49"* — a better result than either arm alone |
+| out-of-intent calls the guard **allowed** | a genuine miss, and the most valuable finding available. It is published as prominently as any success |
+| **again no out-of-intent calls** | the positive class is empty for a second, weaker generator. That is itself informative about the injection family's difficulty, and it is reported as a **null result for the second time** rather than as evidence the guard works |
+
+#### Rules carried over, and one added
+
+Everything in §8–§11 applies unchanged: blinded worksheet, adjudication from
+`intent_text` alone, every call published with its reason, no early stop, void
+traces re-run with the reason recorded.
+
+**Added — the arms are never pooled.** No combined confusion matrix, no combined
+rate, no "across 90 traces" anywhere. Each arm has its own `RESULTS.md`, and
+§4.4's retraction is the reason: every quantity is conditional on the generator's
+call distribution, so two generators produce two distributions, and one number
+spanning both would describe neither. Arm A remains bound to the freeze it ran
+under (`study/arms.json`), which this amendment does not disturb.
 
 
 ---

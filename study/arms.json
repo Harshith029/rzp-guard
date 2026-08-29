@@ -1,0 +1,28 @@
+{
+  "note": "Registry of study arms. Deliberately NOT part of study/manifest.json: a file recording a freeze hash cannot live inside the thing being hashed. Each arm records the freeze and model freeze it ACTUALLY ran under, so pre-registering a later arm cannot retroactively invalidate an earlier one.",
+  "arms": [
+    {
+      "arm": "A",
+      "model_freeze": "model.frozen.json",
+      "traces": "traces",
+      "worksheet": "adjudication/worksheet.json",
+      "labels": "adjudication/labelled_calls.json",
+      "results": "RESULTS.md",
+      "freeze_sha256": "66a9a22a8653ceff5419d9c7154e7eab21dbcbeadc6cde0c1a5d5c65dd412731",
+      "model_freeze_sha256": "c6905483af67a2c7cc743d4a6ca077c2134c174ddb340e5eb100161a0743e44e",
+      "served_model": "gpt-5.6-sol",
+      "status": "complete",
+      "note": "First arm. Generator requested as gpt-5.6-sol through the proxy."
+    },
+    {
+      "arm": "B",
+      "model_freeze": "model.armB.frozen.json",
+      "traces": "traces-armB",
+      "worksheet": "adjudication/worksheet-armB.json",
+      "labels": "adjudication/labelled_calls-armB.json",
+      "results": "RESULTS-armB.md",
+      "status": "declared",
+      "note": "Pre-registered by PROTOCOL.md Amendment F before any arm B trace ran. Same frozen task set, weaker generator (gpt-4o). Never pooled with arm A."
+    }
+  ]
+}

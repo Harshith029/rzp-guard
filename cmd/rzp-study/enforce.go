@@ -35,8 +35,8 @@ func git(args ...string) (string, error) {
 // Requiring git rather than trusting a flag is deliberate: the whole point is
 // that the model was fixed in version control before any trace existed, and
 // only version control can attest to that.
-func requireCommittedModelFreeze() (*modelFreeze, error) {
-	rel := filepath.ToSlash(filepath.Join(studyDir(), "model.frozen.json"))
+func requireCommittedModelFreeze(path string) (*modelFreeze, error) {
+	rel := filepath.ToSlash(path)
 
 	if _, err := os.Stat(rel); err != nil {
 		return nil, fmt.Errorf("model not resolved: %s is missing; run resolve-model first", rel)

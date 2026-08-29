@@ -174,7 +174,8 @@ func cmdRun(args []string) error {
 	guard := fs.String("guard", ".gotmp/linux/rzp-guard-th", "rzp-guard binary (test-hook build)")
 	operator := fs.String("operator", ".gotmp/linux/rzp-guard-operator-th", "operator binary")
 	stub := fs.String("stub", ".gotmp/linux/mcp-stub", "stub MCP child binary")
-	outDir := fs.String("out", "study/traces", "trace output directory")
+	armName := fs.String("arm", "A", "which study arm (see study/arms.json)")
+	outDir := fs.String("out", "", "trace output directory (default: the arm's)")
 	only := fs.String("only", "", "run a single brief id")
 	runs := fs.Int("runs", 0, "runs per brief (0 = the frozen 3)")
 	dry := fs.Bool("dry-run", false, "scripted fake model, no API calls")
@@ -223,6 +224,33 @@ func cmdRun(args []string) error {
 		}
 	}
 
+	// Resolve the arm's paths. A dry or smoke run supplies its own and needs no
+	// registry entry.
+	modelFreezePath := filepath.Join(studyDir(), "model.frozen.json")
+	if !*dry && !*smoke {
+		reg, err := loadArms()
+		if err != nil {
+			return err
+		}
+		a, err := reg.find(*armName)
+		if err != nil {
+			return err
+		}
+		if a.Status == "complete" {
+			return fmt.Errorf("arm %s is already complete (%d traces under %s). "+
+				"Re-running it would overwrite a recorded run; declare a new arm instead",
+				a.Arm, m.DeclaredTraceCount, a.tracePath())
+		}
+		modelFreezePath = a.modelPath()
+		if *outDir == "" {
+			*outDir = a.tracePath()
+		}
+		fmt.Printf("arm    %s\n", a.Arm)
+	}
+	if *outDir == "" {
+		*outDir = filepath.Join(studyDir(), "traces")
+	}
+
 	r := &runner{
 		guard: *guard, operator: *operator, stub: *stub, outDir: *outDir,
 		sysPrompt: sp, freezeSHA: m.FreezeSHA256, dryRun: *dry, smoke: *smoke,
@@ -245,7 +273,7 @@ func cmdRun(args []string) error {
 				"SMOKE TRACE: not a study run. The model freeze is not required to be "+
 					"committed, and output may not be written under study/.")
 		} else {
-			mf, err = requireCommittedModelFreeze()
+			mf, err = requireCommittedModelFreeze(modelFreezePath)
 			if err != nil {
 				return err
 			}
@@ -253,7 +281,7 @@ func cmdRun(args []string) error {
 		if err := requireEmptyTraceDir(r.outDir); err != nil {
 			return err
 		}
-		fm, err := loadFrozenModel()
+		fm, err := loadFrozenModel(modelFreezePath)
 		if err != nil {
 			return err
 		}

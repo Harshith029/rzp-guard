@@ -47,7 +47,7 @@ func TestValidateTraceSetAcceptsTheDeclaredSet(t *testing.T) {
 	if len(traces) != m.DeclaredTraceCount {
 		t.Fatalf("built %d traces, declared %d", len(traces), m.DeclaredTraceCount)
 	}
-	if err := validateTraceSet(traces, "study/traces", m, mf); err != nil {
+	if err := validateTraceSet(traces, "study/traces", m, mf, nil); err != nil {
 		t.Fatalf("the complete declared set must be accepted: %v", err)
 	}
 }
@@ -99,7 +99,7 @@ func TestValidateTraceSetRefusesEverythingElse(t *testing.T) {
 		{"a trace from an older freeze", func(ts []trace) []trace {
 			ts[7].FreezeSHA = "0000000000000000"
 			return ts
-		}, "current freeze is"},
+		}, "freeze is"},
 
 		{"a trace from an older model freeze", func(ts []trace) []trace {
 			ts[9].ModelFreezeSHA = "0000000000000000"
@@ -120,7 +120,7 @@ func TestValidateTraceSetRefusesEverythingElse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			traces, m, mf := goodTraceSet(t)
 			traces = tc.mutate(traces)
-			err := validateTraceSet(traces, "study/traces", m, mf)
+			err := validateTraceSet(traces, "study/traces", m, mf, nil)
 			if err == nil {
 				t.Fatal("must be refused; this is how a fake number gets published")
 			}
@@ -168,7 +168,7 @@ func TestAllowDryCannotBypassValidationForRealTraces(t *testing.T) {
 			name = "WITH -allow-dry"
 		}
 		t.Run(name, func(t *testing.T) {
-			err := gateAdjudication(partial, ".gotmp/fake", m, allowDry,
+			err := gateAdjudication(partial, ".gotmp/fake", m, nil, allowDry,
 				"study/adjudication/worksheet.json")
 			if err == nil {
 				t.Fatal("a partial REAL trace set must never produce an artifact, " +
@@ -187,13 +187,13 @@ func TestAllowDryPermitsScriptedTracesOutsideStudy(t *testing.T) {
 	}
 	scripted := []trace{{BriefID: "A01", RunIndex: 1, Model: dryRunModel}}
 
-	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, false, ".gotmp/w.json"); err == nil {
+	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, nil, false, ".gotmp/w.json"); err == nil {
 		t.Fatal("scripted traces need the flag")
 	}
-	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, true, ".gotmp/w.json"); err != nil {
+	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, nil, true, ".gotmp/w.json"); err != nil {
 		t.Fatalf("scripted traces outside study/ are the flag's purpose: %v", err)
 	}
-	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, true,
+	if err := gateAdjudication(scripted, ".gotmp/dryrun", m, nil, true,
 		"study/adjudication/w.json"); err == nil {
 		t.Fatal("scripted output must never land in study/, flag or no flag")
 	}
