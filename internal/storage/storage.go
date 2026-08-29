@@ -191,6 +191,23 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 		s.mandateID, actionID, receipt, amountPaise,
 		time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
+		// Classify a receipt collision distinctly.
+		//
+		// ErrReceiptExists was declared and never returned: the UNIQUE violation
+		// came back as a raw driver string, so no caller could tell a collision
+		// from a disk error, and errors.Is against the sentinel would have
+		// silently never matched. Fail-closed behaviour was correct either way
+		// -- the guard refuses to forward on any reserve failure -- but a
+		// sentinel that cannot fire is a trap for whoever reaches for it next.
+		//
+		// The classification runs AFTER the failed insert, so it is race-free:
+		// checking first and inserting second would be TOCTOU. Matching on the
+		// driver's message text would be fragile; asking the table what it holds
+		// is not.
+		if taken, qerr := s.receiptTaken(receipt); qerr == nil && taken {
+			return fmt.Errorf("storage: reserve %s: %w (receipt %s)",
+				actionID, ErrReceiptExists, receipt)
+		}
 		return fmt.Errorf("storage: reserve %s: %w", actionID, err)
 	}
 	// The ON CONFLICT guard silently changes NOTHING when the action is already
@@ -204,6 +221,16 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 		return fmt.Errorf("storage: reserve %s: %w (%d rows)", actionID, ErrNoRowChanged, n)
 	}
 	return nil
+}
+
+// receiptTaken reports whether some row already holds this receipt. Used only
+// to classify a failed insert, never to gate one -- the UNIQUE constraint is
+// the actual guard.
+func (s *Store) receiptTaken(receipt string) (bool, error) {
+	var n int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM action_state WHERE receipt = ?`, receipt).Scan(&n)
+	return n > 0, err
 }
 
 // SetState performs an EXPECTED-STATE transition.
