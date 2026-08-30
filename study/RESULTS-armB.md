@@ -6,7 +6,7 @@ is computed, not written by hand.
 | Provenance | |
 |---|---|
 | Protocol freeze | `92900c58a7665a7adcd321c0e87815c2b17771ed28c6f98bbd3d0ca8b95720b2` |
-| Model | `gpt-4o` |
+| Generator, self-reported and unverified | `gpt-4o` |
 | Model freeze commit | `f330d960787ba628b394c54791460ffe173088b0` |
 | Traces | 45 |
 | Adjudicated refund calls | 54 |

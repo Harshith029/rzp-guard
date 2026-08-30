@@ -531,3 +531,103 @@ The measurement worth having is the one I cannot author: **how often a correctly
 **ACCEPT.** It advertised `live` and `live-recover`, neither implemented, so `make live-recover` printed help and **succeeded**. Corrected, and `make help` executed inside the golang container — this host has no make, which is exactly why the staleness survived unnoticed. run.sh now exits non-zero on an unknown command.
 
 **Net effect of Round 8:** the repository went from not containing its own executable to being clone-and-run verified; the live control went from decorative to load-bearing; and the process lifecycle went from claimed to controlled.
+
+
+---
+
+## Round 9 — red-team brief + study provenance — reviewer: ChatGPT — 2026-08-31
+
+**Six raised, six accepted.** One is the sharpest instance yet of the defect
+class this repository keeps producing: a control that a comment describes and
+the code does not provide. Two of the six are my own published claims being
+wrong.
+
+### P9.1 — "The prompt's stated metric is wrong: it says precision 0.333; Arm B is 0.250."
+**ACCEPT — P0, and the reviewer's weakest-claim callout was right.** `REDTEAM_PROMPT.md`
+told an external reviewer the system's measured precision was 0.333. The
+published figure is **0.250 (3/12)**. 0.333 is my own counterfactual replay,
+which I labelled "not a study number" in `study/COUNTERFACTUAL-combining.md` and
+then quoted unqualified in the very next document. An inaccurate brief
+contaminates every finding the review produces. The prompt now gives 0.250 as
+the published result and names the two other figures as what they are.
+
+The file count was stale too: I wrote 63, the tree has **65**. Verified with
+`git ls-files '*.go' | wc -l`. The reviewer's own line count (14,019) does not
+match the current tree either — it is **15,330** tracked, ~8,700 non-test — so
+the corrected prompt states the command that produces the number rather than the
+number alone.
+
+### P9.2 — "Model-identity check fails open on an omitted field."
+**ACCEPT — P1, and worse than described.** The check read
+
+```go
+if out.Model != "" && out.Model != req.Model
+```
+
+so the untrusted endpoint could **opt out of the check on itself by sending
+less rather than something wrong**. `openai.go` had the identical shape. And
+`validateTraceSet` counted served models with `if t.ServedModel != ""`, so the
+"exactly ONE served model" control tripped on `len(served) > 1` — and **zero is
+not more than one**. A study where every trace omitted the field would have
+passed validation with no provenance at all.
+
+Fixed at both layers: an empty model is now as fatal as a wrong one, an empty
+response id likewise, and validation rejects a trace or turn with no provenance
+instead of skipping it. Checked before shipping that the committed study meets
+the stronger rule — all 90 traces and all 213 turns already carry both fields —
+so nothing published was invalidated. Regression tests in
+`cmd/rzp-study/provenance_test.go`, including the vacuous case where every trace
+omits the model.
+
+**The tell was in the test file.** `goodTraceSet`, the fixture named *good*,
+built traces with no served model and no turns, and passed.
+
+### P9.3 — "Do not present the proxy-run traces as an evaluation of a named model."
+**ACCEPT — P1.** The generated reports rendered `| Model | gpt-4o |`, which reads
+as "a gpt-4o evaluation". Publishing every emitted call makes the guard's
+decision on those calls auditable; it does not turn an unverifiable endpoint
+into a named model. The label is now
+`| Generator, self-reported and unverified |`. Both reports regenerated
+deliberately through the immutability guard, with every number and both label
+files byte-identical — one line changed per report.
+
+The reviewer also asks why a third party that previously substituted models is
+in the measurement path at all. The answer is in `PROTOCOL.md` §4.5 and it is not
+a good one: it was the only credential available. That is a reason, not a
+justification, and the correct fix remains a direct provider account.
+
+### P9.4 — "The red-team safety boundary needs executable rules."
+**ACCEPT — P1.** "Do not target a live account" is not a boundary when the
+repository contains `.env`, gate commands that reach a real API, and captured
+Test Mode artefacts. The prompt now names the six commands not to run, forbids
+reading `.env` at all, requires `-tags testhook` with `cmd/mcp-stub`, forbids
+touching `study/`, and requires every identifier in a reproducer to match
+`pay_SYN*`.
+
+### P9.5 — "I12 is imprecise; reviewers may report intended determinism as a defect."
+**ACCEPT — P2.** "Receipts are unique per forwarded call" invites a false
+positive, because a receipt is *deterministic* for a given (mandate, action-set)
+by design. Restated: no two distinct reservations may hold the same
+`call_receipt` row, and reusing an action set fails earlier anyway because its
+actions are no longer AVAILABLE.
+
+### P9.6 — "Scope the red-team pass."
+**ACCEPT — P2.** Thirteen invariants with no ordering is a brief that gets
+half-covered everywhere. Now three passes — money-can-move first (I1–I5, I13),
+then operator-misleading, then the rest — with required reporting of baseline
+commit, exact commands, fuzz seed and time budget, and whether each result is
+source-only, unit-tested or fuzz-found.
+
+### The question this round does not close
+
+**"Show the held-out positive examples that establish recall."** Three positive
+calls, all from one injection brief, in one arm; the other arm has none. That is
+a descriptive account of what happened on 15 hand-written briefs adjudicated by
+their own author. It is not a held-out detector evaluation and no amount of
+tightening the provenance controls makes it one. The README says this; after
+this round it says it in the reviewer's sharper words.
+
+**Net effect of Round 9:** the untrusted endpoint lost its ability to silently
+decline to identify itself, two of my own published numbers were corrected, the
+red-team brief acquired rules a machine can follow, and the study's headline
+label stopped implying a model evaluation it cannot support.

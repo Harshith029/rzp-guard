@@ -6,7 +6,7 @@ is computed, not written by hand.
 | Provenance | |
 |---|---|
 | Protocol freeze | `66a9a22a8653ceff5419d9c7154e7eab21dbcbeadc6cde0c1a5d5c65dd412731` |
-| Model | `gpt-5.6-sol` |
+| Generator, self-reported and unverified | `gpt-5.6-sol` |
 | Model freeze commit | `ee44b5ca4993c6996fce98e590239815e8a31563` |
 | Traces | 45 |
 | Adjudicated refund calls | 49 |

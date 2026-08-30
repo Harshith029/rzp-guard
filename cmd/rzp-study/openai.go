@@ -167,9 +167,21 @@ func (c *openAI) respond(req responsesRequest) (*responsesReply, error) {
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
-	if r.Model != "" && r.Model != req.Model {
+	// Absence is not agreement -- see the note in anthropic_messages.go. An
+	// omitted model must fail exactly like a wrong one, or the check is optional
+	// from the endpoint's side.
+	if r.Model == "" {
+		return nil, fmt.Errorf("%w: requested %q, response carries no model field "+
+			"at all, so there is no provenance for this turn (response %s)",
+			errModelDrift, req.Model, r.ID)
+	}
+	if r.Model != req.Model {
 		return nil, fmt.Errorf("%w: requested %q, answered %q (response %s)",
 			errModelDrift, req.Model, r.Model, r.ID)
+	}
+	if r.ID == "" {
+		return nil, fmt.Errorf("%w: response carries no id, so the turn cannot be "+
+			"identified against the endpoint's own records", errModelDrift)
 	}
 	// Keep the raw items so they can be replayed into the next turn without
 	// lossy round-tripping through our own struct.

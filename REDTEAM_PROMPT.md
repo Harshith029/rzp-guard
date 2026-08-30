@@ -21,15 +21,39 @@ Two things make a red-team of this repository useful rather than performative:
 ````text
 You are red-teaming `rzp-guard`, a defensive authorization proxy that sits
 between an AI agent and Razorpay's MCP server and blocks refunds the merchant
-did not authorize. It is ~15,000 lines of Go across 63 files. Your job is to
-BREAK ITS STATED GUARANTEES and produce reproducible evidence.
+did not authorize. It is 15,330 lines of Go across 65 files (`git ls-files
+'*.go' | xargs wc -l`; ~8,700 of those lines are non-test). Your job is to BREAK
+ITS STATED GUARANTEES and produce reproducible evidence.
 
 This is authorized security testing of a defensive tool, on its own repository.
 Findings must be defensive: a failing test or a minimal reproducer that
 demonstrates the gap. Do not write anything that functions as a general-purpose
-attack tool against a payment provider, and do not target any live account —
-every payment identifier in this repo is a non-resolvable `pay_SYN*` synthetic
-and must stay that way.
+attack tool against a payment provider.
+
+## HARD RULES — these are executable, not aspirational
+
+This repository contains a `.env` with Razorpay Test Mode keys, gate commands
+that reach a real API, and captured artefacts from a real Test Mode refund.
+"Do not target a live account" is not a sufficient boundary against that, so:
+
+1. **Never source, read, export or echo `.env`.** Do not set `RAZORPAY_KEY_ID`
+   or `RAZORPAY_KEY_SECRET` in any shell you run.
+2. **Never run these:** `./run.sh live-block`, `./run.sh live-allow`,
+   `./run.sh verify-refund-evidence`, `./run.sh process-recover`, anything
+   labelled G1.6, or any command that starts the `razorpay/mcp` container.
+3. **Never start the real child.** Use `-tags testhook` with `cmd/mcp-stub`,
+   which is the synthetic MCP child built for exactly this.
+4. **Every payment identifier you write must match `pay_SYN*`.** Reject your own
+   reproducer if it contains anything else. The synthetics are non-resolvable by
+   construction; a real id is how an experiment becomes a transaction.
+5. **Do not modify anything under `study/`.** The traces, briefs, mandates and
+   manifest are a hash-frozen experimental record. Read them freely; a diff
+   there invalidates a published result.
+6. **No network egress** beyond `go mod download`. If a reproducer seems to need
+   the internet, it is testing the wrong thing.
+
+If a finding genuinely cannot be demonstrated within these rules, describe the
+mechanism and say so rather than working around them.
 
 ## How the system works, in one paragraph
 
@@ -69,7 +93,12 @@ I9. A state file is bound to its mandate and to a schema version. A foreign
 I10. The mandate cannot be changed, widened or reloaded at runtime by anything
     arriving over JSON-RPC.
 I11. `supportedTools` is a build constant. A mandate can only narrow it.
-I12. Receipts are unique per forwarded call, enforced by the database.
+I12. A receipt is DETERMINISTIC for a given (mandate, action-set) — the same
+    set always derives the same string, by design, and that is not a defect.
+    The invariant is that **no two distinct reservations may hold the same
+    `call_receipt` row**: the second attempt fails, and in normal operation it
+    fails earlier still because the actions are no longer AVAILABLE. Attack the
+    uniqueness enforcement, not the determinism.
 I13. A durable write failure never leaves the in-memory ledger claiming
     something the database does not have. (`lifecycle.transition`,
     `lifecycle.ReserveMany`)
@@ -133,6 +162,30 @@ I. **The study harness.** `cmd/rzp-study` refuses to run unless a SHA-256 freeze
    that is not backed by the committed traces — for example with `-allow-dry`,
    partial trace sets, a hand-edited `arms.json`, or paths that escape `study/`.
 
+## Scope and order
+
+Thirteen invariants is too many to attack at once. Work in this order and stop
+to report rather than half-covering everything:
+
+**Pass 1 — money can move.** I1, I2, I3, I4, I5, I13. These are the ones where a
+defect means a refund happens that should not, or happens twice, or for the
+wrong amount. Everything else can wait.
+
+**Pass 2 — an operator is misled.** I6, I9, I12, plus finding class G.
+
+**Pass 3 — everything else.** I7, I8, I10, I11, and the study harness.
+
+Record, for the whole pass:
+
+- the **baseline commit** you tested (`git rev-parse HEAD`);
+- the **exact commands** you ran, verbatim;
+- for fuzzing: the **seed corpus, `-fuzztime`, and execution count** reached;
+- for each finding, whether it is **source-only** (read the code and reasoned),
+  **unit-tested** (a failing test), or **fuzz-found** (a saved corpus entry).
+
+Parser-differential work (finding class A) must target the **test-hook child**
+via `cmd/mcp-stub`, never the real Razorpay container.
+
 ## Method
 
 - Build and test in the pinned container, as the repo does:
@@ -155,8 +208,19 @@ For each finding:
 3. **Consequence in money terms.** Does it move money, permit a replay, exceed
    a cap, strand a refund, or mislead an operator during recovery?
 4. **Severity, and be honest about fail-closed.** If the outcome is a refusal,
-   say so — but do not dismiss it, because a wrong refusal is a false block and
-   those are this system's measured weakness (precision 0.333).
+   say so — but do not dismiss it, because a wrong refusal is a false block, and
+   those are this system's measured weakness.
+
+   The published figure is **precision 0.250 (3/12), recall 1.000 (3/3)** on
+   arm B (`study/RESULTS-armB.md`). Arm A's positive class is empty, so its
+   precision is degenerate at `0/8` and its recall undefined — never quote
+   either as a detector score. Two other numbers appear in this repository and
+   are **not** the published result: 0.333 is a counterfactual replay of arm B's
+   recorded calls through the current guard, and 1.000 is that replay against
+   hand-corrected mandates. Both are labelled in
+   `study/COUNTERFACTUAL-combining.md` as not-a-study-number, and both are
+   computed on a non-reactive subset. Use 0.250 unless you mean one of the
+   others and say which.
 5. **The smallest fix** you would make.
 
 Rank by whether money can move, then by whether an operator would be misled,

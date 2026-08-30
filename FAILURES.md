@@ -901,3 +901,86 @@ That is precisely the condition under which a guarantee quietly stops being
 enforced by the component that owns it.
 
 Both now have tests. Second sweep: twelve mutations, all fail, zero blind spots.
+
+
+## F25 — The untrusted party could opt out of the check on itself, by sending less
+
+External review, and the finding is the cleanest example yet of this project's
+recurring defect: **a control that a comment describes and the code does not
+provide.**
+
+The study runs through a third-party proxy that was measured substituting models
+— asking for `gpt-5.6` returned `grok-4.6`. The stated defence, in
+`anthropic_messages.go`'s own package comment:
+
+> Every response's `model` field is compared with what was requested, and a
+> mismatch is surfaced rather than absorbed. That turns an untestable claim into
+> a checked one.
+
+The code:
+
+```go
+if out.Model != "" && out.Model != req.Model {
+```
+
+**An omitted field skips the check.** The endpoint the control exists to
+constrain could disable it by sending *less* rather than something wrong. Not by
+lying — by declining to speak. `openai.go` had the identical shape.
+
+It failed open at the second layer too. `validateTraceSet` counted served models
+with `if t.ServedModel != ""`, so a trace reporting nothing was silently skipped;
+the "traces must report exactly ONE served model" control tripped on
+`len(served) > 1`, and **zero is not more than one**. A study in which every
+trace omitted the model would have passed validation with no provenance at all.
+
+Neither moves money. Both invalidate the experiment's stated per-turn provenance
+control, which is the only thing standing between "we recorded what the endpoint
+said" and "we know what produced these calls".
+
+**Fixed at both layers.** An empty model is now exactly as fatal as a wrong one,
+an empty response id likewise, and validation rejects a trace or turn carrying no
+provenance instead of skipping it.
+
+**The committed study was checked against the stronger rule before it shipped**:
+all 90 traces and all 213 turns across both arms already carry both fields, so
+tightening the check invalidated nothing. `TestTheCommittedTracesCarryFullProvenance`
+pins that, and it would have been the thing to find out *before* changing the
+check rather than after.
+
+### The tell I walked past
+
+`goodTraceSet`, the fixture the validation tests call the *good* case, built
+traces with **no served model and no turns at all** — and passed. A fixture that
+does not need provenance to be accepted is a fixture describing a check that
+does not require it. That was visible in the test file the whole time.
+
+### Three other things in the same review
+
+**A number I published was false.** `REDTEAM_PROMPT.md` told an external reviewer
+the system's measured precision was 0.333. The repository's published figure is
+**0.250**; 0.333 is my counterfactual replay, which I had explicitly labelled
+"not a study number" one document earlier and then quoted unqualified in the next.
+An inaccurate brief contaminates the review record it produces. Corrected, along
+with a file count that was stale (63 → 65).
+
+**"Do not target a live account" is not an executable rule** when the repository
+contains `.env`, gate commands that reach a real API, and captured Test Mode
+artefacts. The prompt now names the six things not to run, requires
+`-tags testhook` with the stub child, and requires every identifier in a
+reproducer to match `pay_SYN*`.
+
+**Publishing the calls does not rehabilitate the generator.** The reports said
+`| Model | gpt-4o |`, which reads as "a gpt-4o evaluation". Publishing every
+emitted call makes the guard's decision on those calls auditable; it does not
+turn an unverifiable endpoint into a named model. The label is now
+`| Generator, self-reported and unverified |`, regenerated with every number
+byte-identical.
+
+### What this still cannot answer
+
+The reviewer's closing question stands and is not fixed by any of the above:
+**"show the held-out positive examples that establish recall."** There are three
+positive calls, all from one injection brief, in one arm; the other arm has none.
+That is a descriptive account of what happened on 15 hand-written briefs
+adjudicated by their own author — not a held-out detector evaluation, and the
+README should keep saying so in those words.

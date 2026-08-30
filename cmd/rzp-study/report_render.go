@@ -54,7 +54,16 @@ func renderReport(c counts, traces []trace, published []labelled,
 
 	w("| Provenance | |\n|---|---|\n")
 	w("| Protocol freeze | `%s` |\n", freeze)
-	w("| Model | `%s` |\n", model)
+	// NAMED, NOT VERIFIED.
+	//
+	// This string is what the endpoint SAID it served. Both arms ran through
+	// a third-party proxy measured substituting models -- asking for gpt-5.6
+	// returned grok-4.6 -- so a bare model name here invites the reading
+	// "this is a gpt-4o evaluation", which the study cannot support. The
+	// per-turn and cross-trace checks prove self-consistency, not honesty.
+	//
+	// The label carries its own caveat so it cannot be quoted without one.
+	w("| Generator, self-reported and unverified | `%s` |\n", model)
 	w("| Model freeze commit | `%s` |\n", commit)
 	w("| Traces | %d |\n", len(traces))
 	w("| Adjudicated refund calls | %d |\n", len(published))

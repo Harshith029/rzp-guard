@@ -108,11 +108,32 @@ func validateTraceSet(traces []trace, dir string, m *manifest, mf *modelFreeze, 
 	// endpoint demonstrated to substitute (PROTOCOL.md 4.5). Since every
 	// denominator counts calls the agent actually emitted, two generators means
 	// two call distributions blended into one number that describes neither.
+	// A trace with NO served model is not a trace that agrees with the others --
+	// it is a trace with no provenance, and skipping it made the "one served
+	// model" control vacuous: zero distinct models is not more than one, so a
+	// study where every trace omitted the field passed validation.
+	//
+	// The per-turn check in the provider now refuses an empty model outright, so
+	// this cannot arise from a live run. It is enforced here as well because
+	// validation reads FILES, and a file can be hand-edited.
 	served := map[string][]string{}
 	for _, t := range traces {
-		if t.ServedModel != "" {
-			key := fmt.Sprintf("%s/run%d", t.BriefID, t.RunIndex)
-			served[t.ServedModel] = append(served[t.ServedModel], key)
+		key := fmt.Sprintf("%s/run%d", t.BriefID, t.RunIndex)
+		if t.ServedModel == "" {
+			problems = append(problems, fmt.Sprintf(
+				"%s reports no served model; a trace with no provenance cannot "+
+					"be part of a pre-registered result", key))
+			continue
+		}
+		served[t.ServedModel] = append(served[t.ServedModel], key)
+		for _, m := range t.Messages {
+			if m.ServedModel == "" || m.ResponseID == "" {
+				problems = append(problems, fmt.Sprintf(
+					"%s turn %d carries no served model or response id; per-turn "+
+						"provenance is what makes the served-model control checkable",
+					key, m.Turn))
+				break
+			}
 		}
 	}
 	if len(served) > 1 {

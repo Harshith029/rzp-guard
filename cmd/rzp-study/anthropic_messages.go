@@ -121,9 +121,31 @@ func (c *anthropicClient) messages(req messagesRequest) (*messagesReply, []byte,
 
 	// The control described above. Not a warning -- an error, because a trace
 	// produced by an unknown model is not the pre-registered experiment.
-	if out.Model != "" && out.Model != req.Model {
+	//
+	// ABSENCE IS NOT AGREEMENT. This used to read
+	//
+	//	if out.Model != "" && out.Model != req.Model
+	//
+	// which let an endpoint skip the check entirely by OMITTING the field. The
+	// whole reason this control exists is that the endpoint is untrusted and was
+	// measured substituting models; an untrusted party that can silently opt out
+	// of a check by leaving a field empty is not being checked. A response with
+	// no model is now exactly as unusable as one with the wrong model.
+	if out.Model == "" {
+		return nil, raw, fmt.Errorf("%w: requested %q, response carries no model "+
+			"field at all, so there is no provenance for this turn",
+			errModelSubstituted, req.Model)
+	}
+	if out.Model != req.Model {
 		return nil, raw, fmt.Errorf("%w: requested %q, served %q",
 			errModelSubstituted, req.Model, out.Model)
+	}
+	// The response id is the only other per-turn artefact the endpoint supplies.
+	// Recorded in every trace and worthless if it can be blank.
+	if out.ID == "" {
+		return nil, raw, fmt.Errorf("%w: response carries no id, so the turn "+
+			"cannot be identified against the endpoint's own records",
+			errModelSubstituted)
 	}
 	return &out, raw, nil
 }

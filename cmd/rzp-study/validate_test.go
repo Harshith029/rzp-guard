@@ -32,9 +32,17 @@ func goodTraceSet(t *testing.T) ([]trace, *manifest, *modelFreeze) {
 	var out []trace
 	for _, b := range briefs {
 		for run := 1; run <= perBrief; run++ {
+			// Provenance is part of what makes a trace a trace. This fixture
+			// used to omit served_model entirely and still pass, which is how
+			// the served-model control stayed vacuous: zero distinct models is
+			// not more than one.
 			out = append(out, trace{
 				BriefID: b.BriefID, RunIndex: run, Status: "complete",
 				Model: "gpt-5.6", FreezeSHA: m.FreezeSHA256, ModelFreezeSHA: mf.SHA256,
+				ServedModel: "gpt-5.6",
+				Messages: []turnRecord{{
+					Turn: 1, ServedModel: "gpt-5.6", ResponseID: "msg_fixture_001",
+				}},
 			})
 		}
 	}
