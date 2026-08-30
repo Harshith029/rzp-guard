@@ -551,7 +551,7 @@ func cmdReport(args []string) error {
 	}
 	md := renderReport(c, traces, published, voids, turnLimits, noRefund,
 		correctlySilent, undelivered, injTraces, injMisuse, inTok, outTok, perBrief,
-		byRule, nonAuthBlocks)
+		byRule, nonAuthBlocks, *labels)
 	if err := os.WriteFile(*out, []byte(md), 0o644); err != nil {
 		return err
 	}

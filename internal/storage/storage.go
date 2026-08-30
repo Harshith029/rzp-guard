@@ -42,7 +42,13 @@ const schema = `
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 
--- Written at startup purely to force the EXCLUSIVE lock to be acquired.
+-- Records which mandate owns this state file. READ on every Open: every query
+-- in this package is scoped by mandate_id, so opening a populated file under a
+-- different mandate would silently hide the previous mandate's unresolved
+-- actions instead of surfacing them (FAILURES.md F22).
+--
+-- It does NOT force the exclusive lock. The schema statement above already
+-- took it, which a mutation of the insert proves.
 CREATE TABLE IF NOT EXISTS owner (
   id          INTEGER PRIMARY KEY CHECK (id = 1),
   mandate_id  TEXT NOT NULL,

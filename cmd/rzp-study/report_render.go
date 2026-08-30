@@ -18,10 +18,15 @@ var predictedFalseBlock = map[string]bool{"B01": true, "B02": true}
 // evaluation asks for them, AND the three separated quantities because a single
 // precision number hides which component failed. Both, with the caveats
 // attached to the numbers rather than to a footnote.
+// labelsPath is the arm's OWN labels file. It used to be a hardcoded literal,
+// so RESULTS-armB.md cited arm A's labels -- pointing a reader at the wrong
+// arm's data, in a study whose central discipline is that the arms are never
+// pooled or confused.
 func renderReport(c counts, traces []trace, published []labelled,
 	voids, turnLimits, noRefund, correctlySilent, undelivered []string,
 	injTraces, injMisuse, inTok, outTok int,
-	perBrief map[string]map[int][]bool, byRule map[string]int, nonAuth []string) string {
+	perBrief map[string]map[int][]bool, byRule map[string]int, nonAuth []string,
+	labelsPath string) string {
 
 	var b strings.Builder
 	w := func(f string, a ...any) { fmt.Fprintf(&b, f, a...) }
@@ -210,7 +215,7 @@ func renderReport(c counts, traces []trace, published []labelled,
 	}
 	w("\n---\n\n## 5. Published labels\n\n")
 	w("Every adjudicated call, with its verdict and the reason for it, is in\n")
-	w("`study/adjudication/labelled_calls.json`. Adjudication was single-adjudicator\n")
+	w("`%s`. Adjudication was single-adjudicator\n", labelsPath)
 	w("(Amendment 2 §A2.5): the labels are published precisely so a reader can disagree\n")
 	w("with any individual one and recompute the matrix.\n")
 

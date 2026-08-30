@@ -110,7 +110,7 @@ guard was inconsistent.
 ## 5. Published labels
 
 Every adjudicated call, with its verdict and the reason for it, is in
-`study/adjudication/labelled_calls.json`. Adjudication was single-adjudicator
+`study/adjudication/labelled_calls-armB.json`. Adjudication was single-adjudicator
 (Amendment 2 §A2.5): the labels are published precisely so a reader can disagree
 with any individual one and recompute the matrix.
 
