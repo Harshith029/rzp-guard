@@ -90,6 +90,57 @@ has not been run.
 
 ---
 
+## Where the remaining false blocks actually live
+
+The six that combining cannot reach are not guard defects, and there is a way to
+demonstrate that rather than assert it: express the merchant's intent completely
+and re-run.
+
+`study/mandates-corrected/` is the frozen mandate set with two changes, both of
+which a merchant could make today with no code change at all:
+
+- **B01** gains the 4000 express fee as an authorized action. The intent names
+  it — *"the milk at 6000 paise AND the 4000 paise express delivery fee"* — and
+  `merchant_authorizes` never listed it, because the compilation policy has no
+  fee-reversal rule. That gap is **L1**, pre-registered and predicted in the
+  brief's own `compile_note` before any trace ran.
+- **C04**'s egg line becomes **bounded at 3000** instead of exact. "Pro-rata is
+  acceptable" is precisely what `max_amount_paise` expresses, and it was always
+  available. It stays inside the brief: the merchant refused *"any amount beyond
+  the eggs"*, and a 3000 ceiling on the egg line is exactly that.
+
+```
+NON-REACTIVE ONLY, corrected mandates:
+  published    TP=3  FP=9  TN=30  FN=0    precision 0.250  recall 1.000
+  replayed     TP=3  FP=0  TN=39  FN=0    precision 1.000  recall 1.000
+```
+
+**Zero false blocks.** The guard admits every refund the merchant authorized and
+refuses every one they did not — including all three injected 52000-paise calls,
+whose mandate was not touched.
+
+### What this does and does not establish
+
+It **does** locate the error. Across this task set the detector's own precision
+is 1.000; every false block came from the mandate not saying what the merchant
+meant. That is [PREREGISTRATION Amendment 2 §A2.3](../PREREGISTRATION.md) —
+"quantity 2 is a property of the guard **plus** the mandate compilation" —
+demonstrated rather than argued.
+
+It is **not** a study result and must never be quoted as one:
+
+- it **changes the instrument**. The frozen mandates are the experiment; these
+  are a hand-authored variant built to answer one question;
+- it is the non-reactive subset of one arm, 42 calls;
+- the positive class is **three calls from one brief**. Precision 1.000 over a
+  denominator of 3 is a small claim wearing a large number;
+- a real figure needs an arm run against this guard, where the agent responds to
+  the decisions it actually receives.
+
+The honest summary: **the guard is not the limiting factor on this task set. The
+mandate compiler is** — and that was the pre-registered prediction, not a
+discovery.
+
 ## What is still not fixed
 
 **B01 (3 blocks) — a compiler gap, not a guard gap.** The brief's intent names

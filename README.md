@@ -178,7 +178,43 @@ Mandate size barely matters until it is large: 1, 10 and 100 actions all land
 within noise of each other (~200–260 ns) and only 1000 actions reaches 1.2 µs.
 The linear scan in `mandate.Find()` is not worth replacing.
 
-Not measured: sustained load, memory under long sessions, p99 under concurrency.
+### Under sustained load
+
+`go test ./internal/bootstrap/ -run Soak -timeout 30m`. 6000 refunds through one
+guard, full reserve-and-commit lifecycle:
+
+| | |
+|---|---|
+| Throughput | **59 refunds/second**, sustained |
+| Heap | 1.2 MiB → 1.9 MiB across 6000 calls |
+| State file + WAL | 4.3 MiB → 5.7 MiB (calls grew 6×, the file grew 1.3×) |
+| Rate window | 4000 writes over 2 simulated hours, **2001 retained** |
+
+Nothing grows with **uptime**. Heap tracks the mandate — one ledger entry per
+action, 6000 of them here — and the state file tracks the same. The write-ahead
+log checkpoints rather than expanding, and the rate window is bounded by its
+retention. Those were the three ways a long-running session could have died
+quietly, and none of them happens.
+
+### How it actually scales
+
+The exclusive lock excludes a second guard from **one state file**. That has
+been read — including by me, in the audit dossier — as "it does not scale".
+Those are different claims and only the first was true.
+
+The deployment shape is one agent session, one mandate, one state file, so the
+**mandate is the shard key** and it was there from the start.
+`internal/bootstrap/concurrent_test.go` runs it: **24 concurrent sessions**, each
+authorizing its full budget, with every session's encumbrance exactly its own —
+no ledger, budget or receipt leaks between them. A separate case confirms the
+lock still admits **exactly 1 of 16** concurrent opens on a shared file, which is
+the guarantee the sharding relies on.
+
+What does *not* scale is one Docker child per session. That is the real ceiling
+and it is a process-management problem, not an architectural one.
+
+Still not measured: p99 under concurrent load, behaviour on a network
+filesystem, recovery after an unclean kill.
 
 ## The false blocks, and what was done about them
 
@@ -219,6 +255,29 @@ being replayed**. A real figure needs a new arm run against this guard.
 This also corrects an earlier estimate of "~6 of 9". That was written from a
 summary rather than the labels, and it assumed B01's fee was in the mandate. It
 was not.
+
+**Where the other six actually come from.** Rather than assert they are not the
+guard's fault, express the merchant's intent completely and re-run. B01 gains
+the express fee its intent names; C04's egg line becomes bounded, which is what
+`max_amount_paise` is for. Both are changes a merchant could make today with no
+code at all ([study/mandates-corrected/](study/mandates-corrected/)):
+
+```
+NON-REACTIVE ONLY, corrected mandates:
+  published    TP=3  FP=9  TN=30  FN=0    precision 0.250  recall 1.000
+  replayed     TP=3  FP=0  TN=39  FN=0    precision 1.000  recall 1.000
+```
+
+**Zero false blocks**, with all three injected 52000-paise calls still refused —
+C01's mandate was not touched. On this task set the detector's own precision is
+1.000, and every false block came from the mandate not saying what the merchant
+meant. That is [PREREGISTRATION Amendment 2 §A2.3](PREREGISTRATION.md)
+demonstrated rather than argued: quantity 2 is a property of the guard **plus**
+the compilation.
+
+It changes the instrument, so it is **not** a study number, its positive class is
+three calls from one brief, and precision 1.000 over a denominator of 3 is a
+small claim wearing a large number. Read the caveats before quoting it.
 
 ## Known limits — stated, not buried
 
