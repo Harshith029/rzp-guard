@@ -733,3 +733,84 @@ acquired a mode where "use the stub" is enforced instead of requested; the stub
 refuses to impersonate a provider for anything that might be real; and four
 factual claims in my own brief — one of them a command that does not exist —
 were corrected.
+
+
+---
+
+## Round 11 — the red-team lane, again — reviewer: ChatGPT — 2026-08-31
+
+**Seven raised, seven accepted.** Third consecutive round on the same surface,
+and the same failure each time: **a claim slightly stronger than what was
+enforced.** Round 9 was a control an untrusted party could skip. Round 10 was
+rules called "executable" that were prose. Round 11 is a lane that was real and
+still had three holes.
+
+### P11.1 — "`./run.sh fuzz` escapes the new boundary."
+**ACCEPT — P0.** `cmd_fuzz` called `gorun`, which mounts the real workspace with
+default networking. I built the isolated lane, then wrote a brief telling
+reviewers to fuzz through the exact path the lane exists to replace. It now
+delegates to `cmd_redteam`.
+
+### P11.2 — "Strict child mode is bypassable and does not pin the stub."
+**ACCEPT — P0, and the reviewer's weakest-claim callout.** Two defects, both
+real. `RZP_GUARD_CHILD_STRICT` was an environment variable, so anything running
+inside the lane could unset it and restore `sh -c`. And even when set it only
+`Stat`ed `./.gotmp/mcp-stub` — a **writable relative path**, symlinks followed,
+no identity check.
+
+The sharpest part: **the test I wrote to prove strict mode worked demonstrated
+the opposite.** It created a shell script, renamed it to the strict path, and
+strict mode ran it. I read that as a passing test.
+
+Replaced with a compile-time boundary. `-tags redteam` selects
+`child_redteam.go`, which has no shell branch, no environment lookup and no path
+resolution; the path is absolute; `Lstat` refuses a symlink and a non-regular
+file; absence is refused rather than falling back. Proved by construction:
+`RZP_GUARD_CHILD_CMD` appears twice in the testhook binary and **zero times** in
+the redteam binary.
+
+The file now also states what it does NOT guarantee — that the file at that path
+is the real stub. Anyone who can write there can substitute it. Overstating this
+is what the last three rounds were about.
+
+### P11.3 — "The module cache is shared mutable state across isolated runs."
+**ACCEPT — P0.** `rzpguard-modcache` was a persistent read/write volume mounted
+into both the networked fetch stage and the offline test stage. Neither fresh
+nor removed: a poisoned cache would survive, and one review command could leave
+state for the next. Now created per invocation, destroyed in the trap, and
+mounted **read-only** in the offline stage.
+
+### P11.4 — "The key scan is narrower than its claim."
+**ACCEPT — P1.** It matched Razorpay ids only. Broadened to OpenAI, Anthropic,
+GitHub, AWS and PEM private keys — and the documentation now calls it a backstop
+for an accident rather than implying coverage. Also switched to `$GO_IMAGE_PINNED`
+directly, so a `GOIMAGE` override cannot redirect the isolated lane, and added
+`--pull=never` to the fetch stage that lacked it.
+
+### P11.5 — "`git archive HEAD` prevents reproducing newly written tests."
+**ACCEPT — P1, and the most practically important.** A reviewer writes a failing
+test, reruns the lane, and silently gets the last commit. That is an incentive
+to leave the safe runner, which is worse than the risk the archive avoided. Now
+`git ls-files -c -o --exclude-standard` copied from the working tree: uncommitted
+edits and new files are present, gitignored paths — `.env` included — are not.
+
+### P11.6 — "The synthetic-ID control is prefix-only and its refusal is not an MCP error."
+**ACCEPT — P1, all three parts.** `pay_SYNanything` passed; the refusal used
+`toolText` so it was a SUCCESS carrying an error-shaped body, while `toolError`
+with `isError: true` already existed two functions away; and only
+`create_refund` checked at all. Now exact membership against the 16 payment
+fixtures plus an explicit intentional-unknown set, a real tool error, and
+applied to `fetch_payment` and `fetch_multiple_refunds_for_payment` too.
+`pay_SYN8099` still returns not-found, because that is what C02 tests.
+
+### P11.7 — "The 'verified empirically' claim is not regression-protected."
+**ACCEPT — P1.** I verified the lane by hand and nothing stopped it regressing —
+which, given this is the third round on the same boundary, is the finding that
+matters most. `./run.sh redteam-selfcheck` now checks eight properties, and a CI
+job runs it alongside the redteam child tests and a stub-refusal assertion.
+
+**Net effect of Round 11:** the lane stopped being something I had checked once
+and became something that fails a build when it lapses; "only the stub can
+execute" was replaced by a compile-time guarantee plus an explicit statement of
+what it does not cover; and the fuzz command stopped pointing outside the
+boundary it was written to enforce.

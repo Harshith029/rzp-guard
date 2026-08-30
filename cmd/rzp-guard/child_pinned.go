@@ -1,4 +1,4 @@
-//go:build !testhook
+//go:build !testhook && !redteam
 
 package main
 

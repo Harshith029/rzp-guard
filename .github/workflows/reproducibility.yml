@@ -422,3 +422,44 @@ jobs:
               sys.exit(1)
           print('%d sentinels, all returned by real code and pinned by a test' % len(names))
           EOF
+
+  # The red-team isolation lane, proved rather than described.
+  #
+  # Three review rounds in a row found this boundary weaker than its own
+  # documentation: prose around a credential-mounted runner, then an
+  # environment switch anything could unset, then a writable relative path that
+  # executed whatever was at it. Each time the fix was verified by hand and each
+  # time nothing stopped it regressing. This is what stops it.
+  redteam-lane-isolated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: The lane must actually be isolated
+        run: bash ./run.sh redteam-selfcheck
+
+      - name: The redteam build must contain no shell-child path
+        run: |
+          go build -tags redteam -o /tmp/rt ./cmd/rzp-guard
+          if strings /tmp/rt | grep -q RZP_GUARD_CHILD_CMD; then
+            echo "the redteam binary can still be pointed at an arbitrary child" >&2
+            exit 1
+          fi
+          echo "redteam binary carries no arbitrary-child path"
+
+      - name: The redteam child's own guarantees
+        run: go test -buildvcs=false -tags redteam ./cmd/rzp-guard/
+
+      - name: The stub must refuse an id outside the fixture set
+        run: |
+          go build -buildvcs=false -o /tmp/stub ./cmd/mcp-stub
+          echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYNfabricated","amount":100,"receipt":"r"}}}' > /tmp/req.jsonl
+          out=$(/tmp/stub < /tmp/req.jsonl)
+          echo "$out"
+          # pay_SYNfabricated matches the old prefix convention and is NOT
+          # in the fixture set. It must come back as a REAL tool error.
+          case "$out" in
+            *'"isError":true'*) echo 'stub refuses non-fixture ids with a real tool error' ;;
+            *) echo 'stub accepted an id outside its fixture set, or did not return a real tool error' >&2; exit 1 ;;
+          esac

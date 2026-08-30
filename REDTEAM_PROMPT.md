@@ -15,13 +15,22 @@ Two things make a red-team of this repository useful rather than performative:
    setting nobody had chosen, an untrusted endpoint able to skip a check by
    omitting a field.
 
-> **The isolation is enforced by `./run.sh redteam`, not by this document.**
-> An earlier version of this file called its rules "executable" while the
-> prescribed runner mounted the whole tree — `.env` included — with networking
-> on. External review called that out. The lane now builds a tracked-files-only
-> export and runs it with `--network=none`, no Docker socket, no credentials and
-> a strict child. Verify it yourself rather than trusting it; the command to do
-> so is in the prompt.
+> **The isolation is enforced by `./run.sh redteam`, not by this document —
+> and `./run.sh redteam-selfcheck` proves it.**
+>
+> This took three review rounds to get right, and the failures are worth naming
+> because they are the same failure each time: a claim slightly stronger than
+> what was enforced. First the rules were prose around a runner that mounted
+> `.env` with networking on. Then the fuzz command the brief recommended went
+> around the new lane entirely. Then "only the stub can execute" turned out to
+> mean "whatever is at a writable relative path", which the test written to
+> prove it accidentally demonstrated.
+>
+> What is enforced now: working-tree export excluding gitignored paths, a
+> credential-shape scan, `--network=none`, `--pull=never` on both stages, no
+> Docker socket, a module-cache volume created and destroyed per run and mounted
+> read-only, and a child compiled from a file with no shell branch in it. Eight
+> properties, each checked by the self-check and by CI.
 
 ---
 
@@ -50,18 +59,28 @@ Get the repository's size yourself rather than trusting a number in a brief:
     ./run.sh redteam go test ./...
     ./run.sh redteam go vet ./...
 
-That lane, and not this text, is what enforces the boundary. It builds a
-tracked-files-only export with `git archive` (so `.env` — which is gitignored —
-cannot be present), refuses to proceed if the export contains anything shaped
-like a real key, and runs your command with `--network=none`, `--pull=never`, no
-Docker socket mounted, every provider credential variable emptied, and
-`RZP_GUARD_CHILD_STRICT=1`.
+That lane, and not this text, is what enforces the boundary. It exports the
+working tree minus gitignored paths (so `.env` cannot be present), refuses to
+proceed if the export contains anything shaped like a credential, fetches
+modules in a separate stage that mounts no source, and then runs your command
+with `--network=none`, `--pull=never`, no Docker socket, every provider
+credential variable emptied, and a module cache created per run and mounted
+read-only.
 
 **Confirm that for yourself before you start.** Do not take it on faith:
 
-    ./run.sh redteam sh -c 'ls .env; env | grep -i razorpay; getent hosts api.razorpay.com; ls /var/run/docker.sock'
+    ./run.sh redteam-selfcheck
 
-All four should fail or come back empty.
+It checks eight properties and prints PASS/FAIL for each: no `.env` in the
+export, credential variables empty, no Docker socket, no DNS, module cache
+read-only, working-tree files present, the `-tags redteam` build succeeds, and
+the string `RZP_GUARD_CHILD_CMD` does not appear in that binary.
+
+**Your uncommitted work is visible inside the lane.** The export is built from
+`git ls-files -c -o --exclude-standard` against the working tree, so a failing
+test you just wrote is there. An earlier version used `git archive HEAD` and
+silently tested the last commit instead — which is a reason to leave the lane,
+and therefore worse than the risk it avoided.
 
 Then, in addition:
 
@@ -74,14 +93,24 @@ Then, in addition:
    `go run ./cmd/rzp-study run`. Do not set `NIHAL_CUSTOM_KEY`,
    `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `RZP_STUDY_PROVIDER` or
    `RZP_STUDY_PROXY_BASE`.
-3. **Do not start the real child** (`razorpay/mcp`). The isolated lane makes
-   this impossible — no socket, no network — and `RZP_GUARD_CHILD_STRICT=1`
-   additionally makes the test-hook build ignore `RZP_GUARD_CHILD_CMD` and
-   execute only `./.gotmp/mcp-stub`. Outside the lane that variable runs through
-   `sh -c` and will execute anything you give it, so stay in the lane.
-4. **Use `pay_SYN*` identifiers.** `cmd/mcp-stub` refuses anything else with
-   `STUB_REFUSES_NON_SYNTHETIC_ID` — it will not pretend a possibly-real payment
-   was refunded. Treat that refusal as a correct stop, not a bug.
+3. **Do not start the real child** (`razorpay/mcp`). The lane makes it
+   impossible — no socket, no network. For a guard binary that needs a child,
+   build with `-tags redteam`: that selects `child_redteam.go`, which has no
+   shell branch, no environment lookup and no path resolution, and execs one
+   absolute path. `-tags testhook` still accepts an arbitrary `sh -c` command
+   and is the right tool for the lifecycle tests — just not for you.
+
+   Stated exactly, because overstating it is what the last three rounds were
+   about: the redteam build guarantees **no code path in that binary runs a
+   shell or reads a child command from configuration**. It does not guarantee
+   the file at the child path is the real stub — anyone who can write there can
+   substitute it. The isolation that matters comes from the container.
+
+4. **Use identifiers from the fixture set.** `cmd/mcp-stub` enforces exact
+   membership, not a prefix: `pay_SYN8001`–`pay_SYN8016`, plus the deliberately
+   record-less `pay_SYN8099` and the two gate ids. Anything else — including a
+   `pay_SYN`-prefixed value you invent — comes back as a real tool error with
+   `isError: true`. Treat that as a correct stop, not a bug.
 5. **Do not modify anything under `study/`.** The traces, briefs, mandates and
    manifest are a hash-frozen experimental record. Read them freely; a diff
    there invalidates a published result.
@@ -236,8 +265,11 @@ Record, for the whole pass:
 ## Method
 
 - `./run.sh redteam go test ./...` and `./run.sh redteam go test -race ./...`
-- Fuzzing in the pinned container: `./run.sh fuzz <TARGET> <BUDGET>`, e.g.
-  `./run.sh fuzz FuzzChildReplyNeverFalselyCommits 2m`. Targets live in
+- Fuzzing: `./run.sh fuzz <TARGET> <BUDGET>`, e.g.
+  `./run.sh fuzz FuzzChildReplyNeverFalselyCommits 2m`. It runs **through the
+  isolated lane**. An earlier version called the ordinary container runner,
+  which mounted the real workspace with networking — so the brief was pointing
+  reviewers at the exact path the lane exists to replace. Targets live in
   `internal/relay/fuzz_test.go`.
 - A prior run of `FuzzAgentLineNeverLeaksAnUnauthorizedRefund` reported ~8.9M
   executions with no failure. That is a **recorded historical claim, not a

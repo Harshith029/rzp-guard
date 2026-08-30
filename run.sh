@@ -105,73 +105,74 @@ cmd_operator_setup() {
 # ---------------------------------------------------------------------------
 # THE ISOLATED LANE, for external red-team work.
 #
-# The red-team brief used to say its rules were "executable". They were prose.
-# gorun mounts the WHOLE working tree -- .env included -- with default
-# networking, so a reviewer who added one test file could read Razorpay keys or
-# make egress without doing anything unusual. External review called that out
-# and was right: an instruction is not a boundary.
+# Round 10 of review said the "hard rules" were prose around a runner that
+# mounted .env with networking on. Round 11 said this lane still had three holes,
+# and it did. Both were right. What follows is the third attempt and it states
+# only what it enforces.
 #
-# This lane is the boundary.
+#   1. EXPORT: tracked files plus untracked-not-ignored files, copied from the
+#      WORKING TREE. `git archive HEAD` was wrong -- a reviewer who wrote a
+#      failing test could not run it, because the archive holds the last commit.
+#      That is an incentive to leave the lane, which is worse than the risk it
+#      avoided. Gitignored paths are still excluded, so .env cannot appear.
+#   2. SECRETS: the export is scanned for several credential shapes, not only
+#      Razorpay's. The scan is a backstop for a mistake, not a guarantee.
+#   3. IMAGE: the pinned digest constant directly, never the $GOIMAGE override,
+#      and --pull=never on BOTH stages.
+#   4. MODULE CACHE: a volume created per invocation and destroyed with the run.
+#      A persistent shared cache is mutable state carried between supposedly
+#      isolated runs; a poisoned one would survive.
+#   5. OFFLINE: the stage that runs your code has --network=none, no Docker
+#      socket, credentials emptied, and the cache mounted READ-ONLY.
+#   6. CHILD: built with `-tags redteam`, whose newChild has no shell branch at
+#      all. Not an environment switch -- a different compiled program.
 #
-#   1. A TRACKED-FILES-ONLY export. `git archive` emits exactly what is
-#      committed, so .env (gitignored), .gotmp, dist/ and any local raw
-#      artefacts cannot be present. Verified, not assumed, below.
-#   2. --network=none on the lane that runs code. Module downloads happen in a
-#      separate, earlier step that never mounts the export.
-#   3. No Docker socket, so no sibling container can be started -- which is what
-#      makes "never start the real child" enforceable rather than advisory.
-#   4. --pull=never, so a compromised tag cannot introduce a new image.
-#   5. Credential variables explicitly emptied, not merely absent from .env.
-#   6. RZP_GUARD_CHILD_STRICT=1, which makes the test-hook build refuse an
-#      arbitrary RZP_GUARD_CHILD_CMD and accept only the built stub.
-#
-# Usage:  ./run.sh redteam <go args...>
+# Usage:  ./run.sh redteam <command...>
 #         ./run.sh redteam go test ./...
-#         ./run.sh redteam go test ./internal/relay/ -run '^$' -fuzz FuzzAgentLineNeverLeaksAnUnauthorizedRefund -fuzztime 2m
-MODCACHE_VOL="rzpguard-modcache"
+#         ./run.sh redteam go test -tags redteam,testhook ./cmd/rzp-guard/
+#         ./run.sh redteam-selfcheck      # proves the properties above
 
 redteam_export() {
   local work="$1"
-  git archive --format=tar HEAD | tar -x -C "$work"
+  # Tracked AND untracked-but-not-ignored, from the working tree, so
+  # uncommitted work and new test files are present while .env is not.
+  ( cd "$PWD" && git ls-files -z -c -o --exclude-standard ) |
+    while IFS= read -r -d '' f; do
+      [ -f "$f" ] || continue
+      mkdir -p "$work/$(dirname "$f")"
+      cp -p "$f" "$work/$f"
+    done
 
-  # The export must not carry a credential or a local artefact. Checked rather
-  # than trusted: a .gitignore edit is one commit away from making this false.
-  local leaked=0
+  local leaked=0 bad f
   for bad in .env .env.local .gotmp dist evidence/live; do
     if [ -e "$work/$bad" ]; then
-      echo "REFUSING: tracked export contains $bad" >&2
+      echo "REFUSING: export contains $bad" >&2
       leaked=1
     fi
   done
-  # Anything key-SHAPED, excluding documented placeholders.
-  #
-  # .env.example exists to show the shape, so `rzp_test_xxxxxxxxxxxx` lives there
-  # legitimately and tripped this on the first run. The fix is to reject
-  # placeholders rather than to exempt the file: exempting it by name would mean
-  # a real key pasted into the template ships silently, which is exactly the
-  # mistake the scan is here to catch.
-  #
-  # A placeholder is a single repeated character (xxxx, 0000) or one of the
-  # words the templates use. Everything else key-shaped is treated as a key.
-  #
-  # Written without a backreference on purpose: POSIX ERE has none, and the
-  # first version of this line failed with "Invalid back reference" -- which
-  # would have silently disabled the scan had it not been checked.
-  local hits f tail
-  hits="$(grep -rlE "rzp_(test|live)_[A-Za-z0-9]{10,}" "$work" 2>/dev/null || true)"
-  for f in $hits; do
-    for tail in $(grep -ohE "rzp_(test|live)_[A-Za-z0-9]{10,}" "$f" | sed -E 's/^rzp_(test|live)_//'); do
-      # Collapse repeats: a placeholder reduces to one character.
+
+  # Several credential shapes, not just Razorpay's. This is a BACKSTOP for an
+  # accident, not a secret scanner: it will miss anything it does not know the
+  # shape of, and the documentation says so rather than implying coverage.
+  local pat='rzp_(test|live)_[A-Za-z0-9]{10,}|sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+  for f in $(grep -rlE "$pat" "$work" 2>/dev/null || true); do
+    local tail hit=0 tok
+    for tok in $(grep -ohE "$pat" "$f"); do
+      tail="$(printf %s "$tok" | sed -E 's/^(rzp_(test|live)_|sk-ant-|sk-|ghp_|github_pat_)//')"
+      # A placeholder collapses to one repeated character, or starts with a
+      # word the templates use.
       case "$(printf %s "$tail" | tr -s 'A-Za-z0-9')" in
         x|X|0|a|A) continue ;;
       esac
       case "$tail" in
-        xxx*|XXX*|000*|abc*|your*|stub*|studystub*) continue ;;
+        xxx*|XXX*|000*|abc*|your*|stub*|studystub*|REDACTED*) continue ;;
       esac
-      echo "REFUSING: $f contains something shaped like a real Razorpay key" >&2
-      leaked=1
-      break
+      hit=1
     done
+    if [ "$hit" = 1 ]; then
+      echo "REFUSING: $f contains something shaped like a real credential" >&2
+      leaked=1
+    fi
   done
   [ "$leaked" = 0 ] || exit 1
 }
@@ -179,30 +180,78 @@ redteam_export() {
 cmd_redteam() {
   [ "$#" -gt 0 ] || { echo "usage: ./run.sh redteam <command...>" >&2; exit 2; }
 
-  # NOT `local`: the EXIT trap fires in global scope, where a function-local is
-  # already gone, and `set -u` then aborts the shell AFTER the tests have passed
-  # -- turning a green run into a non-zero exit.
+  # NOT `local`: the EXIT trap runs in global scope where a function-local is
+  # already gone, and `set -u` would then abort AFTER a green run.
   REDTEAM_WORK="$(mktemp -d)"
-  trap 'rm -rf "${REDTEAM_WORK:-}"' EXIT
-  local work="$REDTEAM_WORK"
-  redteam_export "$work"
-  local workw; workw="$(cygpath -w "$work" 2>/dev/null || printf %s "$work")"
+  REDTEAM_VOL="rzpguard-rt-$$-$(date +%s)"
+  trap 'rm -rf "${REDTEAM_WORK:-}"; docker volume rm -f "${REDTEAM_VOL:-}" >/dev/null 2>&1 || true' EXIT
 
-  # Dependencies are fetched HERE, with network, mounting only the module
-  # manifests -- never the export, and never the working tree.
-  echo "--- populating module cache (network on, no source mounted) ---"
-  MSYS_NO_PATHCONV=1 docker run --rm       -v "${MODCACHE_VOL}:/go/pkg/mod"       -v "$workw/go.mod:/m/go.mod:ro" -v "$workw/go.sum:/m/go.sum:ro"       -w /m -e GOFLAGS=-buildvcs=false "$GOIMAGE"       go mod download >/dev/null
+  redteam_export "$REDTEAM_WORK"
+  local workw; workw="$(cygpath -w "$REDTEAM_WORK" 2>/dev/null || printf %s "$REDTEAM_WORK")"
 
-  echo "--- running with NO network, NO docker socket, NO credentials ---"
-  MSYS_NO_PATHCONV=1 docker run --rm       --network=none --pull=never       -v "${MODCACHE_VOL}:/go/pkg/mod"       -v "$workw":/src -w /src       -e GOFLAGS=-buildvcs=false       -e GOPROXY=off       -e RZP_GUARD_CHILD_STRICT=1       -e RAZORPAY_KEY_ID= -e RAZORPAY_KEY_SECRET=       -e NIHAL_CUSTOM_KEY= -e OPENAI_API_KEY= -e ANTHROPIC_API_KEY=       -e RZP_STUDY_PROVIDER= -e RZP_STUDY_PROXY_BASE=       "$GOIMAGE" "$@"
+  # Dependencies fetched HERE, with network, mounting only the manifests --
+  # never the export, never the working tree. The pinned digest directly, so a
+  # GOIMAGE override cannot redirect the isolated lane.
+  echo "--- fetching modules (network on, no source mounted, fresh volume) ---"
+  MSYS_NO_PATHCONV=1 docker run --rm --pull=never \
+      -v "${REDTEAM_VOL}:/go/pkg/mod" \
+      -v "$workw/go.mod:/m/go.mod:ro" -v "$workw/go.sum:/m/go.sum:ro" \
+      -w /m -e GOFLAGS=-buildvcs=false "$GO_IMAGE_PINNED" \
+      go mod download >/dev/null
+
+  echo "--- running: no network, no socket, no credentials, cache read-only ---"
+  MSYS_NO_PATHCONV=1 docker run --rm \
+      --network=none --pull=never \
+      -v "${REDTEAM_VOL}:/go/pkg/mod:ro" \
+      -v "$workw":/src -w /src \
+      -e GOFLAGS=-buildvcs=false \
+      -e GOPROXY=off \
+      -e RAZORPAY_KEY_ID= -e RAZORPAY_KEY_SECRET= \
+      -e NIHAL_CUSTOM_KEY= -e OPENAI_API_KEY= -e ANTHROPIC_API_KEY= \
+      -e RZP_STUDY_PROVIDER= -e RZP_STUDY_PROXY_BASE= \
+      "$GO_IMAGE_PINNED" "$@"
 }
 
-# Fuzzing, in the pinned container. The brief used to hand out a bare host
-# `go test -fuzz` command while insisting everything run in the container.
+# Proves the lane's properties instead of asserting them in a comment. Run it
+# before trusting the lane, and in CI so the properties cannot silently lapse.
+cmd_redteam_selfcheck() {
+  echo "=== red-team lane self-check ==="
+  cmd_redteam sh -c '
+    fail=0
+    check() { if [ "$2" = ok ]; then echo "  PASS  $1"; else echo "  FAIL  $1"; fail=1; fi; }
+
+    [ ! -e .env ] && check "no .env in the export" ok || check "no .env in the export" no
+    [ -z "${RAZORPAY_KEY_ID:-}${RAZORPAY_KEY_SECRET:-}${NIHAL_CUSTOM_KEY:-}${OPENAI_API_KEY:-}" ] \
+      && check "credential variables empty" ok || check "credential variables empty" no
+    [ ! -e /var/run/docker.sock ] && check "no docker socket" ok || check "no docker socket" no
+    if getent hosts proxy.golang.org >/dev/null 2>&1; then check "no DNS" no; else check "no DNS" ok; fi
+    [ ! -w /go/pkg/mod ] && check "module cache read-only" ok || check "module cache read-only" no
+    # Uncommitted work must be visible, or reviewers leave the lane.
+    [ -f run.sh ] && check "working-tree files present" ok || check "working-tree files present" no
+
+    # The redteam child must have no shell branch. Build it and look.
+    go build -tags redteam -o /tmp/g ./cmd/rzp-guard 2>/dev/null \
+      && check "redteam build succeeds" ok || check "redteam build succeeds" no
+    if strings /tmp/g 2>/dev/null | grep -q "RZP_GUARD_CHILD_CMD"; then
+      check "no RZP_GUARD_CHILD_CMD in the redteam binary" no
+    else
+      check "no RZP_GUARD_CHILD_CMD in the redteam binary" ok
+    fi
+
+    echo
+    [ "$fail" = 0 ] && echo "lane self-check PASSED" || { echo "lane self-check FAILED" >&2; exit 1; }
+  '
+}
+
+# Fuzzing INSIDE the isolated lane.
+#
+# This used to call gorun, which mounts the real workspace with networking --
+# so the brief told reviewers to fuzz through the exact path the lane exists to
+# replace. Round 11 caught that.
 cmd_fuzz() {
-  local target="${1:-FuzzAgentLineNeverLeaksAnUnauthorizedRefund}"
+  local target="${1:-FuzzChildReplyNeverFalselyCommits}"
   local budget="${2:-60s}"
-  gorun go test ./internal/relay/ -run '^$' -fuzz "$target" -fuzztime "$budget"
+  cmd_redteam go test ./internal/relay/ -run '^$' -fuzz "$target" -fuzztime "$budget"
 }
 
 cmd_build() {
@@ -563,7 +612,8 @@ rzp-guard
   ./run.sh bench             measure the decision and the durable writes
   ./run.sh fuzz [TARGET] [BUDGET]
                              fuzz in the pinned container (default 60s)
-  ./run.sh redteam <cmd...>  ISOLATED lane for external review: tracked-files
+  ./run.sh redteam-selfcheck proves the isolated lane's properties
+  ./run.sh redteam <cmd...>  ISOLATED lane for external review: working-tree
                              export, --network=none, no docker socket, no
                              credentials, strict child. Use this one.
   ./run.sh release [VERSION] stamped static linux/amd64 build + checksums
@@ -603,6 +653,7 @@ case "${1:-help}" in
   vet) cmd_vet ;;
   build) cmd_build ;;
   redteam) shift; cmd_redteam "$@" ;;
+  redteam-selfcheck) cmd_redteam_selfcheck ;;
   fuzz) shift; cmd_fuzz "$@" ;;
   bench) cmd_bench ;;
   release) shift; cmd_release "$@" ;;
