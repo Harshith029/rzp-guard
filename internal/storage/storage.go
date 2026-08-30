@@ -33,6 +33,11 @@ import (
 // misread into a hard outage: better, but still bad.
 const schemaVersion = 1
 
+// callLogRetention is how much history RecordCall keeps. The rate limiter
+// only ever asks about the last 60 seconds; the surplus is deliberate slack so
+// pruning can never discard a row the limiter is still counting.
+const callLogRetention = time.Hour
+
 var (
 	// ErrSchemaVersion means the file was written by a build with a different
 	// schema. Refused rather than guessed at.
@@ -59,11 +64,14 @@ PRAGMA foreign_keys=ON;
 --
 -- MEASURED (internal/storage/bench_test.go, on this hardware):
 --
---   synchronous=FULL     10.8 ms per commit
---   synchronous=NORMAL   23   us per commit
---   synchronous=OFF      27   us per commit
+--   synchronous=FULL     ~5.6 ms per commit
+--   synchronous=NORMAL   ~34  us per commit
 --
--- A 470x difference, and it is the price of the guarantee the design rests on:
+-- (500 iterations x 3 runs. An earlier 200-iteration measurement put these
+-- at 10.8 ms and 23 us -- roughly 2x high, on a workload dominated by disk
+-- flushes where small samples do not settle.)
+--
+-- A ~165x difference, and it is the price of the guarantee the design rests on:
 -- a reservation must be on disk BEFORE any byte is forwarded to the child. With
 -- NORMAL, a WAL commit is not fsynced, so a power loss can discard the most
 -- recent transactions. Lose a reservation whose refund already reached Razorpay
@@ -75,7 +83,7 @@ PRAGMA foreign_keys=ON;
 -- FULL was already in force as the driver's default. That is why this line
 -- exists: a default is not a decision, and a driver upgrade or a DSN change
 -- could have quietly moved it to NORMAL. The result would have looked like a
--- 470x performance win while removing the guarantee. TestSynchronousIsFull
+-- 165x performance win while removing the guarantee. TestSynchronousIsFull
 -- fails if this is ever weakened.
 PRAGMA synchronous=FULL;
 
@@ -442,10 +450,40 @@ func (s *Store) SetState(actionID, from, to string) error {
 }
 
 // RecordCall appends a forwarded call to the durable rate window.
+// RecordCall appends to the rate window and drops rows that have fallen out
+// of it, in ONE transaction.
+//
+// Pruning used to happen only in RecentCalls, whose sole caller is the startup
+// restore. So a long-running guard appended a row per forwarded call and never
+// removed one until the next restart -- bounded only by uptime.
+//
+// The obvious fix, a second Exec, would have been the wrong one: at
+// synchronous=FULL every commit is an fsync costing ~11ms (F23), so a separate
+// DELETE would DOUBLE the cost of every authorized refund to buy tidiness.
+// Both statements share one transaction and therefore one fsync, so the table
+// is bounded at no measurable cost.
+//
+// The window is generous on purpose: the limiter cares about 60 seconds, and
+// this keeps an hour. Pruning to exactly the window would race a clock that
+// moved backwards and silently discard slots the limiter still counts.
 func (s *Store) RecordCall(atUnixNano int64) error {
-	if _, err := s.db.Exec(
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("storage: record call: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(
 		`INSERT INTO call_log (mandate_id, at_unix_nano) VALUES (?, ?)`,
 		s.mandateID, atUnixNano); err != nil {
+		return fmt.Errorf("storage: record call: %w", err)
+	}
+	if _, err := tx.Exec(
+		`DELETE FROM call_log WHERE mandate_id = ? AND at_unix_nano < ?`,
+		s.mandateID, atUnixNano-int64(callLogRetention)); err != nil {
+		return fmt.Errorf("storage: prune call log: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("storage: record call: %w", err)
 	}
 	return nil

@@ -103,3 +103,18 @@ func BenchmarkRecoverStartup(b *testing.B) {
 		})
 	}
 }
+
+// RecordCall now prunes in the same transaction as the insert. If that ever
+// becomes a second commit, this benchmark roughly doubles -- which is the whole
+// reason the DELETE shares the transaction rather than following it.
+func BenchmarkRecordCallStaysOneCommit(b *testing.B) {
+	s := benchStore(b)
+	base := time.Now().UTC().UnixNano()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := s.RecordCall(base + int64(i)); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

@@ -142,31 +142,41 @@ The control matters: the container answered a legitimate read with a real Razorp
 
 | Operation | Cost |
 |---|---|
-| `Decide()` — permitted read | 188 ns |
-| `Decide()` — deny, unknown payment | 1.5 µs |
-| `Decide()` — deny, 1000-action mandate | 1.6 µs |
-| `ReceiptFor()` — one SHA-256 | 2.1 µs |
-| **one durable commit** | **~11 ms** |
-| **one authorized refund** (two commits) | **~22 ms** |
+| `Decide()` — permitted read | ~170 ns |
+| `Decide()` — deny, unknown payment | ~340 ns |
+| `Decide()` — deny, 1000-action mandate | ~1.2 µs |
+| `ReceiptFor()` — one SHA-256 | ~407 ns |
+| **one durable commit** | **~5.6 ms** |
+| **one authorized refund** (two commits) | **~10.8 ms** |
+
+Figures are from 500 iterations × 3 runs (2000 × 3 for the sub-microsecond
+rows). An earlier 100–200 iteration pass put
+the durable numbers about twice as high; on a workload dominated by disk
+flushes, small samples do not settle, and the first set was published before
+that was checked.
 
 The decision is free. The durable layer is everything, and it is fsync:
-`synchronous=FULL` costs 10.8 ms per commit against 23 µs at `NORMAL`. That 470×
-is the price of the guarantee the whole design rests on — a reservation must be
-on disk *before* any byte is forwarded, or a power loss can resurrect a consumed
-action as `AVAILABLE` and permit a replay.
+`synchronous=FULL` costs ~5.6 ms per commit against ~34 µs at `NORMAL`. That
+~165× is the price of the guarantee the whole design rests on — a reservation
+must be on disk *before* any byte is forwarded, or a power loss can resurrect a
+consumed action as `AVAILABLE` and permit a replay.
 
 `FULL` was previously in force only as the driver's default. It is now declared
 in the schema and pinned by `TestSynchronousIsFull`, because a default is not a
-decision and the 470× would have looked like a win to anyone profiling this
+decision and the 165× would have looked like a win to anyone profiling this
 ([F23](FAILURES.md)).
 
 **What this means in context.** A Razorpay round trip is 100–500 ms, so the
-guard adds 4–20%. Because `Decide()` holds its mutex across both writes, a
-single guard serialises at roughly **45 authorized refunds/second** — ample for
+guard adds 2–11%. Because `Decide()` holds its mutex across both writes, a
+single guard serialises at roughly **90 authorized refunds/second** — ample for
 one support session, and now a known number rather than an assumption. Halving
 it by merging the two writes into one transaction is available and **not taken**:
 it touches the most safety-critical sequence in the codebase to save time nothing
 is waiting on.
+
+Mandate size barely matters until it is large: 1, 10 and 100 actions all land
+within noise of each other (~200–260 ns) and only 1000 actions reaches 1.2 µs.
+The linear scan in `mandate.Find()` is not worth replacing.
 
 Not measured: sustained load, memory under long sessions, p99 under concurrency.
 

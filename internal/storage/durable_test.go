@@ -255,8 +255,8 @@ func TestOperatorVerifierCannotBeSilentlyReplaced(t *testing.T) {
 // only as the driver's default until it was written down; this test is what
 // stops it drifting back.
 //
-// The measured cost is 10.8ms per commit against 23us at NORMAL. Anyone
-// profiling this system will find that number and be tempted -- it is a 470x
+// The measured cost is ~5.6ms per commit against ~34us at NORMAL. Anyone
+// profiling this system will find that number and be tempted -- it is a ~165x
 // win, and it silently trades away the promise that a reservation survives
 // power loss before its refund is forwarded.
 func TestSynchronousIsFull(t *testing.T) {

@@ -732,19 +732,18 @@ question I did not ask.
 
 **The measurement.** The authorization decision is free — 188 ns for a permitted
 read, 1.5 µs to deny an unknown payment, 1.6 µs against a 1000-action mandate.
-The durable path is not: **one commit costs ~11 ms**, and an authorized refund
-performs two, for ~22 ms.
+The durable path is not: **one commit costs ~5.6 ms**, and an authorized refund
+performs two, for **~10.8 ms**.
 
-Eleven milliseconds is not a database being slow. It is a disk being flushed,
-and a probe confirmed it:
+Milliseconds is not a database being slow. It is a disk being flushed, and a
+probe confirmed it:
 
 | `synchronous` | cost per commit |
 |---|---|
-| `FULL` (2) | 10.8 ms |
-| `NORMAL` (1) | 23 µs |
-| `OFF` (0) | 27 µs |
+| `FULL` (2) | ~5.6 ms |
+| `NORMAL` (1) | ~34 µs |
 
-**470×.** And that is the right price: the guarantee this whole design rests on
+**~165×.** And that is the right price: the guarantee this whole design rests on
 is that a reservation is on disk *before* any byte is forwarded. Under `NORMAL`
 a WAL commit is not fsynced, so a power loss can discard the most recent
 transactions. Lose a reservation whose refund already reached Razorpay and the
@@ -755,7 +754,7 @@ fail-open case the lifecycle exists to prevent.
 was in force as the *driver's default*. Nothing in the schema set it, no comment
 mentioned it, and no test asserted it. A driver upgrade, a DSN change, or
 someone adding `?_pragma=synchronous(1)` while chasing throughput would have
-removed the guarantee and looked like a 470× win.
+removed the guarantee and looked like a ~165× win.
 
 That is the same shape as F22 and as the three stale comments before it: **a
 claim resting on something unverified.** Here the claim was the central one.
@@ -765,10 +764,38 @@ It is now written into the schema with the measurement beside it, and
 same treatment for the same reason.
 
 **Not fixed, deliberately.** Merging the reservation and the rate-window write
-into one transaction would halve the cost to ~11 ms. It is not taken: it touches
-the most safety-critical sequence in the codebase to save 11 ms that nothing is
-waiting on. The Razorpay round trip is 100–500 ms, so the guard is 4–20% of a
-refund either way. That is a real number now, which is the point.
+into one transaction would halve the cost to ~5.6 ms. It is not taken: it
+touches the most safety-critical sequence in the codebase to save 5 ms that
+nothing is waiting on. The Razorpay round trip is 100–500 ms, so the guard is
+2–11% of a refund either way. That is a real number now, which is the point.
+
+### The first version of these numbers was wrong, and I published it
+
+The measurements above are from **500 iterations × 3 runs**. The first pass ran
+at 100–200 iterations and reported **10.8 ms per commit, 23 µs at NORMAL, a
+470× ratio, and ~22 ms per refund** — roughly double the true cost with the
+ratio overstated nearly threefold.
+
+Those figures went into the schema comment, a test comment, `README.md`,
+`OPERATIONS.md` and a commit message before anyone checked them. They are
+corrected in place.
+
+The cause is ordinary and worth naming: **an fsync-bound benchmark does not
+settle at 100 iterations.** Disk and page-cache state dominate, and a small
+sample reports whatever the container's I/O happened to be doing. The tell was
+available and I walked past it — the same operation measured 10.4 ms in one run
+and 6.2 ms in another, and I wrote up the first number instead of asking why
+two runs disagreed by 70%.
+
+The corrected set is internally consistent, which is the check that should have
+been applied first: one commit at 5.4 ms, an authorized refund performing two
+commits at 10.8 ms, and the standalone probe at 5.6 ms all agree.
+
+**The conclusion did not change.** `FULL` is far more expensive than `NORMAL`,
+the difference is the durability guarantee, and it must not be weakened. Only
+the magnitudes moved. But a number published without a variance check is a
+guess wearing a decimal point, and this repository is built on the claim that
+it does not do that.
 
 ### Two more fabrications caught by checking
 

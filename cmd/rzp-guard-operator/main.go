@@ -193,6 +193,33 @@ func run() error {
 }
 
 // authenticate verifies a presented token and returns an unforgeable Grant.
+//
+// THERE IS DELIBERATELY NO ATTEMPT COUNTER OR LOCKOUT HERE, and the reasoning
+// is worth stating because its absence looks like an oversight.
+//
+// The KDF is the rate limit, measured rather than assumed
+// (opauth.BenchmarkVerify): one verification costs 36.6 ms and allocates
+// 64 MiB. That caps an attacker at ~27 guesses per second per core against a
+// token of 256 bits from crypto/rand. Online guessing is not a threat model,
+// it is arithmetic. The rejection path measures 35.0 ms -- the same within
+// noise -- so the constant-time compare leaves no timing oracle either.
+//
+// A counter would also not defend the real threat. Reading the verifier
+// requires the state file, and anyone holding the state file can attack it
+// OFFLINE at their own pace; a counter stored in that same file is not a
+// boundary against someone who already owns it. That is why README limit 6
+// says the operator token is a second factor on top of filesystem ownership
+// rather than an independent one.
+//
+// And it would cost something real. This CLI is the ONLY path to resolve an
+// IN_DOUBT refund. A lockout on it means a mistyped token during an incident
+// can deny the legitimate operator access to stuck money at exactly the moment
+// they need it. Trading a genuine availability risk for no security gain is a
+// bad trade, so it is not made.
+//
+// This changes if the credential ever becomes human-chosen. A passphrase would
+// make guessing feasible and a counter necessary -- which is a reason to keep
+// generating tokens rather than accepting them.
 func authenticate(store *storage.Store, subject, token string) (opauth.Grant, error) {
 	stored, configured, _, err := store.OperatorVerifier()
 	if err != nil {
