@@ -136,6 +136,40 @@ The control matters: the container answered a legitimate read with a real Razorp
 > undo: those objects sat in a cloud-synced `.git` for about a day, and no local
 > rewrite retracts an upload that already happened.
 
+## Measured cost
+
+`./run.sh bench`. Numbers from the pinned container, not the host.
+
+| Operation | Cost |
+|---|---|
+| `Decide()` — permitted read | 188 ns |
+| `Decide()` — deny, unknown payment | 1.5 µs |
+| `Decide()` — deny, 1000-action mandate | 1.6 µs |
+| `ReceiptFor()` — one SHA-256 | 2.1 µs |
+| **one durable commit** | **~11 ms** |
+| **one authorized refund** (two commits) | **~22 ms** |
+
+The decision is free. The durable layer is everything, and it is fsync:
+`synchronous=FULL` costs 10.8 ms per commit against 23 µs at `NORMAL`. That 470×
+is the price of the guarantee the whole design rests on — a reservation must be
+on disk *before* any byte is forwarded, or a power loss can resurrect a consumed
+action as `AVAILABLE` and permit a replay.
+
+`FULL` was previously in force only as the driver's default. It is now declared
+in the schema and pinned by `TestSynchronousIsFull`, because a default is not a
+decision and the 470× would have looked like a win to anyone profiling this
+([F23](FAILURES.md)).
+
+**What this means in context.** A Razorpay round trip is 100–500 ms, so the
+guard adds 4–20%. Because `Decide()` holds its mutex across both writes, a
+single guard serialises at roughly **45 authorized refunds/second** — ample for
+one support session, and now a known number rather than an assumption. Halving
+it by merging the two writes into one transaction is available and **not taken**:
+it touches the most safety-critical sequence in the codebase to save time nothing
+is waiting on.
+
+Not measured: sustained load, memory under long sessions, p99 under concurrency.
+
 ## Known limits — stated, not buried
 
 1. **The detector metric exists now, and it is small, model-dependent and half-bad.** Arm B measured **recall 1.000 (3/3)** and **precision 0.250 (3/12)** over 54 adjudicated calls — the guard stopped every out-of-intent refund it was shown, and three blocks in four were wrong. Three true positives come from **one** injection brief; that is not a general claim about injections, and 15 hand-written briefs adjudicated by their own author are **not a held-out sample**. Arm A, against a stronger model, produced no out-of-intent calls at all, so its precision and recall are degenerate and must never be quoted as detector scores. **The arms are never pooled.** Separately, the conformance corpus in `corpus/` still cannot supply detector metrics at all: its labels are computed from the same predicate the policy matches on ([PREREGISTRATION.md Amendment 1](PREREGISTRATION.md)).

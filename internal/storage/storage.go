@@ -25,7 +25,19 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// schemaVersion is the version this build writes and understands.
+//
+// Bump it ONLY alongside an actual schema change, and only together with a
+// decision about files at the previous version -- migrate them, or refuse them
+// with instructions. Bumping it without that decision converts a silent
+// misread into a hard outage: better, but still bad.
+const schemaVersion = 1
+
 var (
+	// ErrSchemaVersion means the file was written by a build with a different
+	// schema. Refused rather than guessed at.
+	ErrSchemaVersion = errors.New("state file schema version is not supported by this build")
+
 	ErrReceiptExists = errors.New("receipt already issued")
 	// ErrNotOwner means another guard process already owns this state file.
 	ErrNotOwner = errors.New("state file is owned by another guard process")
@@ -120,6 +132,22 @@ CREATE TABLE IF NOT EXISTS operator_verifier (
   ephemeral INTEGER NOT NULL DEFAULT 0
 );
 
+-- What version of this schema the file was created with.
+--
+-- There is no migration framework here and this does not add one. What it adds
+-- is the ability to FAIL LOUDLY instead of silently misreading a file, and that
+-- is the half that cannot be retrofitted: once state files exist in the wild, a
+-- file with no version stamp is indistinguishable from a v1 file, and the first
+-- schema change has no safe way to tell them apart.
+--
+-- Added while every state file in existence is still disposable. That is the
+-- only moment it is free.
+CREATE TABLE IF NOT EXISTS schema_meta (
+  id         INTEGER PRIMARY KEY CHECK (id = 1),
+  version    INTEGER NOT NULL,
+  created_at TEXT    NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   at            TEXT NOT NULL,
@@ -163,6 +191,13 @@ func Open(path, mandateID string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
+	}
+	// Before ANY read of the tables below. A file this build cannot correctly
+	// interpret must be refused while it is still untouched, not after its
+	// contents have been half-understood.
+	if err := checkSchemaVersion(db); err != nil {
+		db.Close()
+		return nil, err
 	}
 	// Which mandate does this state file already belong to?
 	//
@@ -330,6 +365,49 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 // receiptTaken reports whether some row already holds this receipt. Used only
 // to classify a failed insert, never to gate one -- the UNIQUE constraint is
 // the actual guard.
+// checkSchemaVersion stamps a new file and refuses one this build cannot read.
+//
+// A file at a HIGHER version was written by a newer guard that may track state
+// in columns this build ignores. Opening it would mean acting on a partial view
+// of money another process considers authoritative, so it is refused rather
+// than tolerated. A LOWER version means a schema change shipped without a
+// migration -- a defect in this repository, not in the operator's file, and the
+// message says so plainly, because the instinct on meeting it is to delete the
+// file and that file may hold IN_DOUBT actions whose refunds already moved.
+//
+// INSERT OR IGNORE, not INSERT: a file created before this table existed gets
+// stamped v1 on first open, which is correct -- the schema it holds IS v1.
+func checkSchemaVersion(db *sql.DB) error {
+	if _, err := db.Exec(
+		`INSERT OR IGNORE INTO schema_meta (id, version, created_at) VALUES (1, ?, ?)`,
+		schemaVersion, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("storage: stamp schema version: %w", err)
+	}
+
+	var found int
+	if err := db.QueryRow(`SELECT version FROM schema_meta WHERE id = 1`).
+		Scan(&found); err != nil {
+		return fmt.Errorf("storage: read schema version: %w", err)
+	}
+	switch {
+	case found == schemaVersion:
+		return nil
+	case found > schemaVersion:
+		return fmt.Errorf("%w: file is version %d, this build understands %d. "+
+			"It was written by a NEWER rzp-guard which may track state in columns "+
+			"this build cannot see, so opening it would act on a partial view of "+
+			"money that another process considers authoritative. Upgrade the "+
+			"binary rather than downgrading the file",
+			ErrSchemaVersion, found, schemaVersion)
+	default:
+		return fmt.Errorf("%w: file is version %d, this build expects %d. No "+
+			"migration exists for that step, which is a defect in rzp-guard and "+
+			"not in your state file. Do NOT delete it: it may hold IN_DOUBT "+
+			"actions whose refunds already moved money",
+			ErrSchemaVersion, found, schemaVersion)
+	}
+}
+
 func (s *Store) receiptTaken(receipt string) (bool, error) {
 	var n int
 	err := s.db.QueryRow(

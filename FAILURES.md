@@ -723,3 +723,75 @@ filesystem, a container restart with the file still locked, or a stale lock
 after an unclean kill — all still untested, as `REVIEW_PACKET.md` says. And a
 guard rail on picking the state file is not the measured recovery drill that
 limitation 5 of the README still says is missing.
+
+
+## F23 — The durability guarantee rested on a default nobody had chosen
+
+The project had never measured itself. Writing the first benchmarks answered a
+question I did not ask.
+
+**The measurement.** The authorization decision is free — 188 ns for a permitted
+read, 1.5 µs to deny an unknown payment, 1.6 µs against a 1000-action mandate.
+The durable path is not: **one commit costs ~11 ms**, and an authorized refund
+performs two, for ~22 ms.
+
+Eleven milliseconds is not a database being slow. It is a disk being flushed,
+and a probe confirmed it:
+
+| `synchronous` | cost per commit |
+|---|---|
+| `FULL` (2) | 10.8 ms |
+| `NORMAL` (1) | 23 µs |
+| `OFF` (0) | 27 µs |
+
+**470×.** And that is the right price: the guarantee this whole design rests on
+is that a reservation is on disk *before* any byte is forwarded. Under `NORMAL`
+a WAL commit is not fsynced, so a power loss can discard the most recent
+transactions. Lose a reservation whose refund already reached Razorpay and the
+action returns as `AVAILABLE` at the next start — a replay, and precisely the
+fail-open case the lifecycle exists to prevent.
+
+**The defect is not the cost. It is that nobody chose it.** `synchronous=FULL`
+was in force as the *driver's default*. Nothing in the schema set it, no comment
+mentioned it, and no test asserted it. A driver upgrade, a DSN change, or
+someone adding `?_pragma=synchronous(1)` while chasing throughput would have
+removed the guarantee and looked like a 470× win.
+
+That is the same shape as F22 and as the three stale comments before it: **a
+claim resting on something unverified.** Here the claim was the central one.
+
+It is now written into the schema with the measurement beside it, and
+`TestSynchronousIsFull` fails if anyone weakens it. `journal_mode=WAL` got the
+same treatment for the same reason.
+
+**Not fixed, deliberately.** Merging the reservation and the rate-window write
+into one transaction would halve the cost to ~11 ms. It is not taken: it touches
+the most safety-critical sequence in the codebase to save 11 ms that nothing is
+waiting on. The Razorpay round trip is 100–500 ms, so the guard is 4–20% of a
+refund either way. That is a real number now, which is the point.
+
+### Two more fabrications caught by checking
+
+**A digest I invented.** The new Dockerfile needs the pinned alpine image. I
+wrote one from memory: `28bd5fe8fa1a80b9...`. The real digest is
+`28bd5fe8b56d1bd0...`. **The first eight hex characters matched and the
+remaining fifty-six did not** — which is exactly how a fabricated hash looks when
+the memory of it is real but partial. Caught by diffing against `run.sh`, which
+is now a CI job, because a duplicated constant drifts and a Dockerfile cannot
+read a shell variable.
+
+**A test that reported a hole it had not found.** The new fuzz target asserts
+that no input makes an unauthorized `create_refund` reach the child. It broke in
+0.55 seconds on `{"":"create_refund"}` — an object carrying that text as a
+*value*, with no method at all. The relay forwards non-`tools/call` frames
+byte-for-byte by design and the child ignores a frame that invokes nothing.
+
+The bug was in my assertion: it asked whether the string `create_refund` appeared
+in the forwarded bytes. **A substring is not a tool call.** It now decodes each
+forwarded line and checks for a genuine `tools/call` naming the tool. After the
+fix: **8.9 million executions, 415 distinct interesting inputs, zero failures.**
+
+Third time in this project that a detector reported something real-looking and
+wrong — `sed` patterns that did not match, a `-run` filter that excluded the new
+test, and now a substring standing in for a parse. The lesson is stable:
+**a check that has never been shown to fail correctly is not evidence.**
