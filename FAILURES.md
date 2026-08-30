@@ -632,8 +632,9 @@ not publish those records** — which was the actual blocker.
 I went looking for test coverage and found a way to lose a refund.
 
 `internal/storage` was the lowest-covered package that matters, so I audited it.
-Ten sentinel errors are declared; one, `ErrReceiptExists`, was **returned
-nowhere** — declared at line 28 and dead. Four more were returned but pinned by
+Ten sentinel errors were declared at that point — eleven now, counting the one
+this fix adds. One, `ErrReceiptExists`, was **returned nowhere**: declared at
+line 28 and dead. Four more were returned but pinned by
 no `errors.Is` assertion anywhere: their behaviour was covered, their contract
 was not. `ErrNotOwner` was one of those, and it guards single-instance
 ownership, which is a money claim: two guards over one state file each check the

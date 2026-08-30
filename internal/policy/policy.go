@@ -402,6 +402,14 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	// Only now is the rate slot consumed: this call really is going to the child.
 	// If the durable write fails the reservation is rolled back, because a
 	// forwarded call that is not in the rate window is a bypass.
+	//
+	// The rollback is attempted, not guaranteed: the rate write failing usually
+	// means the store is broken, so the release will fail too. Then the action
+	// stays RESERVED, holding its budget, and recovery surfaces it as IN_DOUBT
+	// at the next start. Nothing was forwarded, so that is a refund an operator
+	// will be asked about that never left the building -- the conservative
+	// error, and the right one to make. Releasing an action whose release could
+	// not be durably recorded is the alternative, and that one can be replayed.
 	if err := g.rate.record(now); err != nil {
 		_ = g.ledger.ReleaseConfirmedRejection(action.ActionID)
 		return deny(tool, MalformedArguments,

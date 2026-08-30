@@ -48,6 +48,21 @@ type pending struct {
 
 // Relay wires an agent-facing stream to a child MCP server.
 type Relay struct {
+	// Transitions on this guard are called for effect and their errors are
+	// deliberately discarded -- MarkInDoubt, Commit and
+	// ReleaseConfirmedRejection all appear below as `_ = ...`.
+	//
+	// That is safe because of an invariant in lifecycle.transition: the durable
+	// write happens first, and the in-memory entry moves only if it succeeded.
+	// A failed write therefore leaves memory and the database agreeing on
+	// RESERVED, and RecoverStartup promotes anything still RESERVED to IN_DOUBT
+	// at the next start, so the outcome of a storage outage is a human looking
+	// at it rather than a divergence. There is nothing useful the relay could do
+	// here instead: it cannot un-send bytes the child already has.
+	//
+	// lifecycle.TestAFailedDurableWriteStrandsNoBudget pins that ordering. If it
+	// ever goes green while transition() mutates memory first, these discards
+	// become real: budget freed in memory that the database still holds.
 	guard *policy.Guard
 	now   func() time.Time
 	sink  DecisionSink
