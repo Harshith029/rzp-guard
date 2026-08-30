@@ -144,7 +144,7 @@ F. **Schema v2 and its migration.** `migrateV1toV2` rebuilds `action_state` and
    malformed, or has a version this build refuses.
 
 G. **Claims that outrun the code.** This is a real finding class in this
-   repository, with four prior instances (see FAILURES.md F22, F23, F24). Look
+   repository, with five prior instances (see FAILURES.md F22-F25). Look
    for: comments describing a guarantee the code does not provide; a declared
    error that can never be returned; a test whose assertion would pass even with
    the protection removed; a documented behaviour no test exercises; a default
@@ -190,12 +190,16 @@ via `cmd/mcp-stub`, never the real Razorpay container.
 
 - Build and test in the pinned container, as the repo does:
   `./run.sh test`, `./run.sh race`, `./run.sh lifecycle`
-- Existing fuzz targets: `go test ./internal/relay/ -run XXX -fuzz FuzzAgentLine... -fuzztime 5m`.
-  Extend them or write new ones.
+- Two fuzz targets exist in `internal/relay/fuzz_test.go`:
+  `FuzzAgentLineNeverLeaksAnUnauthorizedRefund` and
+  `FuzzChildReplyNeverFalselyCommits`. Run one with
+  `go test ./internal/relay/ -run '^$' -fuzz FuzzAgentLineNeverLeaksAnUnauthorizedRefund -fuzztime 5m`.
+  The first has 8.9M executions behind it with zero failures, so a new
+  finding there needs a genuinely new input shape. Extend them or add targets.
 - The mutation-testing discipline used here is worth copying: remove a
   protection, confirm a test fails, restore. A protection whose removal breaks
   nothing is either dead or untested — both are findings.
-- `FAILURES.md` documents 24 prior defects. Read it. It tells you the author's
+- `FAILURES.md` documents 25 prior defects. Read it. It tells you the author's
   blind spots, and several classes recur.
 
 ## What to report
