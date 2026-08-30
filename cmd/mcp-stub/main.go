@@ -38,6 +38,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 //go:embed fixtures.json
@@ -148,9 +149,41 @@ func main() {
 				})
 
 			case "create_refund":
-				// Never rejected: see the package comment. The refund id is
-				// derived from (payment, amount, receipt) so a trace is
-				// reproducible and two distinct refunds get distinct ids.
+				// ONE refusal, and it is not a policy.
+				//
+				// The stub has no policy of its own and must not acquire one --
+				// see the package comment. This check is about IDENTIFIER
+				// PROVENANCE, not authorization: a program that impersonates a
+				// payment provider should refuse to impersonate it for an
+				// identifier that might name something real.
+				//
+				// It cannot confound the study. Every payment id in the frozen
+				// briefs, mandates and examples is pay_SYN* (verified: zero
+				// exceptions), so this branch is unreachable for the experiment
+				// and fires only for input the study never contains.
+				//
+				// It exists because external review pointed out that "use only
+				// pay_SYN ids" was a naming convention in a document rather
+				// than anything enforced. A red-team reproducer that reaches
+				// for a real-looking id now fails loudly here instead of
+				// quietly appearing to work.
+				if !strings.HasPrefix(a.PaymentID, "pay_SYN") {
+					toolText(req.ID, map[string]any{
+						"error": map[string]any{
+							"code": "STUB_REFUSES_NON_SYNTHETIC_ID",
+							"description": "mcp-stub only impersonates the provider for " +
+								"pay_SYN* identifiers, which are non-resolvable by " +
+								"construction. Got " + a.PaymentID + ". This is not an " +
+								"authorization decision -- the stub has no policy -- it is " +
+								"a refusal to pretend a possibly-real payment was refunded.",
+						},
+					})
+					continue
+				}
+				// Never rejected beyond that: see the package comment. The
+				// refund id is derived from (payment, amount, receipt) so a
+				// trace is reproducible and two distinct refunds get distinct
+				// ids.
 				sum := sha256.Sum256([]byte(a.PaymentID + "|" + a.Amount.String() + "|" + a.Receipt))
 				amt, err := a.Amount.Int64()
 				if err != nil {

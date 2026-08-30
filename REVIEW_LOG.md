@@ -631,3 +631,105 @@ this round it says it in the reviewer's sharper words.
 decline to identify itself, two of my own published numbers were corrected, the
 red-team brief acquired rules a machine can follow, and the study's headline
 label stopped implying a model evaluation it cannot support.
+
+
+---
+
+## Round 10 — red-team boundary — reviewer: ChatGPT — 2026-08-31
+
+**Nine raised, nine accepted.** The weakest-claim callout was right for the
+third round running, and this time it was aimed at a heading I had written one
+round earlier.
+
+### P10.1 — "'Executable hard rules' is false. The prescribed containers mount the whole repo including .env, with network."
+**ACCEPT — P0, and the most deserved hit in ten rounds.** I wrote
+"HARD RULES — these are executable, not aspirational" and then listed prose,
+around a runner whose entire isolation was `-v "$PWDW":/src`. `gorun` mounts the
+working tree — `.env` included — with default networking. A reviewer adding one
+test file could have read Razorpay keys or made egress without doing anything
+unusual.
+
+Fixed by building the boundary rather than rewording it. `./run.sh redteam`:
+tracked-files-only export via `git archive` (so a gitignored `.env` cannot be
+present), an explicit refusal if the export contains anything key-shaped,
+`--network=none`, `--pull=never`, no Docker socket, credentials emptied,
+`RZP_GUARD_CHILD_STRICT=1`. Module downloads happen in a separate earlier step
+that never mounts the export.
+
+Verified, not asserted — run inside the lane: no `.env`, all four credential
+variables unset, no DNS, no outbound TCP, no docker socket, no `.gotmp`/`dist`/
+`evidence/live`. The prompt now tells the reviewer to run that check themselves
+rather than believe the paragraph.
+
+Two bugs surfaced while proving it, both of which would have made the lane look
+fine and behave badly: an ERE backreference that grep rejected outright (which
+would have silently disabled the key scan), and an EXIT trap referencing a
+function-local under `set -u`, which turned a green test run into a non-zero
+exit after the fact.
+
+### P10.2 — "`-tags testhook` is not automatically safe; its child override accepts RZP_GUARD_CHILD_CMD through sh -c."
+**ACCEPT — P0.** True, and the recovery gate legitimately depends on it
+(`RZP_GUARD_CHILD_CMD="head -c 120 > /dev/null; exit 0"`), so removing it was not
+an option. Added `RZP_GUARD_CHILD_STRICT`: when set, the test-hook build ignores
+the variable entirely, takes no shell, and execs exactly `./.gotmp/mcp-stub` —
+refusing outright if that binary is absent rather than falling back. Enforced in
+`child_testhook.go` rather than only in `run.sh`, because a harness that can be
+bypassed by invoking the binary directly is the same advisory boundary the
+review was objecting to. Three tests pin it, including that non-strict mode is
+unchanged.
+
+### P10.3 — "The fuzz instructions are internally inconsistent, and the target is not a parser-differential test."
+**ACCEPT — P1.** The brief demanded the pinned container and then handed out a
+bare host `go test -fuzz`; there was no fuzz lane at all. Added `./run.sh fuzz`.
+And the relabelling is the substantive half: `FuzzAgentLineNeverLeaks…` writes to
+a `bytes.Buffer`, so it compares the guard against **nothing**. Section A now
+says plainly that no differential test exists and that building one is a
+contribution.
+
+### P10.4 — "`pay_SYN*` is a naming convention, not a security boundary."
+**ACCEPT — P1.** Correct: a prefix does not make an opaque id non-resolvable.
+The real controls are no credentials, no real child, no network, and those are
+now enforced by the lane. In addition `cmd/mcp-stub` refuses any non-`pay_SYN`
+payment id with `STUB_REFUSES_NON_SYNTHETIC_ID` — identifier provenance, not
+policy, so the stub does not become a second detector. Verified it cannot
+confound the study: every payment id in the frozen briefs, mandates and examples
+is `pay_SYN*`, zero exceptions, so the branch is unreachable for the experiment.
+
+### P10.5 — "Prohibit the study/provider paths explicitly."
+**ACCEPT — P1.** `study-model`, `study-smoke`, `study-run`, `rzp-study
+resolve-model|run` and every provider credential variable are now named in the
+banned list. "No egress" alone does not stop someone exporting a proxy key on a
+machine that has one.
+
+### P10.6 — "Several factual claims need correction."
+**ACCEPT — P2, and I invented one of them.** `live-allow` **is not a command** —
+I made it up while writing a list of things not to run. `verify-refund-evidence`
+is read-only with no network, no credentials and no child, and says so in its own
+comment; `process-recover` drives a local test-hook stub with placeholder keys.
+Both are now listed as safe, so a reviewer does not avoid them by mistake.
+Static line and file counts removed in favour of the command that derives them.
+
+### P10.7 — "I11 overclaims: supportedTools is an unexported mutable var, not a build constant."
+**ACCEPT — P2.** It is `var supportedTools = map[string]struct{}{...}`. Restated
+to the guarantee that is actually enforceable: nothing over JSON-RPC and no
+mandate can widen the forwarded tool surface. Left in deliberately with a note
+not to report the mutability itself, which would otherwise be a guaranteed
+false positive.
+
+### P10.8 — "Phrase the metric limitation even more strictly."
+**ACCEPT — P2.** The numbers are correct arithmetic over descriptive trace
+outcomes and nothing more. The prompt now says so in one place: not held-out
+precision and recall, not evidence about a named model, not a population
+estimate.
+
+### P10.9 — "Fuzz history is not proof."
+**ACCEPT — P2.** 8.9M executions is something I observed once; the committed
+corpus holds a single entry. Labelled a recorded historical claim, with
+instructions to re-derive it or ignore it rather than inherit it as coverage.
+
+**Net effect of Round 10:** the red-team boundary went from a heading to a
+runner whose isolation can be checked in one command; the test-hook build
+acquired a mode where "use the stub" is enforced instead of requested; the stub
+refuses to impersonate a provider for anything that might be real; and four
+factual claims in my own brief — one of them a command that does not exist —
+were corrected.

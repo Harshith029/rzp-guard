@@ -102,6 +102,109 @@ cmd_operator_setup() {
   ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/block_state.db" init
 }
 
+# ---------------------------------------------------------------------------
+# THE ISOLATED LANE, for external red-team work.
+#
+# The red-team brief used to say its rules were "executable". They were prose.
+# gorun mounts the WHOLE working tree -- .env included -- with default
+# networking, so a reviewer who added one test file could read Razorpay keys or
+# make egress without doing anything unusual. External review called that out
+# and was right: an instruction is not a boundary.
+#
+# This lane is the boundary.
+#
+#   1. A TRACKED-FILES-ONLY export. `git archive` emits exactly what is
+#      committed, so .env (gitignored), .gotmp, dist/ and any local raw
+#      artefacts cannot be present. Verified, not assumed, below.
+#   2. --network=none on the lane that runs code. Module downloads happen in a
+#      separate, earlier step that never mounts the export.
+#   3. No Docker socket, so no sibling container can be started -- which is what
+#      makes "never start the real child" enforceable rather than advisory.
+#   4. --pull=never, so a compromised tag cannot introduce a new image.
+#   5. Credential variables explicitly emptied, not merely absent from .env.
+#   6. RZP_GUARD_CHILD_STRICT=1, which makes the test-hook build refuse an
+#      arbitrary RZP_GUARD_CHILD_CMD and accept only the built stub.
+#
+# Usage:  ./run.sh redteam <go args...>
+#         ./run.sh redteam go test ./...
+#         ./run.sh redteam go test ./internal/relay/ -run '^$' -fuzz FuzzAgentLineNeverLeaksAnUnauthorizedRefund -fuzztime 2m
+MODCACHE_VOL="rzpguard-modcache"
+
+redteam_export() {
+  local work="$1"
+  git archive --format=tar HEAD | tar -x -C "$work"
+
+  # The export must not carry a credential or a local artefact. Checked rather
+  # than trusted: a .gitignore edit is one commit away from making this false.
+  local leaked=0
+  for bad in .env .env.local .gotmp dist evidence/live; do
+    if [ -e "$work/$bad" ]; then
+      echo "REFUSING: tracked export contains $bad" >&2
+      leaked=1
+    fi
+  done
+  # Anything key-SHAPED, excluding documented placeholders.
+  #
+  # .env.example exists to show the shape, so `rzp_test_xxxxxxxxxxxx` lives there
+  # legitimately and tripped this on the first run. The fix is to reject
+  # placeholders rather than to exempt the file: exempting it by name would mean
+  # a real key pasted into the template ships silently, which is exactly the
+  # mistake the scan is here to catch.
+  #
+  # A placeholder is a single repeated character (xxxx, 0000) or one of the
+  # words the templates use. Everything else key-shaped is treated as a key.
+  #
+  # Written without a backreference on purpose: POSIX ERE has none, and the
+  # first version of this line failed with "Invalid back reference" -- which
+  # would have silently disabled the scan had it not been checked.
+  local hits f tail
+  hits="$(grep -rlE "rzp_(test|live)_[A-Za-z0-9]{10,}" "$work" 2>/dev/null || true)"
+  for f in $hits; do
+    for tail in $(grep -ohE "rzp_(test|live)_[A-Za-z0-9]{10,}" "$f" | sed -E 's/^rzp_(test|live)_//'); do
+      # Collapse repeats: a placeholder reduces to one character.
+      case "$(printf %s "$tail" | tr -s 'A-Za-z0-9')" in
+        x|X|0|a|A) continue ;;
+      esac
+      case "$tail" in
+        xxx*|XXX*|000*|abc*|your*|stub*|studystub*) continue ;;
+      esac
+      echo "REFUSING: $f contains something shaped like a real Razorpay key" >&2
+      leaked=1
+      break
+    done
+  done
+  [ "$leaked" = 0 ] || exit 1
+}
+
+cmd_redteam() {
+  [ "$#" -gt 0 ] || { echo "usage: ./run.sh redteam <command...>" >&2; exit 2; }
+
+  # NOT `local`: the EXIT trap fires in global scope, where a function-local is
+  # already gone, and `set -u` then aborts the shell AFTER the tests have passed
+  # -- turning a green run into a non-zero exit.
+  REDTEAM_WORK="$(mktemp -d)"
+  trap 'rm -rf "${REDTEAM_WORK:-}"' EXIT
+  local work="$REDTEAM_WORK"
+  redteam_export "$work"
+  local workw; workw="$(cygpath -w "$work" 2>/dev/null || printf %s "$work")"
+
+  # Dependencies are fetched HERE, with network, mounting only the module
+  # manifests -- never the export, and never the working tree.
+  echo "--- populating module cache (network on, no source mounted) ---"
+  MSYS_NO_PATHCONV=1 docker run --rm       -v "${MODCACHE_VOL}:/go/pkg/mod"       -v "$workw/go.mod:/m/go.mod:ro" -v "$workw/go.sum:/m/go.sum:ro"       -w /m -e GOFLAGS=-buildvcs=false "$GOIMAGE"       go mod download >/dev/null
+
+  echo "--- running with NO network, NO docker socket, NO credentials ---"
+  MSYS_NO_PATHCONV=1 docker run --rm       --network=none --pull=never       -v "${MODCACHE_VOL}:/go/pkg/mod"       -v "$workw":/src -w /src       -e GOFLAGS=-buildvcs=false       -e GOPROXY=off       -e RZP_GUARD_CHILD_STRICT=1       -e RAZORPAY_KEY_ID= -e RAZORPAY_KEY_SECRET=       -e NIHAL_CUSTOM_KEY= -e OPENAI_API_KEY= -e ANTHROPIC_API_KEY=       -e RZP_STUDY_PROVIDER= -e RZP_STUDY_PROXY_BASE=       "$GOIMAGE" "$@"
+}
+
+# Fuzzing, in the pinned container. The brief used to hand out a bare host
+# `go test -fuzz` command while insisting everything run in the container.
+cmd_fuzz() {
+  local target="${1:-FuzzAgentLineNeverLeaksAnUnauthorizedRefund}"
+  local budget="${2:-60s}"
+  gorun go test ./internal/relay/ -run '^$' -fuzz "$target" -fuzztime "$budget"
+}
+
 cmd_build() {
   go build -buildvcs=false -o rzp-guard.exe ./cmd/rzp-guard
   go build -buildvcs=false -o gate-verify.exe ./cmd/gate-verify
@@ -458,6 +561,11 @@ rzp-guard
   ./run.sh all               every lane: default, lifecycle, and BOTH race runs
   ./run.sh build             build all three binaries
   ./run.sh bench             measure the decision and the durable writes
+  ./run.sh fuzz [TARGET] [BUDGET]
+                             fuzz in the pinned container (default 60s)
+  ./run.sh redteam <cmd...>  ISOLATED lane for external review: tracked-files
+                             export, --network=none, no docker socket, no
+                             credentials, strict child. Use this one.
   ./run.sh release [VERSION] stamped static linux/amd64 build + checksums
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
@@ -494,6 +602,8 @@ case "${1:-help}" in
   all) cmd_all ;;
   vet) cmd_vet ;;
   build) cmd_build ;;
+  redteam) shift; cmd_redteam "$@" ;;
+  fuzz) shift; cmd_fuzz "$@" ;;
   bench) cmd_bench ;;
   release) shift; cmd_release "$@" ;;
   operator-setup) cmd_operator_setup ;;
