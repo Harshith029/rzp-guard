@@ -2,6 +2,7 @@ package policy
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -619,6 +620,11 @@ func TestResolutionRequiresAGrantAndIsDurablyAudited(t *testing.T) {
 	if err := lifecycle.ResolveInDoubt(opauth.Grant{}, led, st, "rfa_001", true,
 		"forged"); err == nil {
 		t.Fatal("an unauthenticated zero-value Grant resolved the action")
+	} else if !errors.Is(err, lifecycle.ErrNotAuthorized) {
+		// The refusal must be identifiable as an authorization failure. Reported
+		// as anything else, an operator tool could not tell a rejected token from
+		// a broken store and might retry into a state it should not.
+		t.Fatalf("refused with %v, want lifecycle.ErrNotAuthorized", err)
 	}
 	if g.State("rfa_001") != lifecycle.InDoubt {
 		t.Fatal("a refused resolution changed state")

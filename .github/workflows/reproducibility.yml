@@ -188,9 +188,6 @@ jobs:
           echo "no money-moving command exposed"
 
   # The pre-registration is only a control if something checks it. Editing a
-  # brief or the protocol without re-freezing would silently invalidate every
-  # committed trace, and nothing would have said so.
-  # The pre-registration is only a control if something checks it. Editing a
   # brief or the protocol without re-freezing would silently invalidate the
   # committed traces, and nothing would have said so.
   #
@@ -332,4 +329,67 @@ jobs:
               for b in bad:
                   print("  " + b)
               sys.exit(1)
+          EOF
+
+  # A sentinel error is a promise that callers can branch on a specific failure.
+  # Two ways to break it, both found in this repo and both silent:
+  #
+  #   dead       ErrReceiptExists was declared and returned NOWHERE. The UNIQUE
+  #              violation surfaced as a raw driver string, so errors.Is against
+  #              the sentinel would never have matched -- a trap for whoever
+  #              reached for it next (FAILURES.md F22).
+  #   unpinned   four more were returned by real code but asserted by no
+  #              errors.Is anywhere. Their behaviour was covered; their contract
+  #              was not, so a refactor could return something else and every
+  #              test would still pass.
+  #
+  # Neither is caught by tests, vet, or review attention. This is cheap and it
+  # is exact, so it runs on every push.
+  sentinels-live-and-pinned:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Every declared sentinel must be returned and asserted
+        run: |
+          python - <<'EOF'
+          import pathlib, re, sys
+
+          decl = re.compile(r'^\s*(Err[A-Za-z0-9_]+)\s*=\s*(?:errors\.New|fmt\.Errorf)', re.M)
+          files = list(pathlib.Path('.').rglob('*.go'))
+          src = {p: p.read_text(encoding='utf-8') for p in files}
+          prod = '\n'.join(s for p, s in src.items() if not p.name.endswith('_test.go'))
+          test = '\n'.join(s for p, s in src.items() if p.name.endswith('_test.go'))
+
+          names = set()
+          for p, s in src.items():
+              if not p.name.endswith('_test.go'):
+                  names.update(decl.findall(s))
+
+          dead, unpinned = [], []
+          for n in sorted(names):
+              # -1 for the declaration itself.
+              returned = len(re.findall(r'\b%s\b' % n, prod)) - 1
+              pinned = len(re.findall(r'errors\.Is\([^)]*\b%s\b' % n, test))
+              status = 'ok'
+              if returned == 0:
+                  dead.append(n); status = 'DEAD'
+              elif pinned == 0:
+                  unpinned.append(n); status = 'NOT PINNED'
+              print('  %-24s returned:%d  errors.Is pins:%d  %s'
+                    % (n, returned, pinned, status))
+
+          print()
+          if dead:
+              print('DECLARED BUT NEVER RETURNED -- a sentinel that cannot fire:')
+              for n in dead:
+                  print('  ' + n)
+          if unpinned:
+              print('RETURNED BUT PINNED BY NO errors.Is ASSERTION:')
+              for n in unpinned:
+                  print('  ' + n)
+          if dead or unpinned:
+              sys.exit(1)
+          print('%d sentinels, all returned by real code and pinned by a test' % len(names))
           EOF

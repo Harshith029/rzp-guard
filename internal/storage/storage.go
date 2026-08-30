@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -30,6 +31,9 @@ var (
 	ErrNotOwner = errors.New("state file is owned by another guard process")
 	// ErrNoRowChanged means an expected-state write matched nothing.
 	ErrNoRowChanged = errors.New("no row changed: action was not in the expected state")
+	// ErrMandateMismatch means this state file already belongs to a different
+	// mandate that still has unresolved actions.
+	ErrMandateMismatch = errors.New("state file belongs to another mandate with unresolved actions")
 )
 
 func nowUnixNano() int64 { return time.Now().UTC().UnixNano() }
@@ -129,8 +133,54 @@ func Open(path, mandateID string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
 	}
-	// Force the exclusive lock to be taken now rather than on first write, so
-	// ownership is decided at startup and not mid-refund.
+	// Which mandate does this state file already belong to?
+	//
+	// Every query in this package is scoped by mandate_id, including recovery.
+	// So opening a populated state file under a DIFFERENT mandate does not fail
+	// -- it silently hides everything the previous mandate left behind. A refund
+	// that was RESERVED when the process died would never be promoted to
+	// IN_DOUBT, never appear in the operator console, and never be resolvable,
+	// while the money it represents may already have moved.
+	//
+	// That is not an exotic path: -state defaults to rzp-guard.db for both
+	// binaries while the mandate is a separate file supplied per run, and this
+	// repository alone carries 18 distinct mandate ids. Running any two of them
+	// without passing -state is enough.
+	//
+	// Refuse. The alternative -- recovering across mandates -- would surface one
+	// mandate's actions inside another's ledger and cap arithmetic, which is a
+	// worse trade for a component whose whole job is to keep authorization
+	// scoped.
+	var previous string
+	switch err := db.QueryRow(`SELECT mandate_id FROM owner WHERE id = 1`).Scan(&previous); {
+	case errors.Is(err, sql.ErrNoRows):
+		// Fresh state file; this mandate takes it below.
+	case err != nil:
+		db.Close()
+		return nil, fmt.Errorf("storage: read state file owner: %w", err)
+	case previous != mandateID:
+		stranded, serr := unresolvedFor(db, previous)
+		if serr != nil {
+			db.Close()
+			return nil, fmt.Errorf("storage: check for stranded actions: %w", serr)
+		}
+		if len(stranded) > 0 {
+			db.Close()
+			return nil, fmt.Errorf(
+				"storage: %w: %s holds %d unresolved action(s) [%s]; opening it as %s "+
+					"would hide them permanently, and a refund that was in flight may "+
+					"already have landed. Re-open with that mandate and resolve them "+
+					"(rzp-guard-operator -mandate <that mandate> list), or point -state "+
+					"at a different file",
+				ErrMandateMismatch, previous, len(stranded),
+				strings.Join(stranded, ", "), mandateID)
+		}
+		// The previous mandate left nothing unresolved, so reuse is safe.
+	}
+
+	// Record the owner. This does NOT force the exclusive lock -- the schema
+	// statement above already took it, which a mutation of this line proves. It
+	// is here so the check above has something to read on the next open.
 	if _, err := db.Exec(
 		`INSERT INTO owner (id, mandate_id, acquired_at) VALUES (1, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET mandate_id = excluded.mandate_id,
@@ -140,6 +190,29 @@ func Open(path, mandateID string) (*Store, error) {
 		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
 	}
 	return &Store{db: db, mandateID: mandateID}, nil
+}
+
+// unresolvedFor lists the actions of some other mandate that still need a
+// human: RESERVED (mid-flight when the process died) or IN_DOUBT (recovered and
+// waiting). COMMITTED and terminal rows are finished business and do not block
+// reuse of the state file.
+func unresolvedFor(db *sql.DB, mandateID string) ([]string, error) {
+	rows, err := db.Query(`SELECT action_id FROM action_state
+		 WHERE mandate_id = ? AND state IN ('RESERVED', 'IN_DOUBT')
+		 ORDER BY action_id`, mandateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (s *Store) Close() error { return s.db.Close() }

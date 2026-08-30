@@ -26,7 +26,7 @@ Scope is deliberately one tool. Prior review rounds narrowed it from six.
 
 **Fail-closed lifecycle.** Reservations are persisted to SQLite before anything is forwarded. Once bytes reach the child, the only automatic outcomes are COMMIT and `IN_DOUBT` — there is no auto-release, because a JSON-RPC error does not prove the request was rejected *before* provider execution (the child can fail after dispatching the HTTP call). COMMIT additionally requires a refund entity matching payment_id AND amount AND the injected receipt AND a non-empty provider-assigned id.
 
-**Ownership is exclusive** (SQLite `locking_mode=EXCLUSIVE`); a second guard process over the same state file is refused, verified by spawning a real second process.
+**Ownership is exclusive** (SQLite `locking_mode=EXCLUSIVE`); a second guard process over the same state file is refused, verified by spawning a real second process. **The state file is also bound to its mandate.** Every query in the storage layer is scoped by `mandate_id`, recovery included, so opening a populated file under a different mandate used to succeed and silently hide the previous mandate's in-flight refunds — never recovered, never listed, never resolvable. It now refuses while anything is unresolved and names what is stranded ([F22](FAILURES.md)).
 
 ## What was actually built and run this round
 

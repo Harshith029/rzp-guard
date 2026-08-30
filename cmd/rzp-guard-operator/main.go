@@ -136,6 +136,16 @@ func run() error {
 
 	store, err := storage.Open(*statePath, m.MandateID)
 	if err != nil {
+		// Two very different causes, and the wrong advice is expensive here.
+		// A mandate mismatch means nothing is running and the state file is
+		// healthy -- the operator is simply holding the wrong mandate, which is
+		// exactly the situation in which they are hunting for stranded actions.
+		// Telling them to stop the guard would send them after a process that
+		// does not exist.
+		if errors.Is(err, storage.ErrMandateMismatch) {
+			return fmt.Errorf("this state file belongs to a different mandate, and "+
+				"every query here is scoped by mandate.\n  %w", err)
+		}
 		return fmt.Errorf("could not take the state file — is the guard still "+
 			"running? It holds an exclusive lock for its lifetime, so stop it "+
 			"before resolving.\n  underlying: %w", err)

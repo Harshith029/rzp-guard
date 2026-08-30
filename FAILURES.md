@@ -625,3 +625,100 @@ OneDrive-synced `.git` directory for roughly a day. Rewriting local history does
 not retract anything the sync client already uploaded, and no change in this
 repository can. What it does guarantee is that **publishing this repository does
 not publish those records** — which was the actual blocker.
+
+
+## F22 — Every query was scoped by mandate, so a new mandate hid the old one's stranded money
+
+I went looking for test coverage and found a way to lose a refund.
+
+`internal/storage` was the lowest-covered package that matters, so I audited it.
+Ten sentinel errors are declared; one, `ErrReceiptExists`, was **returned
+nowhere** — declared at line 28 and dead. Four more were returned but pinned by
+no `errors.Is` assertion anywhere: their behaviour was covered, their contract
+was not. `ErrNotOwner` was one of those, and it guards single-instance
+ownership, which is a money claim: two guards over one state file each check the
+cumulative cap against their own in-memory ledger, so between them they can
+spend past it. Writing that test is what led here.
+
+**The defect.** Every query in the package is scoped by `mandate_id` — eleven of
+them, `RecoverStartup` included. So opening a populated state file under a
+*different* mandate does not fail. It silently hides everything the previous
+mandate left behind. Probed, not reasoned about:
+
+```
+REOPEN UNDER A DIFFERENT MANDATE: ACCEPTED
+recovery promoted: []
+ActionsInState(RESERVED) under mandate B: 0 rows
+ActionsInState(IN_DOUBT) under mandate B: 0 rows
+RAW table: 1 rows still RESERVED across ALL mandates
+```
+
+A refund that was in flight when the process died is never promoted to
+`IN_DOUBT`, never appears in the operator console, and can never be resolved —
+while the money it represents may already have moved. The operator sees a clean
+slate. This is precisely the outcome the entire `IN_DOUBT` mechanism exists to
+prevent, and the state file reports success.
+
+**It is not an edge case.** `-state` defaults to `rzp-guard.db` for both
+binaries, the mandate is a separate file supplied per run, and this repository
+carries **18 distinct mandate ids**. Running any two of them without passing
+`-state` is enough. It is what happens by default the second time anyone uses
+this.
+
+**The fix.** `Open` now reads the `owner` row — a table that was being *written
+and never read* — and refuses a mismatch while anything is unresolved, naming
+the previous mandate and every stranded action so the operator can act on it. A
+state file whose previous mandate left nothing unresolved is still reusable;
+refusing there would wedge the guard after every clean session.
+
+Recovering *across* mandates was the alternative and it is worse: it would
+surface one mandate's actions inside another's ledger and cap arithmetic, in a
+component whose whole job is keeping authorization scoped.
+
+### Three things fell out of fixing it
+
+**The comment on the owner write was false.** It claimed the INSERT forced the
+exclusive lock to be taken at startup. Mutating that line proved it does not —
+the schema statement above it already took the lock. The line records ownership;
+that is now what the comment says, and the read added above is what finally
+makes the row load-bearing.
+
+**The operator CLI gave the wrong advice.** It wrapped *every* `Open` failure as
+"is the guard still running? It holds an exclusive lock." For a mandate mismatch
+nothing is running and the file is healthy — and that is exactly the moment an
+operator is hunting for stranded actions. It now branches on the sentinel.
+
+**Two documents claimed a test that did not exist.** `README.md` and
+`REVIEW_PACKET.md` both said ownership was "verified by spawning a real second
+process". The only test made two `Open` calls **inside one process**, which
+could in principle be refused by driver bookkeeping rather than a real file
+lock. There is now a test that re-execs the test binary so an actual OS process
+contends. The claim is true as of this commit and was not before. A sweep for
+every other "verified by" / "tested with" claim in the docs found the remaining
+ones backed.
+
+### The harness lied to me twice
+
+| Sweep | Reported | Actually |
+|---|---|---|
+| storage, run 1 | 1 blind spot | **vacuous** — pattern said `INSERT INTO`, code says `INSERT OR IGNORE INTO` |
+| mandate scope, run 2 | 1 blind spot | **not run** — the test written to close it was not in the `-run` filter |
+
+The second is the more embarrassing: I wrote a test to close a real gap, the
+sweep said the gap was still open, and the reason was that my own filter
+excluded the new test by name. A mutation harness that reports a hole which does
+not exist is as useless as one that misses a hole that does. The `-run` filter
+is gone; the sweep runs the whole package.
+
+One of the two reported holes was real. **Counting only `RESERVED` rows as
+unresolved passed every test I had written** — I had covered the mid-flight case
+and never the one where an action has already been recovered to `IN_DOUBT` and
+is explicitly waiting on a human. That is the stronger case, not the weaker one:
+somebody was told to make a decision, and a mandate swap would have taken the
+decision away from them. Closed.
+
+**What this does not fix.** Nothing here addresses ownership under a network
+filesystem, a container restart with the file still locked, or a stale lock
+after an unclean kill — all still untested, as `REVIEW_PACKET.md` says. And a
+guard rail on picking the state file is not the measured recovery drill that
+limitation 5 of the README still says is missing.

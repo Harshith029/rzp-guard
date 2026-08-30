@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // A second guard process must not be able to open the same state file. Each
@@ -19,11 +21,28 @@ func TestSecondInstanceCannotOpenTheSameStateFile(t *testing.T) {
 	}
 	defer first.Close()
 
+	start := time.Now()
 	second, err := Open(db, "mnd_test")
+	elapsed := time.Since(start)
 	if err == nil {
 		second.Close()
 		t.Fatal("a second instance opened the same state file: two guards would " +
 			"each enforce the cumulative cap against their own in-memory ledger")
+	}
+	// Refused as a named ownership conflict, not an anonymous failure: a caller
+	// has to be able to tell contention from a corrupt or unreadable state file.
+	if !errors.Is(err, ErrNotOwner) {
+		t.Fatalf("refused with %v, want ErrNotOwner", err)
+	}
+	// Refused at startup, not waited on. Adding a busy_timeout to the DSN would
+	// turn this into a stall that surfaces mid-refund instead.
+	if elapsed > 10*time.Second {
+		t.Fatalf("the second open blocked for %v before being refused", elapsed)
+	}
+	// A rejected takeover must not cost the incumbent its lock, or the guard
+	// would fail closed on every refund after someone else tried the door.
+	if err := first.Reserve("rfa_001", "rzpg_aaaaaaaaaaaa", 5000); err != nil {
+		t.Fatalf("the incumbent could not write after a rejected takeover: %v", err)
 	}
 }
 
@@ -57,9 +76,14 @@ func TestReserveFailsWhenTheRowIsNotAvailable(t *testing.T) {
 	if err := st.Reserve("rfa_001", "rzpg_aaaaaaaaaaaa", 1000); err != nil {
 		t.Fatalf("first reserve: %v", err)
 	}
-	// Still RESERVED: a second reservation must be refused, loudly.
+	// Still RESERVED: a second reservation must be refused, loudly. The upsert's
+	// WHERE state = 'AVAILABLE' guard changes no row, so this is ErrNoRowChanged
+	// and not a receipt collision -- the row already exists and is being updated,
+	// not inserted a second time.
 	if err := st.Reserve("rfa_001", "rzpg_aaaaaaaaaaaa", 1000); err == nil {
 		t.Fatal("re-reserving a RESERVED action reported success with zero rows changed")
+	} else if !errors.Is(err, ErrNoRowChanged) {
+		t.Fatalf("refused with %v, want ErrNoRowChanged", err)
 	}
 
 	if err := st.SetState("rfa_001", "RESERVED", "COMMITTED"); err != nil {
@@ -106,6 +130,8 @@ func TestStaleTransitionCannotReleaseACommittedAction(t *testing.T) {
 	// A late duplicate reply tries the transition it thinks is pending.
 	if err := st.SetState("rfa_001", "RESERVED", "AVAILABLE"); err == nil {
 		t.Fatal("a stale RESERVED->AVAILABLE transition released a COMMITTED action")
+	} else if !errors.Is(err, ErrNoRowChanged) {
+		t.Fatalf("refused with %v, want ErrNoRowChanged", err)
 	}
 	snap, err := st.Snapshot()
 	if err != nil {

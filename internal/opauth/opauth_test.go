@@ -149,9 +149,15 @@ func TestWriteTokenExclusiveRefusesAnExistingPath(t *testing.T) {
 	if err := os.WriteFile(path, []byte("pre-existing"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := WriteTokenExclusive(path, "rzpop_new", true); err == nil {
+	_, err := WriteTokenExclusive(path, "rzpop_new", true)
+	if err == nil {
 		t.Fatal("writing over an existing path must be refused — a failed run " +
 			"must not destroy the credential a previous one delivered")
+	}
+	// Pin the contract, not just the behaviour: a caller has to be able to tell
+	// "that path is taken, pick another" from a permission or disk failure.
+	if !errors.Is(err, ErrDestinationExists) {
+		t.Fatalf("refused with %v, want ErrDestinationExists", err)
 	}
 	// And it must not have been touched.
 	b, err := os.ReadFile(path)
