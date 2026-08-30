@@ -42,6 +42,31 @@ const schema = `
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 
+-- Durability is the entire point of this package, so the setting that provides
+-- it is stated rather than inherited.
+--
+-- MEASURED (internal/storage/bench_test.go, on this hardware):
+--
+--   synchronous=FULL     10.8 ms per commit
+--   synchronous=NORMAL   23   us per commit
+--   synchronous=OFF      27   us per commit
+--
+-- A 470x difference, and it is the price of the guarantee the design rests on:
+-- a reservation must be on disk BEFORE any byte is forwarded to the child. With
+-- NORMAL, a WAL commit is not fsynced, so a power loss can discard the most
+-- recent transactions. Lose a reservation whose refund already reached Razorpay
+-- and the action returns as AVAILABLE at restart -- a replay, and the exact
+-- fail-open case the lifecycle exists to prevent. NORMAL is safe against a
+-- process or OS crash; it is not safe against power loss, and money is exactly
+-- the workload where that distinction is worth 10 ms.
+--
+-- FULL was already in force as the driver's default. That is why this line
+-- exists: a default is not a decision, and a driver upgrade or a DSN change
+-- could have quietly moved it to NORMAL. The result would have looked like a
+-- 470x performance win while removing the guarantee. TestSynchronousIsFull
+-- fails if this is ever weakened.
+PRAGMA synchronous=FULL;
+
 -- Records which mandate owns this state file. READ on every Open: every query
 -- in this package is scoped by mandate_id, so opening a populated file under a
 -- different mandate would silently hide the previous mandate's unresolved

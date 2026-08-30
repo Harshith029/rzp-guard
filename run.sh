@@ -109,6 +109,61 @@ cmd_build() {
   echo "built ./rzp-guard.exe ./gate-verify.exe ./rzp-guard-operator.exe"
 }
 
+# Benchmarks. Run in the pinned container like everything else, or the numbers
+# describe the host rather than the code.
+#
+# THE RECOVERY BENCHMARK IS DELIBERATELY EXCLUDED from the default sweep: each
+# iteration writes n durable reservations before timing anything, and at ~11ms
+# per commit that takes minutes. Run it explicitly with a small -benchtime.
+#
+# What these measure, and why the ratio is the point: the authorization decision
+# is sub-microsecond, and one durable commit is ~11ms because synchronous=FULL
+# fsyncs. An authorized refund performs two commits. Against a Razorpay round
+# trip of 100-500ms that is 4-20% overhead -- acceptable, and now known rather
+# than assumed.
+cmd_bench() {
+  gorun go test ./internal/policy/ ./internal/storage/ \
+    -run '^$' -bench 'Decide|Receipt|Reserve|RecordCall|SetState' \
+    -benchtime 200x -benchmem
+}
+
+# A locally reproducible, STAMPED release build.
+#
+# Mirrors .github/workflows/release.yml so a developer can produce the same
+# artifact the pipeline does. The build date comes from the commit, not the
+# clock: two builds of the same commit must be byte-identical, and a wall-clock
+# timestamp silently breaks that.
+cmd_release() {
+  local version="${1:-dev}"
+  local commit date pkg
+  commit="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+  date="$(git show -s --format=%cI "$commit" 2>/dev/null || echo '')"
+  pkg="github.com/harshith/rzp-guard/internal/buildinfo"
+
+  mkdir -p dist
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
+    -e CGO_ENABLED=0 -e GOOS=linux -e GOARCH=amd64 -e GOFLAGS=-buildvcs=false \
+    "$GOIMAGE" sh -c "
+      set -e
+      for c in rzp-guard rzp-guard-operator; do
+        go build -trimpath -ldflags \"-s -w \
+          -X $pkg.Version=$version \
+          -X $pkg.Commit=$commit \
+          -X $pkg.BuildDate=$date\" \
+          -o dist/\${c}_${version}_linux_amd64 ./cmd/\$c
+      done
+    "
+  ( cd dist && sha256sum ./*_"${version}"_linux_amd64 > "SHA256SUMS-${version}" )
+  echo
+  echo "artifacts in ./dist:"
+  ls -1 dist
+  echo
+  # Prove the stamp actually landed. A broken -ldflags path ships silently and
+  # is only discovered mid-incident, when the binary cannot say what it is.
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src "$ALPINE" \
+    "./dist/rzp-guard_${version}_linux_amd64" -version
+}
+
 # THE central proof: a call the mandate does not authorize never crosses into
 # Razorpay's official server.
 #
@@ -402,6 +457,8 @@ rzp-guard
   ./run.sh lifecycle-race    lifecycle lane under the race detector
   ./run.sh all               every lane: default, lifecycle, and BOTH race runs
   ./run.sh build             build all three binaries
+  ./run.sh bench             measure the decision and the durable writes
+  ./run.sh release [VERSION] stamped static linux/amd64 build + checksums
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
   ./run.sh study-verify      Phase 4b: check the frozen protocol is intact
@@ -437,6 +494,8 @@ case "${1:-help}" in
   all) cmd_all ;;
   vet) cmd_vet ;;
   build) cmd_build ;;
+  bench) cmd_bench ;;
+  release) shift; cmd_release "$@" ;;
   operator-setup) cmd_operator_setup ;;
   study-verify) cmd_study_verify ;;
   study-dry) cmd_study_dry ;;

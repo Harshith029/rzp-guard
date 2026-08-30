@@ -30,6 +30,24 @@ import (
 // DecisionSink receives every decision for the log and dashboard.
 type DecisionSink func(policy.Decision, json.RawMessage)
 
+// Alerter receives events that need a HUMAN, not a log reader.
+//
+// There is exactly one such event today and it is the most important thing this
+// system produces: an action becoming IN_DOUBT. That is money in an unknown
+// state -- the refund may have reached Razorpay, the budget stays encumbered,
+// and the action is frozen until an operator resolves it.
+//
+// Before this existed, an IN_DOUBT transition mid-session was SILENT. It was
+// discoverable only by someone choosing to run `rzp-guard-operator list`.
+// Nothing paged, nothing printed, nothing distinguished it in the decision log
+// (which records authorization decisions, not outcomes). A refund could sit
+// unresolved indefinitely because no one thought to look.
+//
+// reason says which of the several ambiguous paths produced it, because "why is
+// this IN_DOUBT" is the operator's first question and the answer changes what
+// they check in the dashboard.
+type Alerter func(actionID, reason string)
+
 // ErrDuplicateRequestID is returned to the agent when a JSON-RPC id is reused
 // while the original is still outstanding.
 var ErrDuplicateRequestID = errors.New("duplicate in-flight JSON-RPC id")
@@ -66,6 +84,7 @@ type Relay struct {
 	guard *policy.Guard
 	now   func() time.Time
 	sink  DecisionSink
+	alert Alerter
 
 	mu       sync.Mutex
 	childIn  io.Writer
@@ -82,9 +101,34 @@ func New(g *policy.Guard, childIn, agentOut io.Writer, sink DecisionSink) *Relay
 	}
 	return &Relay{
 		guard: g, childIn: childIn, agentOut: agentOut, sink: sink,
+		alert:    func(string, string) {},
 		now:      func() time.Time { return time.Now().UTC() },
 		inflight: map[string]pending{},
 	}
+}
+
+// SetAlerter installs the handler for events needing a human. Set it before
+// any traffic; a nil alerter is ignored rather than panicking, because losing
+// the alert must never take the guard down with it.
+func (r *Relay) SetAlerter(a Alerter) {
+	if a == nil {
+		return
+	}
+	r.alert = a
+}
+
+// markInDoubt is the ONLY route to IN_DOUBT in this package.
+//
+// Five call sites used to invoke guard.MarkInDoubt directly, which made it
+// possible to add a sixth that transitioned money into an unresolvable state
+// without telling anyone. Routing them through one function means the alert
+// cannot be forgotten: the transition and the notification are the same act.
+func (r *Relay) markInDoubt(actionID, reason string) {
+	if actionID == "" {
+		return
+	}
+	_ = r.guard.MarkInDoubt(actionID)
+	r.alert(actionID, reason)
 }
 
 // SetClock is for tests that need a fixed time.
@@ -236,7 +280,8 @@ func (r *Relay) handleAgentLine(line []byte) error {
 			if n == 0 {
 				_ = r.guard.ReleaseConfirmedRejection(d.MatchedActionID)
 			} else {
-				_ = r.guard.MarkInDoubt(d.MatchedActionID)
+				r.markInDoubt(d.MatchedActionID,
+					"partial write to child: bytes it accepted may already have reached Razorpay")
 			}
 		}
 		r.mu.Lock()
@@ -376,13 +421,16 @@ func (r *Relay) resolve(id string, msg rpcMessage) {
 		return
 	}
 	if len(msg.Error) > 0 || isToolError(msg.Result) || len(msg.Result) == 0 {
-		_ = r.guard.MarkInDoubt(p.actionID)
+		r.markInDoubt(p.actionID,
+			"child reported an error or empty result: a JSON-RPC error does not "+
+				"prove the request was rejected before provider execution")
 		return
 	}
 	if !refundEntityMatches(msg.Result, p) {
 		// The reply is not recognisably the refund we authorized. It may still
 		// have executed, so hold it for an operator rather than guessing.
-		_ = r.guard.MarkInDoubt(p.actionID)
+		r.markInDoubt(p.actionID,
+			"reply carried no refund entity matching payment+amount+receipt")
 		return
 	}
 	_ = r.guard.Commit(p.actionID)
@@ -473,7 +521,8 @@ func (r *Relay) CloseInflight() []string {
 	}
 	r.mu.Unlock()
 	for _, actionID := range stranded {
-		_ = r.guard.MarkInDoubt(actionID)
+		r.markInDoubt(actionID,
+			"session ended with the call still in flight; the child never answered")
 	}
 	return stranded
 }

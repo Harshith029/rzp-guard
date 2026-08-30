@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/harshith/rzp-guard/internal/bootstrap"
+	"github.com/harshith/rzp-guard/internal/buildinfo"
 	"github.com/harshith/rzp-guard/internal/mandate"
 	"github.com/harshith/rzp-guard/internal/policy"
 	"github.com/harshith/rzp-guard/internal/relay"
@@ -56,14 +57,39 @@ func main() {
 // forwarded, before locking whatever is still outstanding.
 const drainGrace = 10 * time.Second
 
+// alertToken prefixes every line reporting money in an unknown state.
+//
+// It is a fixed, greppable string on purpose. This project has no metrics
+// endpoint and no alerting integration, so the realistic operational path is a
+// log rule -- and a log rule needs one token that appears on every such event
+// and on nothing else. Both routes to IN_DOUBT emit it: a transition during the
+// session, and reservations recovered from a previous process at startup.
+//
+// Without this an IN_DOUBT refund was discoverable only by someone choosing to
+// run `rzp-guard-operator list`. Money whose fate is unknown should not wait on
+// somebody's curiosity.
+const alertToken = "RZP_GUARD_ALERT"
+
 func run() error {
 	var (
 		mandatePath = flag.String("mandate", "", "path to the merchant-issued mandate (required)")
 		statePath   = flag.String("state", "rzp-guard.db", "durable state file")
 		childTee    = flag.String("child-tee", "", "record every byte written to child stdin (evidence)")
 		decisionLog = flag.String("decision-log", "", "append-only JSONL decision log")
+		statusFile  = flag.String("status-file", "", "publish a lock-free status document here (see status.go)")
+		statusEvery = flag.Duration("status-interval", 5*time.Second, "how often to refresh -status-file")
+		showVersion = flag.Bool("version", false, "print build identity and exit")
 	)
 	flag.Parse()
+
+	// Answered before every other check, including the credential ones: asking a
+	// binary what it is must not require a working environment. During an
+	// incident this is the first question and it should never fail.
+	if *showVersion {
+		fmt.Println(buildinfo.String("rzp-guard"))
+		fmt.Printf("  child:    %s\n  toolsets: %s\n", PinnedImage, Toolsets)
+		return nil
+	}
 
 	if *mandatePath == "" {
 		return fmt.Errorf("-mandate is required")
@@ -128,7 +154,24 @@ func run() error {
 			"establish that authority itself", *statePath)
 	}
 
+	if *statusFile != "" {
+		sw := newStatusWriter(*statusFile, boot.Guard, m.MandateID)
+		stopStatus := make(chan struct{})
+		go sw.run(stopStatus, *statusEvery)
+		// Registered BEFORE `defer finalize` below. Defers run LIFO, so finalize
+		// runs first and this closes afterwards -- meaning the last document on
+		// disk includes whatever finalize just marked IN_DOUBT. Registered the
+		// other way round, the final status would omit exactly the refunds an
+		// operator most needs to find.
+		defer close(stopStatus)
+	}
+
 	if len(boot.RecoveredInDoubt) > 0 {
+		for _, id := range boot.RecoveredInDoubt {
+			fmt.Fprintf(os.Stderr,
+				"%s IN_DOUBT action=%s reason=%q\n", alertToken, id,
+				"in flight when the previous process died; the refund may have landed")
+		}
 		fmt.Fprintf(os.Stderr,
 			"rzp-guard: recovered %d in-flight reservation(s) from a previous run as "+
 				"IN_DOUBT; operator resolution required: %v\n",
@@ -173,6 +216,18 @@ func run() error {
 	defer closeSink()
 
 	r := relay.New(boot.Guard, childWriter, os.Stdout, sink)
+
+	// Every mid-session IN_DOUBT transition, on stderr, one line each.
+	// Deliberately NOT the decision log: that records authorization decisions,
+	// and this is an outcome. Conflating them would bury the event that needs a
+	// human among thousands that do not.
+	var alertMu sync.Mutex
+	r.SetAlerter(func(actionID, reason string) {
+		alertMu.Lock()
+		defer alertMu.Unlock()
+		fmt.Fprintf(os.Stderr, "%s IN_DOUBT action=%s reason=%q\n",
+			alertToken, actionID, reason)
+	})
 
 	if err := child.Start(); err != nil {
 		return fmt.Errorf("start child (is Docker running?): %w", err)

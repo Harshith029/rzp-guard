@@ -157,6 +157,35 @@ jobs:
             esac
           done
 
+      # The Dockerfile repeats these digests, because a Dockerfile cannot read a
+      # shell variable from another file. A duplicated constant drifts, and this
+      # one drifting would mean the released image was built by a different
+      # toolchain than the tested one -- while both files still looked pinned.
+      #
+      # Caught for real: the Dockerfile was first written with an alpine digest
+      # whose leading 8 characters matched and whose remaining 56 did not.
+      - name: Dockerfile digests must match run.sh
+        run: |
+          bad=0
+          for d in $(grep -oE 'sha256:[0-9a-f]{64}' Dockerfile | sort -u); do
+            if grep -q "$d" run.sh; then
+              echo "  match  $d"
+            else
+              echo "  DRIFT  $d appears in Dockerfile but not in run.sh" >&2
+              bad=1
+            fi
+          done
+          [ "$bad" = 0 ] || { echo "Dockerfile and run.sh disagree on a pinned image" >&2; exit 1; }
+
+      # A release must be built from a pinned toolchain too, and the release
+      # workflow uses setup-go rather than the container. Pin the minor version
+      # there at least, so a silent major bump cannot produce a release.
+      - name: Release workflow must pin its Go version
+        run: |
+          grep -qE "go-version: '1\\.[0-9]+'" .github/workflows/release.yml \
+            || { echo "release.yml does not pin a Go version" >&2; exit 1; }
+          echo "release.yml pins its Go version"
+
   # Committed evidence must carry no provider fields beyond the allowlist, and
   # must not have drifted from the raw capture it was projected from.
   evidence-projection-clean:

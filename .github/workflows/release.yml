@@ -1,0 +1,129 @@
+name: release
+
+# CD, such as it is. The repository had CI and no release path at all: every
+# binary was built ad hoc on a developer machine, carried no version, and left
+# no record of what a given artifact contained.
+#
+# This produces STAMPED, REPRODUCIBLE, CHECKSUMMED artifacts on a tag, which is
+# the minimum needed to answer "what is running in production" during an
+# incident. It deliberately does NOT deploy anywhere: there is no target yet,
+# and a pipeline that pretends to deploy is worse than one that admits it does
+# not.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to stamp for a dry run (no release is published)'
+        required: true
+        default: 'v0.0.0-dev'
+
+permissions:
+  contents: write
+
+jobs:
+  # Never publish an artifact from a tree whose tests do not pass. The release
+  # job needs this to succeed first, so a red build cannot become a release.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26', cache: false }
+      - run: go build -buildvcs=false ./...
+      - run: go test -buildvcs=false ./...
+      - run: go test -buildvcs=false -tags testhook ./cmd/rzp-guard/
+      - run: go vet -buildvcs=false ./...
+      - name: gofmt
+        run: test -z "$(gofmt -l ./cmd ./internal)"
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26', cache: false }
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build stamped static binaries
+        env:
+          CGO_ENABLED: '0'
+          GOFLAGS: -buildvcs=false
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.v.outputs.version }}"
+          COMMIT="$(git rev-parse HEAD)"
+          # Reproducible: the build date comes from the COMMIT, not from the
+          # clock. Two builds of the same tag must produce identical bytes, and
+          # a wall-clock timestamp would silently break that.
+          BUILD_DATE="$(git show -s --format=%cI "$COMMIT")"
+          PKG=github.com/harshith/rzp-guard/internal/buildinfo
+          LDFLAGS="-s -w -X $PKG.Version=$VERSION -X $PKG.Commit=$COMMIT -X $PKG.BuildDate=$BUILD_DATE"
+
+          mkdir -p dist
+          # linux/amd64 is the declared deployment target (README). The others
+          # are for operators running the CLI on their own machines.
+          for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+            GOOS="${target%/*}"; GOARCH="${target#*/}"
+            for cmd in rzp-guard rzp-guard-operator; do
+              ext=""; [ "$GOOS" = "windows" ] && ext=".exe"
+              out="dist/${cmd}_${VERSION}_${GOOS}_${GOARCH}${ext}"
+              echo "building $out"
+              GOOS="$GOOS" GOARCH="$GOARCH" go build -trimpath \
+                -ldflags "$LDFLAGS" -o "$out" "./cmd/$cmd"
+            done
+          done
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Prove the binary reports its own identity
+        run: |
+          set -euo pipefail
+          BIN="$(ls dist/rzp-guard_*_linux_amd64)"
+          chmod +x "$BIN"
+          # A stamped binary must not claim to be "dev". This is the check that
+          # catches a broken -ldflags path, which otherwise ships silently and
+          # is only noticed during an incident.
+          out="$("$BIN" -version)"
+          echo "$out"
+          echo "$out" | grep -q "${{ steps.v.outputs.version }}" \
+            || { echo "binary does not report its version"; exit 1; }
+          echo "$out" | grep -qv "dev$" || { echo "binary still reports dev"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rzp-guard-${{ steps.v.outputs.version }}
+          path: dist/
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Static, stamped binaries. Verify with `sha256sum -c SHA256SUMS`.
+
+            **Test-mode only.** `rzp-guard` refuses any `RAZORPAY_KEY_ID` that
+            does not begin `rzp_test`. This is enforced in code, not by
+            configuration, and it is deliberate: the success path has not been
+            proven enough to move real money.
+
+            Provision the operator credential before first start:
+            `rzp-guard-operator -mandate M -state S init -out TOKENFILE`

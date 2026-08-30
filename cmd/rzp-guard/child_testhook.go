@@ -9,8 +9,13 @@ import (
 	"os/exec"
 )
 
-// PinnedImage is unused in this build; the test-hook child is a local stub.
+// PinnedImage and Toolsets are unused in this build; the test-hook child is a
+// local stub. They exist so -version compiles and, more importantly, so a
+// test-hook binary SAYS SO when asked what it is. A build that cannot be
+// distinguished from the shipped one at runtime is a build that ends up in the
+// wrong place.
 const PinnedImage = "(test-hook build: no container)"
+const Toolsets = "(test-hook build: local stub child, NEVER for Razorpay)"
 
 // newChild runs a local stub instead of the pinned container.
 //

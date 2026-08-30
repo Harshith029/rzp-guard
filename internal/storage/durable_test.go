@@ -250,3 +250,40 @@ func TestOperatorVerifierCannotBeSilentlyReplaced(t *testing.T) {
 		t.Fatalf("the original credential was overwritten: %q", v)
 	}
 }
+
+// Durability here is a money guarantee, not a preference. FULL was in force
+// only as the driver's default until it was written down; this test is what
+// stops it drifting back.
+//
+// The measured cost is 10.8ms per commit against 23us at NORMAL. Anyone
+// profiling this system will find that number and be tempted -- it is a 470x
+// win, and it silently trades away the promise that a reservation survives
+// power loss before its refund is forwarded.
+func TestSynchronousIsFull(t *testing.T) {
+	s := openTemp(t)
+
+	var mode int
+	if err := s.db.QueryRow(`PRAGMA synchronous`).Scan(&mode); err != nil {
+		t.Fatal(err)
+	}
+	// 0=OFF 1=NORMAL 2=FULL 3=EXTRA
+	if mode < 2 {
+		t.Fatalf("synchronous=%d; a reservation must be fsynced before its refund "+
+			"is forwarded, or a power loss can resurrect a consumed action as "+
+			"AVAILABLE and permit a replay", mode)
+	}
+}
+
+// Journal mode is the other half: WAL is what lets the reader-side recovery and
+// the writer coexist, and it is set in the same schema statement.
+func TestJournalModeIsWAL(t *testing.T) {
+	s := openTemp(t)
+
+	var mode string
+	if err := s.db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil {
+		t.Fatal(err)
+	}
+	if strings.ToLower(mode) != "wal" {
+		t.Fatalf("journal_mode=%s, want wal", mode)
+	}
+}
