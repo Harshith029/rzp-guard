@@ -27,7 +27,7 @@ func liveEnvelope(t *testing.T) json.RawMessage {
 }
 
 var livePending = pending{
-	actionID:  "rfa_g16_001",
+	actionIDs: []string{"rfa_g16_001"},
 	isRefund:  true,
 	paymentID: "pay_TTwUH29tzhB4ME",
 	amount:    100,

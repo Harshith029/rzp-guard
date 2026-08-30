@@ -57,7 +57,10 @@ var ErrDuplicateRequestID = errors.New("duplicate in-flight JSON-RPC id")
 // id can be reused, and a reply carrying a matching id proves nothing about
 // which refund the provider executed.
 type pending struct {
-	actionID  string
+	// actionIDs is EVERY action this one call consumes. Usually one; several
+	// when the guard combined a merchant's separate authorizations to satisfy a
+	// single refund. They settle together or not at all.
+	actionIDs []string
 	paymentID string
 	amount    int64
 	receipt   string
@@ -123,12 +126,17 @@ func (r *Relay) SetAlerter(a Alerter) {
 // possible to add a sixth that transitioned money into an unresolvable state
 // without telling anyone. Routing them through one function means the alert
 // cannot be forgotten: the transition and the notification are the same act.
-func (r *Relay) markInDoubt(actionID, reason string) {
-	if actionID == "" {
+func (r *Relay) markInDoubt(actionIDs []string, reason string) {
+	if len(actionIDs) == 0 {
 		return
 	}
-	_ = r.guard.MarkInDoubt(actionID)
-	r.alert(actionID, reason)
+	_ = r.guard.MarkInDoubtMany(actionIDs)
+	// One alert per action. A combined refund that goes ambiguous leaves EVERY
+	// action it consumed frozen, and an operator resolving only the one they
+	// were told about would leave the others held indefinitely.
+	for _, id := range actionIDs {
+		r.alert(id, reason)
+	}
 }
 
 // SetClock is for tests that need a fixed time.
@@ -245,7 +253,7 @@ func (r *Relay) handleAgentLine(line []byte) error {
 	}
 
 	if tracked {
-		p := pending{actionID: d.MatchedActionID, isRefund: d.MatchedActionID != ""}
+		p := pending{actionIDs: d.MatchedActionIDs, isRefund: len(d.MatchedActionIDs) > 0}
 		if p.isRefund {
 			p.paymentID, _ = d.Forwarded["payment_id"].(string)
 			p.amount = d.AuthorizedPaise
@@ -261,8 +269,8 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		// Fail closed: if the approved call cannot be re-encoded exactly, the
 		// original is NOT forwarded, and the reservation is rolled back. Nothing
 		// has been written, so releasing is safe here.
-		if d.MatchedActionID != "" {
-			_ = r.guard.ReleaseConfirmedRejection(d.MatchedActionID)
+		if len(d.MatchedActionIDs) > 0 {
+			_ = r.guard.ReleaseConfirmedRejectionMany(d.MatchedActionIDs)
 		}
 		r.mu.Lock()
 		delete(r.inflight, string(msg.ID))
@@ -276,11 +284,11 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		// A partial write is ambiguous: bytes the child accepted may already have
 		// reached Razorpay. Only a write that moved ZERO bytes is provably
 		// pre-dispatch and safe to release.
-		if d.MatchedActionID != "" {
+		if len(d.MatchedActionIDs) > 0 {
 			if n == 0 {
-				_ = r.guard.ReleaseConfirmedRejection(d.MatchedActionID)
+				_ = r.guard.ReleaseConfirmedRejectionMany(d.MatchedActionIDs)
 			} else {
-				r.markInDoubt(d.MatchedActionID,
+				r.markInDoubt(d.MatchedActionIDs,
 					"partial write to child: bytes it accepted may already have reached Razorpay")
 			}
 		}
@@ -421,7 +429,7 @@ func (r *Relay) resolve(id string, msg rpcMessage) {
 		return
 	}
 	if len(msg.Error) > 0 || isToolError(msg.Result) || len(msg.Result) == 0 {
-		r.markInDoubt(p.actionID,
+		r.markInDoubt(p.actionIDs,
 			"child reported an error or empty result: a JSON-RPC error does not "+
 				"prove the request was rejected before provider execution")
 		return
@@ -429,11 +437,11 @@ func (r *Relay) resolve(id string, msg rpcMessage) {
 	if !refundEntityMatches(msg.Result, p) {
 		// The reply is not recognisably the refund we authorized. It may still
 		// have executed, so hold it for an operator rather than guessing.
-		r.markInDoubt(p.actionID,
+		r.markInDoubt(p.actionIDs,
 			"reply carried no refund entity matching payment+amount+receipt")
 		return
 	}
-	_ = r.guard.Commit(p.actionID)
+	_ = r.guard.CommitMany(p.actionIDs)
 }
 
 func isToolError(result json.RawMessage) bool {
@@ -512,16 +520,20 @@ func refundEntityMatches(result json.RawMessage, p pending) bool {
 // exits or the session ends: an unanswered refund is exactly the ambiguous case.
 func (r *Relay) CloseInflight() []string {
 	r.mu.Lock()
+	// Grouped BY CALL, not flattened: each combined refund must move as a unit,
+	// so its actions transition together rather than one at a time.
+	var calls [][]string
 	stranded := make([]string, 0, len(r.inflight))
 	for id, p := range r.inflight {
 		if p.isRefund {
-			stranded = append(stranded, p.actionID)
+			calls = append(calls, p.actionIDs)
+			stranded = append(stranded, p.actionIDs...)
 		}
 		delete(r.inflight, id)
 	}
 	r.mu.Unlock()
-	for _, actionID := range stranded {
-		r.markInDoubt(actionID,
+	for _, ids := range calls {
+		r.markInDoubt(ids,
 			"session ended with the call still in flight; the child never answered")
 	}
 	return stranded

@@ -379,8 +379,13 @@ func decisionSink(path string) (relay.DecisionSink, func(), error) {
 			"rule":              d.Rule,
 			"reason":            clip(d.Reason, 512),
 			"matched_action_id": d.MatchedActionID,
-			"receipt":           d.Receipt,
-			"authorized_paise":  d.AuthorizedPaise,
+			// The FULL set. One refund may consume several actions, and a forensic
+			// record naming only the first would understate what a call spent.
+			// matched_action_id stays the first of them so existing readers of this
+			// log keep working.
+			"matched_action_ids": d.MatchedActionIDs,
+			"receipt":            d.Receipt,
+			"authorized_paise":   d.AuthorizedPaise,
 		})
 	}
 	return sink, func() { _ = f.Close() }, nil

@@ -23,6 +23,11 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	// For lifecycle.Reservation only. The interface lives with its CONSUMER
+	// (lifecycle.Persister), so the type in its signature does too, and the
+	// implementer imports it. Acyclic: lifecycle does not import storage.
+	"github.com/harshith/rzp-guard/internal/lifecycle"
 )
 
 // schemaVersion is the version this build writes and understands.
@@ -31,7 +36,7 @@ import (
 // decision about files at the previous version -- migrate them, or refuse them
 // with instructions. Bumping it without that decision converts a silent
 // misread into a hard outage: better, but still bad.
-const schemaVersion = 1
+const schemaVersion = 2
 
 // callLogRetention is how much history RecordCall keeps. The rate limiter
 // only ever asks about the last 60 seconds; the surplus is deliberate slack so
@@ -103,10 +108,20 @@ CREATE TABLE IF NOT EXISTS owner (
 CREATE TABLE IF NOT EXISTS action_state (
   mandate_id   TEXT    NOT NULL,
   action_id    TEXT    NOT NULL,
-  -- UNIQUE because the receipt is a TRUNCATED hash, not a guaranteed-unique
-  -- value. This constraint is what actually prevents two actions sharing a
-  -- provider-side correlation key; the hash only makes a collision unlikely.
-  receipt      TEXT    NOT NULL UNIQUE,
+  -- The receipt of the call that most recently reserved this action.
+  --
+  -- NOT UNIQUE any more, and that is the point of schema v2. One forwarded
+  -- refund may now consume SEVERAL actions at once -- a merchant who authorized
+  -- 18500 and 19000 separately should not have an agent's single 37500 call
+  -- refused -- and every action it consumed must carry the SAME receipt,
+  -- because that receipt is the string an operator searches Razorpay for when
+  -- resolving. Rows showing different receipts for one real refund would be
+  -- actively misleading during an incident.
+  --
+  -- The uniqueness guarantee did not go away, it moved to where it belongs:
+  -- call_receipt below, one row per forwarded call. The receipt is a TRUNCATED
+  -- 48-bit hash, so uniqueness has to be enforced rather than assumed.
+  receipt      TEXT    NOT NULL,
   state        TEXT    NOT NULL,
   amount_paise INTEGER NOT NULL,
   updated_at   TEXT    NOT NULL,
@@ -115,6 +130,17 @@ CREATE TABLE IF NOT EXISTS action_state (
 
 -- Rate-limit window. Persisted because an in-memory limiter resets on restart,
 -- which would let a crash-loop bypass max_calls_per_minute entirely.
+-- One row per forwarded refund call. This is where receipt uniqueness lives.
+--
+-- Previously it was a UNIQUE column on action_state, which silently assumed one
+-- call consumes exactly one action. That assumption is what made a merchant's
+-- two separate authorizations un-combinable.
+CREATE TABLE IF NOT EXISTS call_receipt (
+  receipt    TEXT PRIMARY KEY,
+  mandate_id TEXT NOT NULL,
+  issued_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS call_log (
   mandate_id   TEXT    NOT NULL,
   at_unix_nano INTEGER NOT NULL
@@ -328,44 +354,95 @@ func (s *Store) RecoverStartup() ([]string, error) {
 // Reserve persists a reservation. It must succeed BEFORE anything is written to
 // the child's stdin, so a crash mid-flight leaves a recoverable row rather than
 // a silently released authorization.
+// Reserve durably claims one action for one call.
 func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
-	res, err := s.db.Exec(
-		`INSERT INTO action_state (mandate_id, action_id, receipt, state, amount_paise, updated_at)
-		 VALUES (?, ?, ?, 'RESERVED', ?, ?)
-		 ON CONFLICT(mandate_id, action_id) DO UPDATE SET
-		   state = 'RESERVED', amount_paise = excluded.amount_paise, updated_at = excluded.updated_at
-		 WHERE action_state.state = 'AVAILABLE'`,
-		s.mandateID, actionID, receipt, amountPaise,
-		time.Now().UTC().Format(time.RFC3339Nano))
+	return s.ReserveMany(receipt, []lifecycle.Reservation{{ActionID: actionID, AmountPaise: amountPaise}})
+}
+
+// ReserveMany durably claims EVERY action a single forwarded call consumes,
+// atomically, before any byte reaches the child.
+//
+// One call may consume several actions because a merchant who authorized 18500
+// and 19000 separately has authorized 37500 in total, and an agent that issues
+// it as one refund is asking for exactly what was granted. Refusing that was
+// measured as three of arm B's nine false blocks (study/RESULTS-armB.md).
+//
+// ATOMICITY IS THE WHOLE POINT. Reserving two of three actions and failing on
+// the third would leave budget encumbered against a refund that never gets
+// forwarded, and the partial reservation would block the agent's legitimate
+// retry. One transaction, one fsync, all or nothing.
+//
+// The receipt is inserted into call_receipt FIRST. That table is where receipt
+// uniqueness now lives (schema v2): it is one row per forwarded call, which is
+// the level the guarantee actually belongs at. Every action row then carries
+// the same receipt, because that string is what an operator searches Razorpay
+// for -- rows disagreeing about it would mislead exactly when it matters.
+func (s *Store) ReserveMany(receipt string, rs []lifecycle.Reservation) error {
+	if len(rs) == 0 {
+		return errors.New("storage: reserve: no actions given")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	tx, err := s.db.Begin()
 	if err != nil {
-		// Classify a receipt collision distinctly.
-		//
-		// ErrReceiptExists was declared and never returned: the UNIQUE violation
-		// came back as a raw driver string, so no caller could tell a collision
-		// from a disk error, and errors.Is against the sentinel would have
-		// silently never matched. Fail-closed behaviour was correct either way
-		// -- the guard refuses to forward on any reserve failure -- but a
-		// sentinel that cannot fire is a trap for whoever reaches for it next.
-		//
-		// The classification runs AFTER the failed insert, so it is race-free:
-		// checking first and inserting second would be TOCTOU. Matching on the
-		// driver's message text would be fragile; asking the table what it holds
-		// is not.
-		if taken, qerr := s.receiptTaken(receipt); qerr == nil && taken {
-			return fmt.Errorf("storage: reserve %s: %w (receipt %s)",
-				actionID, ErrReceiptExists, receipt)
+		return fmt.Errorf("storage: reserve: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, r := range rs {
+		res, err := tx.Exec(
+			`INSERT INTO action_state (mandate_id, action_id, receipt, state, amount_paise, updated_at)
+			 VALUES (?, ?, ?, 'RESERVED', ?, ?)
+			 ON CONFLICT(mandate_id, action_id) DO UPDATE SET
+			   state = 'RESERVED', receipt = excluded.receipt,
+			   amount_paise = excluded.amount_paise, updated_at = excluded.updated_at
+			 WHERE action_state.state = 'AVAILABLE'`,
+			s.mandateID, r.ActionID, receipt, r.AmountPaise, now)
+		if err != nil {
+			return fmt.Errorf("storage: reserve %s: %w", r.ActionID, err)
 		}
-		return fmt.Errorf("storage: reserve %s: %w", actionID, err)
+		// The ON CONFLICT guard silently changes NOTHING when the action is
+		// already RESERVED / COMMITTED / IN_DOUBT. Without this check the caller
+		// would treat a no-op as success and mark the action reserved in memory
+		// anyway.
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("storage: reserve %s: rows affected: %w", r.ActionID, err)
+		}
+		if n != 1 {
+			return fmt.Errorf("storage: reserve %s: %w (%d rows)", r.ActionID, ErrNoRowChanged, n)
+		}
 	}
-	// The ON CONFLICT guard silently changes NOTHING when the action is already
-	// RESERVED / COMMITTED / IN_DOUBT. Without this check the caller would treat
-	// a no-op as success and mark the action reserved in memory anyway.
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("storage: reserve %s: rows affected: %w", actionID, err)
+
+	// Claim the receipt LAST.
+	//
+	// Order matters for the error a caller sees. An action that is already
+	// RESERVED or COMMITTED is the more specific and more actionable failure --
+	// it is a replay, and ErrNoRowChanged is what the policy maps to
+	// ACTION_CONSUMED. Claiming the receipt first meant a replay of the very
+	// same call reported "receipt already issued" instead, which is true but
+	// less useful and changed a rule the decision log has always carried.
+	//
+	// A PRIMARY KEY collision here is a genuine one: the receipt is a 48-bit
+	// truncated hash, so uniqueness must be enforced rather than assumed. It
+	// fails the whole transaction, so nothing is reserved and nothing is
+	// forwarded -- a collision can only refuse a refund, never duplicate one.
+	if _, err := tx.Exec(
+		`INSERT INTO call_receipt (receipt, mandate_id, issued_at) VALUES (?, ?, ?)`,
+		receipt, s.mandateID, now); err != nil {
+		// Classify INSIDE the transaction. s.receiptTaken() would ask the pool
+		// for a connection while tx holds the only one (SetMaxOpenConns(1)) and
+		// deadlock -- which is exactly what it did, until the tests hung.
+		var n int
+		if qerr := tx.QueryRow(
+			`SELECT COUNT(*) FROM call_receipt WHERE receipt = ?`, receipt).Scan(&n); qerr == nil && n > 0 {
+			return fmt.Errorf("storage: reserve: %w (receipt %s)", ErrReceiptExists, receipt)
+		}
+		return fmt.Errorf("storage: reserve: claim receipt: %w", err)
 	}
-	if n != 1 {
-		return fmt.Errorf("storage: reserve %s: %w (%d rows)", actionID, ErrNoRowChanged, n)
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("storage: reserve: %w", err)
 	}
 	return nil
 }
@@ -386,9 +463,36 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 // INSERT OR IGNORE, not INSERT: a file created before this table existed gets
 // stamped v1 on first open, which is correct -- the schema it holds IS v1.
 func checkSchemaVersion(db *sql.DB) error {
+	// An UNSTAMPED file is not necessarily a new one.
+	//
+	// Files created before schema_meta existed carry the v1 layout, and
+	// stamping them with the current version would skip the migration they
+	// actually need -- adopting a v1 file as v2 and then reading it with v2
+	// assumptions. So the version is INFERRED FROM STRUCTURE when the stamp is
+	// missing: v1's action_state declares receipt UNIQUE and v2's does not.
+	//
+	// Reading the DDL is deliberate. It asks the file what it IS rather than
+	// trusting what it is labelled, which is the whole reason this check exists.
+	initial := schemaVersion
+	var stamped int
+	switch err := db.QueryRow(`SELECT version FROM schema_meta WHERE id = 1`).
+		Scan(&stamped); {
+	case err == nil:
+		initial = stamped
+	case errors.Is(err, sql.ErrNoRows):
+		var ddl string
+		if derr := db.QueryRow(
+			`SELECT sql FROM sqlite_master WHERE type='table' AND name='action_state'`).
+			Scan(&ddl); derr == nil && strings.Contains(ddl, "UNIQUE") {
+			initial = 1
+		}
+	default:
+		return fmt.Errorf("storage: read schema version: %w", err)
+	}
+
 	if _, err := db.Exec(
 		`INSERT OR IGNORE INTO schema_meta (id, version, created_at) VALUES (1, ?, ?)`,
-		schemaVersion, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		initial, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
 		return fmt.Errorf("storage: stamp schema version: %w", err)
 	}
 
@@ -400,6 +504,10 @@ func checkSchemaVersion(db *sql.DB) error {
 	switch {
 	case found == schemaVersion:
 		return nil
+	case found == 1 && schemaVersion == 2:
+		// The first real migration, and the reason the version stamp was added
+		// while state files were still disposable.
+		return migrateV1toV2(db)
 	case found > schemaVersion:
 		return fmt.Errorf("%w: file is version %d, this build understands %d. "+
 			"It was written by a NEWER rzp-guard which may track state in columns "+
@@ -416,10 +524,59 @@ func checkSchemaVersion(db *sql.DB) error {
 	}
 }
 
+// migrateV1toV2 drops the UNIQUE constraint on action_state.receipt and moves
+// that guarantee into call_receipt.
+//
+// SQLite cannot drop a constraint in place, so the table is rebuilt. Everything
+// happens in ONE transaction: a half-migrated state file holding refund
+// reservations is worse than one that refuses to open.
+//
+// Existing receipts are backfilled into call_receipt so the uniqueness
+// guarantee is continuous across the migration rather than restarting empty.
+func migrateV1toV2(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("storage: migrate v1->v2: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmts := []string{
+		`ALTER TABLE action_state RENAME TO action_state_v1`,
+		`CREATE TABLE action_state (
+		   mandate_id   TEXT    NOT NULL,
+		   action_id    TEXT    NOT NULL,
+		   receipt      TEXT    NOT NULL,
+		   state        TEXT    NOT NULL,
+		   amount_paise INTEGER NOT NULL,
+		   updated_at   TEXT    NOT NULL,
+		   PRIMARY KEY (mandate_id, action_id)
+		 )`,
+		`INSERT INTO action_state
+		   (mandate_id, action_id, receipt, state, amount_paise, updated_at)
+		 SELECT mandate_id, action_id, receipt, state, amount_paise, updated_at
+		 FROM action_state_v1`,
+		// Continuity: every receipt already issued stays reserved, so a
+		// migrated file cannot re-issue one it has used before.
+		`INSERT OR IGNORE INTO call_receipt (receipt, mandate_id, issued_at)
+		 SELECT receipt, mandate_id, updated_at FROM action_state_v1`,
+		`DROP TABLE action_state_v1`,
+		`UPDATE schema_meta SET version = 2 WHERE id = 1`,
+	}
+	for _, q := range stmts {
+		if _, err := tx.Exec(q); err != nil {
+			return fmt.Errorf("storage: migrate v1->v2: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("storage: migrate v1->v2: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) receiptTaken(receipt string) (bool, error) {
 	var n int
 	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM action_state WHERE receipt = ?`, receipt).Scan(&n)
+		`SELECT COUNT(*) FROM call_receipt WHERE receipt = ?`, receipt).Scan(&n)
 	return n > 0, err
 }
 
@@ -430,6 +587,49 @@ func (s *Store) receiptTaken(receipt string) (bool, error) {
 // move a COMMITTED action back to AVAILABLE, and RowsAffected == 1 would
 // cheerfully report success -- it proves the row exists, not that the intended
 // transition is the one that happened.
+// SetStateMany moves every action of one call together, in one transaction.
+//
+// A combined refund either commits as a whole or does not: leaving one action
+// COMMITTED and another RESERVED would mean the ledger disagrees with itself
+// about a single refund that either happened or did not.
+func (s *Store) SetStateMany(actionIDs []string, from, to string) error {
+	if len(actionIDs) == 0 {
+		return errors.New("storage: set state: no actions given")
+	}
+	if len(actionIDs) == 1 {
+		return s.SetState(actionIDs[0], from, to)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("storage: set state: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, id := range actionIDs {
+		res, err := tx.Exec(
+			`UPDATE action_state SET state = ?, updated_at = ?
+			 WHERE mandate_id = ? AND action_id = ? AND state = ?`,
+			to, now, s.mandateID, id, from)
+		if err != nil {
+			return fmt.Errorf("storage: set state %s %s->%s: %w", id, from, to, err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("storage: set state %s: rows affected: %w", id, err)
+		}
+		if n != 1 {
+			return fmt.Errorf("storage: set state %s %s->%s: %w (%d rows; the action "+
+				"was not in the expected state)", id, from, to, ErrNoRowChanged, n)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("storage: set state: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) SetState(actionID, from, to string) error {
 	res, err := s.db.Exec(
 		`UPDATE action_state SET state = ?, updated_at = ?

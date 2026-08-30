@@ -71,14 +71,18 @@ const (
 
 // Decision is the complete record of one authorization outcome.
 type Decision struct {
-	Allowed         bool           `json:"allowed"`
-	Rule            string         `json:"rule"`
-	Reason          string         `json:"reason"`
-	Tool            string         `json:"tool"`
-	MatchedActionID string         `json:"matched_action_id,omitempty"`
-	Receipt         string         `json:"receipt,omitempty"`
-	AuthorizedPaise int64          `json:"authorized_paise,omitempty"`
-	Forwarded       map[string]any `json:"-"`
+	Allowed         bool   `json:"allowed"`
+	Rule            string `json:"rule"`
+	Reason          string `json:"reason"`
+	Tool            string `json:"tool"`
+	MatchedActionID string `json:"matched_action_id,omitempty"`
+	// MatchedActionIDs is every action this one call consumes. Usually one.
+	// MatchedActionID above stays the first of them, so the decision log keeps
+	// the shape it has always had.
+	MatchedActionIDs []string       `json:"matched_action_ids,omitempty"`
+	Receipt          string         `json:"receipt,omitempty"`
+	AuthorizedPaise  int64          `json:"authorized_paise,omitempty"`
+	Forwarded        map[string]any `json:"-"`
 }
 
 // ForwardedAmountPaise reports the amount actually written to the child, so a
@@ -275,6 +279,17 @@ func (g *Guard) ReleaseConfirmedRejection(actionID string) error {
 }
 func (g *Guard) MarkInDoubt(actionID string) error { return g.ledger.MarkInDoubt(actionID) }
 
+// The set forms. One forwarded refund may consume several actions, and they
+// must settle together: a call that half-commits leaves the ledger disagreeing
+// with itself about a refund that either happened or did not.
+func (g *Guard) CommitMany(actionIDs []string) error { return g.ledger.CommitMany(actionIDs) }
+func (g *Guard) ReleaseConfirmedRejectionMany(actionIDs []string) error {
+	return g.ledger.ReleaseConfirmedRejectionMany(actionIDs)
+}
+func (g *Guard) MarkInDoubtMany(actionIDs []string) error {
+	return g.ledger.MarkInDoubtMany(actionIDs)
+}
+
 func (g *Guard) State(actionID string) lifecycle.State { return g.ledger.State(actionID) }
 func (g *Guard) Encumbered() int64                     { return g.ledger.Encumbered() }
 func (g *Guard) Remaining() int64                      { return g.ledger.Remaining() }
@@ -346,6 +361,12 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 		}
 	}
 	if len(admitting) == 0 {
+		// No SINGLE action covers it. Before refusing, ask whether a set of the
+		// merchant's own actions sums to exactly this amount -- the agent may
+		// have issued one refund for two authorized items.
+		if combo := combineExact(forPayment, amountPaise, g.ledger.IsAvailable); combo != nil {
+			return g.reserveSet(tool, args, amountPaise, combo, now)
+		}
 		descs := make([]string, 0, len(forPayment))
 		for _, a := range forPayment {
 			descs = append(descs, a.Describe())
@@ -371,32 +392,65 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	}
 	action := pick(available)
 
+	return g.reserveSet(tool, args, amountPaise, []mandate.Action{action}, now)
+}
+
+// reserveSet is the shared tail of every ALLOWED refund: rate check, receipt,
+// atomic reservation, rate record, argument rewrite.
+//
+// One code path for one action and for several. The single-action case builds a
+// one-element set, so a combined refund cannot drift from the ordering and
+// rollback rules that took several revisions to get right.
+//
+// Caller holds g.mu.
+func (g *Guard) reserveSet(tool string, args map[string]any, amountPaise int64,
+	actions []mandate.Action, now time.Time) Decision {
+
+	ids := make([]string, 0, len(actions))
+	for _, a := range actions {
+		ids = append(ids, a.ActionID)
+	}
+	sort.Strings(ids)
+	first := ids[0]
+
 	// 6. rate limit -- HEADROOM CHECK ONLY. The slot is recorded further down,
 	// after the reservation succeeds. Consuming it here would let a request that
 	// never reaches the child still burn rate capacity, causing avoidable false
 	// blocks on the merchant's own legitimate traffic.
+	//
+	// A combined refund is ONE call and consumes ONE slot, because the rate
+	// limit bounds calls to the provider, not actions consumed.
 	if !g.rate.hasHeadroom(now) {
 		return deny(tool, RateLimitExceeded, fmt.Sprintf(
 			"%d calls already in the last 60s, limit is %d",
-			g.rate.count(now), g.mandate.Limits.MaxCallsPerMinute), action.ActionID)
+			g.rate.count(now), g.mandate.Limits.MaxCallsPerMinute), first)
 	}
 
 	// 7. receipt is derived BEFORE reserving, because the durable reservation
 	// records it and a reservation without a valid receipt must never exist.
-	receipt, err := mandate.ReceiptFor(g.mandate.MandateID, action.ActionID)
+	receipt, err := mandate.ReceiptForSet(g.mandate.MandateID, ids)
 	if err != nil {
 		return deny(tool, MalformedArguments,
-			fmt.Sprintf("receipt derivation failed: %v", err), action.ActionID)
+			fmt.Sprintf("receipt derivation failed: %v", err), first)
 	}
 
-	// 8. atomic reserve -- action, budget and the durable row together, before
-	// anything is written to the child.
-	if err := g.ledger.Reserve(action.ActionID, receipt, amountPaise); err != nil {
+	// 8. atomic reserve -- actions, budget and the durable rows together, before
+	// anything is written to the child. Each action carries its OWN authorized
+	// amount; for a combination those sum to the requested total by construction.
+	rs := make([]lifecycle.Reservation, 0, len(actions))
+	for _, a := range actions {
+		amt := amountPaise
+		if len(actions) > 1 {
+			amt = *a.AmountPaise
+		}
+		rs = append(rs, lifecycle.Reservation{ActionID: a.ActionID, AmountPaise: amt})
+	}
+	if err := g.ledger.ReserveMany(receipt, rs); err != nil {
 		rule := CumulativeCapExceeded
 		if errors.Is(err, lifecycle.ErrNotAvailable) {
 			rule = ActionConsumed
 		}
-		return deny(tool, rule, err.Error(), action.ActionID)
+		return deny(tool, rule, err.Error(), first)
 	}
 
 	// Only now is the rate slot consumed: this call really is going to the child.
@@ -404,17 +458,18 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	// forwarded call that is not in the rate window is a bypass.
 	//
 	// The rollback is attempted, not guaranteed: the rate write failing usually
-	// means the store is broken, so the release will fail too. Then the action
-	// stays RESERVED, holding its budget, and recovery surfaces it as IN_DOUBT
-	// at the next start. Nothing was forwarded, so that is a refund an operator
-	// will be asked about that never left the building -- the conservative
-	// error, and the right one to make. Releasing an action whose release could
-	// not be durably recorded is the alternative, and that one can be replayed.
+	// means the store is broken, so the release will fail too. Then the actions
+	// stay RESERVED, holding their budget, and recovery surfaces them as
+	// IN_DOUBT at the next start. Nothing was forwarded, so that is a refund an
+	// operator will be asked about that never left the building -- the
+	// conservative error, and the right one to make. Releasing actions whose
+	// release could not be durably recorded is the alternative, and that one can
+	// be replayed.
 	if err := g.rate.record(now); err != nil {
-		_ = g.ledger.ReleaseConfirmedRejection(action.ActionID)
+		_ = g.ledger.ReleaseConfirmedRejectionMany(ids)
 		return deny(tool, MalformedArguments,
 			fmt.Sprintf("durable rate-window write failed, refusing to forward: %v", err),
-			action.ActionID)
+			first)
 	}
 
 	forwarded := make(map[string]any, len(args)+1)
@@ -426,13 +481,108 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	forwarded["amount"] = amountPaise
 	forwarded["receipt"] = receipt
 
+	descs := make([]string, 0, len(actions))
+	for _, a := range actions {
+		descs = append(descs, a.Describe())
+	}
+	matched := strings.Join(descs, " + ")
+	if len(actions) > 1 {
+		matched = "combination of " + matched
+	}
+
 	return Decision{
 		Allowed: true, Rule: Allowed, Tool: tool,
-		MatchedActionID: action.ActionID, Receipt: receipt,
+		MatchedActionID: first, MatchedActionIDs: ids, Receipt: receipt,
 		AuthorizedPaise: amountPaise, Forwarded: forwarded,
 		Reason: fmt.Sprintf("matches %s; reserved %d paise (%d remaining of %d)",
-			action.Describe(), amountPaise, g.ledger.Remaining(), g.ledger.MaxCumulativePaise()),
+			matched, amountPaise, g.ledger.Remaining(), g.ledger.MaxCumulativePaise()),
 	}
+}
+
+// combineExact finds a set of AVAILABLE exact-amount actions summing to target.
+//
+// WHY THIS EXISTS. A merchant who authorized 18500 for the dal and 19000 for
+// the oil has authorized 37500 in total. An agent that issues one refund for
+// 37500 instead of two is asking for exactly what was granted, and refusing it
+// was three of arm B's nine false blocks -- the single largest measured cause
+// of the guard obstructing legitimate refunds (study/FINDINGS-armB.md).
+//
+// WHY IT IS SAFE. Every action in the returned set is one the merchant granted,
+// each is still consumed exactly once, and the total is the sum of their exact
+// amounts. The cumulative cap is unchanged and checked against the total before
+// anything is reserved. The maximum a compromised agent can extract is
+// identical to what it could extract by issuing the calls separately; only the
+// NUMBER of provider calls differs.
+//
+// BOUNDED ACTIONS ARE EXCLUDED. A bounded grant has no fixed amount, so "which
+// part of the target did it cover" has no single answer, and a wrong split
+// would consume more authority than the refund used. Bounded actions stay
+// single-match, as before.
+//
+// The search is a depth-first walk with pruning, and it is CAPPED. Subset-sum
+// is NP-hard; a mandate with many same-payment actions could otherwise make an
+// agent-supplied amount expensive to refuse. Exhausting the budget returns no
+// match, which denies the call -- the safe direction.
+func combineExact(candidates []mandate.Action, target int64, avail func(string) bool) []mandate.Action {
+	// Descending, so large actions are tried first and pruning bites early.
+	pool := make([]mandate.Action, 0, len(candidates))
+	for _, a := range candidates {
+		if a.IsBounded() || !avail(a.ActionID) {
+			continue
+		}
+		if *a.AmountPaise <= target {
+			pool = append(pool, a)
+		}
+	}
+	sort.Slice(pool, func(i, j int) bool {
+		if *pool[i].AmountPaise != *pool[j].AmountPaise {
+			return *pool[i].AmountPaise > *pool[j].AmountPaise
+		}
+		return pool[i].ActionID < pool[j].ActionID
+	})
+	// A single action is not a combination; Decide has already tried that.
+	if len(pool) < 2 {
+		return nil
+	}
+
+	const maxNodes = 50000
+	const maxSetSize = 8
+
+	// Suffix sums let the walk abandon a branch that cannot reach the target.
+	suffix := make([]int64, len(pool)+1)
+	for i := len(pool) - 1; i >= 0; i-- {
+		suffix[i] = suffix[i+1] + *pool[i].AmountPaise
+	}
+
+	var best []mandate.Action
+	var cur []mandate.Action
+	nodes := 0
+
+	var walk func(i int, sum int64)
+	walk = func(i int, sum int64) {
+		if best != nil || nodes > maxNodes {
+			return
+		}
+		nodes++
+		if sum == target {
+			if len(cur) >= 2 {
+				best = append([]mandate.Action(nil), cur...)
+			}
+			return
+		}
+		if i >= len(pool) || sum > target || len(cur) >= maxSetSize {
+			return
+		}
+		if sum+suffix[i] < target {
+			return // even taking everything left cannot reach it
+		}
+		cur = append(cur, pool[i])
+		walk(i+1, sum+*pool[i].AmountPaise)
+		cur = cur[:len(cur)-1]
+		walk(i+1, sum)
+	}
+	walk(0, 0)
+	return best
 }
 
 // pick prefers an exact action over a bounded one, so a bounded grant is not

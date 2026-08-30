@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -246,4 +247,37 @@ func ReceiptFor(mandateID, actionID string) (string, error) {
 			"[A-Za-z0-9_-]", r)
 	}
 	return r, nil
+}
+
+// ReceiptForSet derives the receipt for a call that consumes SEVERAL actions.
+//
+// One forwarded refund may consume more than one action: a merchant who
+// authorized 18500 and 19000 separately has authorized 37500, and an agent
+// issuing it as a single call is asking for exactly what was granted.
+//
+// The set is sorted so the receipt does not depend on match order, and joined
+// with "+", which cannot occur inside an action_id (actionIDPattern permits
+// only [A-Za-z0-9_-]). That separator choice is what makes the mapping
+// injective: no set of ids can collide with a single id, and no two distinct
+// sets can produce the same string.
+//
+// A ONE-ELEMENT SET DELIBERATELY YIELDS THE PLAIN ReceiptFor VALUE. Every
+// receipt this project has ever issued, including the ones in the frozen study
+// traces, stays bit-identical -- so combining changes behaviour only where it
+// actually fires.
+func ReceiptForSet(mandateID string, actionIDs []string) (string, error) {
+	switch len(actionIDs) {
+	case 0:
+		return "", fmt.Errorf("receipt: no actions given")
+	case 1:
+		return ReceiptFor(mandateID, actionIDs[0])
+	}
+	ids := append([]string(nil), actionIDs...)
+	sort.Strings(ids)
+	for i := 1; i < len(ids); i++ {
+		if ids[i] == ids[i-1] {
+			return "", fmt.Errorf("receipt: %s appears twice in one call", ids[i])
+		}
+	}
+	return ReceiptFor(mandateID, strings.Join(ids, "+"))
 }

@@ -39,11 +39,26 @@ var (
 	ErrNotAuthorized = errors.New("operator token rejected")
 )
 
+// Reservation is one action being consumed by one forwarded call.
+type Reservation struct {
+	ActionID    string
+	AmountPaise int64
+}
+
 // Persister is the durable side. Reserve must be written BEFORE any byte
 // reaches the child, so a crash mid-flight leaves a recoverable row.
+//
+// The Many forms exist because one refund may consume SEVERAL actions: a
+// merchant who authorized 18500 and 19000 separately has authorized 37500, and
+// an agent issuing it as one call is asking for exactly what was granted. Those
+// actions must move together or not at all -- a half-reserved call holds budget
+// against a refund that never leaves, and a half-committed one leaves the
+// ledger disagreeing with itself about a refund that either happened or did not.
 type Persister interface {
 	Reserve(actionID, receipt string, amountPaise int64) error
 	SetState(actionID, from, to string) error
+	ReserveMany(receipt string, rs []Reservation) error
+	SetStateMany(actionIDs []string, from, to string) error
 }
 
 // ResolveStore performs the operator's decision and its audit record atomically.
@@ -174,26 +189,57 @@ func (l *Ledger) HasHeadroom(amountPaise int64) bool {
 // Reserve atomically claims the action and its budget and PERSISTS the
 // reservation before returning. The durable write happens inside the lock, so a
 // caller that sees success knows the row exists before it forwards anything.
+// Reserve claims one action.
 func (l *Ledger) Reserve(actionID, receipt string, amountPaise int64) error {
+	return l.ReserveMany(receipt, []Reservation{{ActionID: actionID, AmountPaise: amountPaise}})
+}
+
+// ReserveMany claims every action one forwarded call consumes.
+//
+// All checks run against the WHOLE set before anything is written: every action
+// must be Available, and the combined amount must fit the remaining budget.
+// Checking them one at a time would let a set pass whose total exceeds the cap.
+func (l *Ledger) ReserveMany(receipt string, rs []Reservation) error {
+	if len(rs) == 0 {
+		return errors.New("reserve: no actions given")
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	e := l.entryLocked(actionID)
-	if e.state != Available {
-		return fmt.Errorf("%w: %s is %s", ErrNotAvailable, actionID, e.state)
+
+	var total int64
+	seen := make(map[string]struct{}, len(rs))
+	for _, r := range rs {
+		if _, dup := seen[r.ActionID]; dup {
+			// The same action twice in one call would be counted once against
+			// the cap and consumed once, while the caller believes it paid for
+			// two. Refuse rather than resolve the ambiguity.
+			return fmt.Errorf("reserve: %s appears twice in one call", r.ActionID)
+		}
+		seen[r.ActionID] = struct{}{}
+
+		e := l.entryLocked(r.ActionID)
+		if e.state != Available {
+			return fmt.Errorf("%w: %s is %s", ErrNotAvailable, r.ActionID, e.state)
+		}
+		total += r.AmountPaise
 	}
-	if remaining := l.maxCumulativePaise - l.encumberedLocked(); amountPaise > remaining {
+	if remaining := l.maxCumulativePaise - l.encumberedLocked(); total > remaining {
 		return fmt.Errorf("%w: %d paise exceeds %d remaining of %d",
-			ErrCumulativeCap, amountPaise, remaining, l.maxCumulativePaise)
+			ErrCumulativeCap, total, remaining, l.maxCumulativePaise)
 	}
+
 	if l.store != nil {
-		if err := l.store.Reserve(actionID, receipt, amountPaise); err != nil {
+		if err := l.store.ReserveMany(receipt, rs); err != nil {
 			// Durability failed, so the reservation does not exist. Fail closed:
-			// no in-memory claim either.
+			// no in-memory claim either, for any action in the set.
 			return fmt.Errorf("durable reserve failed, refusing to forward: %w", err)
 		}
 	}
-	e.state = Reserved
-	e.reserved = amountPaise
+	for _, r := range rs {
+		e := l.entryLocked(r.ActionID)
+		e.state = Reserved
+		e.reserved = r.AmountPaise
+	}
 	return nil
 }
 
@@ -215,6 +261,54 @@ func (l *Ledger) transition(actionID string, want, next State, mutate func(*entr
 }
 
 // Commit records a confirmed success.
+// transitionMany moves a whole call's actions together.
+//
+// Same ordering rule as transition(): the durable write happens FIRST and the
+// in-memory entries move only if it succeeded, so a failure leaves memory and
+// the database agreeing on RESERVED for every action in the set.
+func (l *Ledger) transitionMany(actionIDs []string, want, next State, mutate func(*entry)) error {
+	if len(actionIDs) == 0 {
+		return errors.New("transition: no actions given")
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for _, id := range actionIDs {
+		if e := l.entryLocked(id); e.state != want {
+			return fmt.Errorf("%w: cannot move %s from %s to %s", ErrBadTransition, id, e.state, next)
+		}
+	}
+	if l.store != nil {
+		if err := l.store.SetStateMany(actionIDs, string(want), string(next)); err != nil {
+			return fmt.Errorf("durable state write failed: %w", err)
+		}
+	}
+	for _, id := range actionIDs {
+		e := l.entryLocked(id)
+		mutate(e)
+		e.state = next
+	}
+	return nil
+}
+
+// CommitMany settles every action of one forwarded refund.
+func (l *Ledger) CommitMany(actionIDs []string) error {
+	return l.transitionMany(actionIDs, Reserved, Committed, func(e *entry) {
+		e.committed, e.reserved = e.reserved, 0
+	})
+}
+
+// MarkInDoubtMany locks every action of one ambiguous refund.
+func (l *Ledger) MarkInDoubtMany(actionIDs []string) error {
+	return l.transitionMany(actionIDs, Reserved, InDoubt, func(e *entry) {})
+}
+
+// ReleaseConfirmedRejectionMany returns every action of a call that provably
+// never reached the provider.
+func (l *Ledger) ReleaseConfirmedRejectionMany(actionIDs []string) error {
+	return l.transitionMany(actionIDs, Reserved, Available, func(e *entry) { e.reserved = 0 })
+}
+
 func (l *Ledger) Commit(actionID string) error {
 	return l.transition(actionID, Reserved, Committed, func(e *entry) {
 		e.committed, e.reserved = e.reserved, 0

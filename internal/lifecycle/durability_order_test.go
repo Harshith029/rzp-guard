@@ -68,3 +68,45 @@ func TestAFailedDurableWriteStrandsNoBudget(t *testing.T) {
 		})
 	}
 }
+
+// The same action twice in one call would be checked once against the cap and
+// consumed once, while the caller believes it paid for two -- so the ledger
+// refuses it outright.
+//
+// Nothing upstream can currently produce such a set: combineExact walks each
+// action at most once, and ReceiptForSet rejects duplicates before this is
+// reached. That is exactly why this test exists. A mutation deleting the check
+// went unnoticed by every other test, which means the guarantee was resting on
+// two callers happening to be careful rather than on the ledger enforcing it.
+func TestReserveManyRefusesTheSameActionTwice(t *testing.T) {
+	st := &recordingStore{}
+	l := NewLedger(100000, st)
+
+	err := l.ReserveMany("rzpg_aaaaaaaaaaaa", []Reservation{
+		{ActionID: "rfa_001", AmountPaise: 10000},
+		{ActionID: "rfa_001", AmountPaise: 10000},
+	})
+	if err == nil {
+		t.Fatal("reserved the same action twice in one call: it would be counted " +
+			"once against the cumulative cap while the caller believes two " +
+			"separate authorizations were spent")
+	}
+	if got := l.State("rfa_001"); got != Available {
+		t.Fatalf("state is %s after a refused duplicate, want AVAILABLE", got)
+	}
+	if got := l.Encumbered(); got != 0 {
+		t.Fatalf("a refused duplicate encumbered %d paise", got)
+	}
+	// And nothing may have been written durably.
+	if len(st.reserves) != 0 {
+		t.Fatalf("a refused duplicate reached the durable layer: %v", st.reserves)
+	}
+}
+
+// An empty set is a caller bug, not a no-op refund.
+func TestReserveManyRefusesAnEmptySet(t *testing.T) {
+	l := NewLedger(100000, &recordingStore{})
+	if err := l.ReserveMany("rzpg_aaaaaaaaaaaa", nil); err == nil {
+		t.Fatal("an empty reservation set was accepted")
+	}
+}

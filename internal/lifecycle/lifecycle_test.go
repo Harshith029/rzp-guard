@@ -275,3 +275,24 @@ func TestConcurrentReservesRespectTheCap(t *testing.T) {
 		t.Fatalf("Encumbered = %d, want exactly the cap", l.Encumbered())
 	}
 }
+
+// The set forms of the Persister, for the fake. They delegate to the single
+// forms so the recorded call log and the injected errors behave identically
+// whether a test exercises one action or several.
+func (s *recordingStore) ReserveMany(receipt string, rs []Reservation) error {
+	for _, r := range rs {
+		if err := s.Reserve(r.ActionID, receipt, r.AmountPaise); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *recordingStore) SetStateMany(actionIDs []string, from, to string) error {
+	for _, id := range actionIDs {
+		if err := s.SetState(id, from, to); err != nil {
+			return err
+		}
+	}
+	return nil
+}
