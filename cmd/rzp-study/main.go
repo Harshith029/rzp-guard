@@ -41,6 +41,12 @@ func main() {
 		err = cmdWorksheet(os.Args[2:])
 	case "report":
 		err = cmdReport(os.Args[2:])
+	case "worksheet-armC":
+		err = cmdArmCWorksheet(os.Args[2:])
+	case "agreement-armC":
+		err = cmdArmCAgreement(os.Args[2:])
+	case "report-armC":
+		err = cmdArmCReport(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -61,6 +67,12 @@ func usage() {
   arms             list the study arms; "arms record <A|B>" stamps what one ran under
   worksheet        emit the BLINDED adjudication worksheet from the traces
   report           join filled verdicts onto the traces -> confusion matrix
+
+  arm C (two raters, agreement before any join):
+  worksheet-armC   emit TWO identical blinded worksheets, one per rater
+  agreement-armC   inter-rater agreement + every disagreement; reads no trace
+  report-armC      join frozen labels to guard decisions; refuses until
+                   agreement has been published
 
 run flags:
   -guard PATH      rzp-guard binary (test-hook build, for the stub child)

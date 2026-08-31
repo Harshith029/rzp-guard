@@ -1074,8 +1074,46 @@ flight**, and a CI runner that checks out a new revision mid-job would hit the
 same class of failure. The contaminated logs are kept rather than deleted.
 
 It does not explain the original `exit 1`. Different exit code, different
-mechanism, and nothing was editing `run.sh` at the time. That one stays open
-until the frozen run says otherwise.
+mechanism, and nothing was editing `run.sh` at the time.
+
+### F26.1b — a diagnosis I had to withdraw before committing it
+
+While building arm C, `go test ./cmd/rzp-study/` failed with no failing test:
+
+    fork/exec C:\...\Temp\go-build4060995001001zp-study.test.exe:
+    An Application Control policy has blocked this file.
+
+I ran a clean A/B, got a crisp result — default `GOTMPDIR` failed twice,
+redirected passed twice — and started writing this up as **the** explanation for
+the lost `exit 1`. It is not, on two counts, and both were discoverable in this
+repository before I wrote a word.
+
+**One: it is already F9.** Documented long ago, including the detail that
+demolishes my fix — moving `GOTMPDIR` into the project "helped once and then
+failed again, so it is a reputation/scan delay on newly-created executables
+rather than a path rule." My two-for-two A/B is exactly what a reputation delay
+looks like from inside a five-minute window. I had rediscovered a known fault
+and mistaken the rediscovery for a diagnosis.
+
+**Two, and worse: it cannot explain the failure it was offered for.** The lost
+exit code came from `./run.sh all`, and `cmd_all` calls `cmd_test`, `cmd_race`,
+`cmd_lifecycle` and `cmd_lifecycle_race` — every one of them `gorun`, i.e.
+inside the pinned golang container. **The container is immune to the host's
+Application Control**; F9 is precisely why the canonical runner is containerised.
+A native `go test` failure says nothing about a containerised lane, and
+`run.sh`'s own header has said so since it was written.
+
+So the honest position is unchanged from before I found this: the original
+`exit 1` is **not explained**. What can be said is what the captured runs say —
+six clean-clone `run.sh all` runs, every stream kept, identical `run.sh` hash
+throughout — and that a non-reproduction is not a diagnosis.
+
+The reason this is recorded rather than quietly dropped: I was one commit away
+from publishing a confident causal story that a five-minute read of my own
+`FAILURES.md` and `run.sh` header refutes. That is the project's recurring
+defect — **a claim stronger than the evidence** — arriving this time as an
+explanation rather than a control, and it survived being the exact thing I had
+just written three sections about.
 
 ### F26.2 — the tripwire that would have caught this looked at the wrong thing
 
