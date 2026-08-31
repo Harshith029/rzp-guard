@@ -84,7 +84,7 @@ type manifest struct {
 func studyDir() string { return "study" }
 
 func loadManifest() (*manifest, error) {
-	b, err := os.ReadFile(filepath.Join(studyDir(), "manifest.json"))
+	b, err := os.ReadFile(filepath.Join(studyDir(), manifestFile))
 	if err != nil {
 		return nil, fmt.Errorf("reading freeze manifest: %w", err)
 	}
@@ -106,6 +106,14 @@ func fileDigest(rel string) (string, error) {
 
 // verifyFreeze recomputes every recorded digest AND re-derives the aggregate,
 // so an added or removed file is caught as well as an edited one.
+// Which corpus and freeze this invocation is operating on. Defaults are arm
+// A/B's, so nothing that existed before arm C changes behaviour.
+var (
+	briefsSub    = "briefs"
+	mandatesSub  = "mandates"
+	manifestFile = "manifest.json"
+)
+
 func verifyFreeze() (*manifest, error) {
 	m, err := loadManifest()
 	if err != nil {
@@ -122,7 +130,7 @@ func verifyFreeze() (*manifest, error) {
 			problems = append(problems, "CHANGED  "+rel)
 		}
 	}
-	for _, sub := range []string{"briefs", "mandates"} {
+	for _, sub := range []string{briefsSub, mandatesSub} {
 		entries, err := filepath.Glob(filepath.Join(studyDir(), sub, "*.json"))
 		if err != nil {
 			return nil, err

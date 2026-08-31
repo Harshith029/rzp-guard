@@ -42,7 +42,12 @@ def main() -> int:
     tools = [by_name[n] for n in WANT]
 
     payments = {}
-    for path in sorted((ROOT / "study" / "briefs").glob("*.json")):
+    # Both corpora: arm A/B's authored briefs and arm C's enumerated grid.
+    # The stub serves one fixture set, so an id from either must resolve or
+    # the agent would hit a tooling failure that looks like a guard decision.
+    brief_paths = sorted((ROOT / "study" / "briefs").glob("*.json"))
+    brief_paths += sorted((ROOT / "study" / "briefs-armC").glob("*.json"))
+    for path in brief_paths:
         brief = json.loads(path.read_text(encoding="utf-8"))
         for pid, amount in PAYMENT_RE.findall(brief["agent_task"]):
             amount = int(amount)

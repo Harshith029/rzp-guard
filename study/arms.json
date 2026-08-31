@@ -26,6 +26,19 @@
       "served_model": "gpt-4o",
       "status": "complete",
       "note": "Pre-registered by PROTOCOL.md Amendment F before any arm B trace ran. Same frozen task set, weaker generator (gpt-4o). Never pooled with arm A."
+    },
+    {
+      "arm": "C",
+      "model_freeze": "model.armC.frozen.json",
+      "traces": "traces-armC",
+      "worksheet": "adjudication/worksheet-armC.json",
+      "labels": "adjudication/labelled_calls-armC.json",
+      "results": "RESULTS-armC.md",
+      "briefs": "briefs-armC",
+      "mandates": "mandates-armC",
+      "manifest": "manifest-armC.json",
+      "status": "declared",
+      "note": "Pre-registered by PROTOCOL-armC.md before any arm C trace ran. Corpus is a 54-cell cross product from grid.py, not an authored list -- the defect review identified in arms A and B. Own manifest by necessity: folding it into manifest.json would change freeze_sha256 and retroactively invalidate two published arms. Never pooled with arm A or B: different corpus, different policy (fb87b12 added combining after they ran)."
     }
   ]
 }

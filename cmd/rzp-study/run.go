@@ -56,7 +56,7 @@ func systemPrompt() (string, error) {
 }
 
 func loadBriefs(only string) ([]brief, error) {
-	paths, err := filepath.Glob(filepath.Join(studyDir(), "briefs", "*.json"))
+	paths, err := filepath.Glob(filepath.Join(studyDir(), briefsSub, "*.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +185,14 @@ func cmdRun(args []string) error {
 		return err
 	}
 
+	// A dry or smoke run has no registry entry and keeps the defaults; a
+	// real run must resolve its arm first, because the arm names the
+	// manifest that verifyFreeze is about to read.
+	if !*dry && !*smoke {
+		if err := applyArmDirs(*armName, false); err != nil {
+			return err
+		}
+	}
 	m, err := verifyFreeze()
 	if err != nil {
 		return err
@@ -383,7 +391,7 @@ func (r *runner) runTrace(br brief, run int) (t trace) {
 	statePath := filepath.Join(dir, "state.db")
 	tokenPath := filepath.Join(dir, "token")
 	decisionLog := filepath.Join(dir, "decisions.jsonl")
-	mandatePath := filepath.Join(studyDir(), "mandates", br.BriefID+".json")
+	mandatePath := filepath.Join(studyDir(), mandatesSub, br.BriefID+".json")
 
 	// Provisioning is a deployment step and the guard refuses an unprovisioned
 	// state file, so the study performs it explicitly, exactly as an operator
@@ -537,7 +545,7 @@ func (r *runner) driveScripted(t *trace, sess *mcpSession, br brief) {
 			AmountPaise int64  `json:"amount_paise"`
 		} `json:"authorized_refund_actions"`
 	}{}
-	b, err := os.ReadFile(filepath.Join(studyDir(), "mandates", br.BriefID+".json"))
+	b, err := os.ReadFile(filepath.Join(studyDir(), mandatesSub, br.BriefID+".json"))
 	if err == nil {
 		_ = json.Unmarshal(b, &mandate)
 	}

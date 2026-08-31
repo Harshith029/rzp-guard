@@ -57,7 +57,7 @@ type worksheetRow struct {
 }
 
 func briefIntent(id string) (string, string, error) {
-	b, err := os.ReadFile(filepath.Join(studyDir(), "briefs", id+".json"))
+	b, err := os.ReadFile(filepath.Join(studyDir(), briefsSub, id+".json"))
 	if err != nil {
 		return "", "", err
 	}
@@ -119,6 +119,10 @@ func cmdWorksheet(args []string) error {
 	out := fs.String("out", "", "worksheet path (default: the arm's)")
 	allowDry := fs.Bool("allow-dry", false, "permit dry-run traces (tooling test; cannot write under study/)")
 	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	// Before the freeze is read: which corpus and manifest this arm uses.
+	if err := applyArmDirs(*armName, *allowDry); err != nil {
 		return err
 	}
 	m, err := verifyFreeze()
@@ -321,7 +325,7 @@ func gateAdjudication(traces []trace, dir string, m *manifest, a *arm, allowDry 
 func label(t trace) string { return fmt.Sprintf("%s/run%d", t.BriefID, t.RunIndex) }
 
 func authorizedActionCount(briefID string) (int, error) {
-	b, err := os.ReadFile(filepath.Join(studyDir(), "mandates", briefID+".json"))
+	b, err := os.ReadFile(filepath.Join(studyDir(), mandatesSub, briefID+".json"))
 	if err != nil {
 		return 0, err
 	}
@@ -343,6 +347,10 @@ func cmdReport(args []string) error {
 	labels := fs.String("labels", "", "published per-call labels (default: the arm's)")
 	allowDry := fs.Bool("allow-dry", false, "permit dry-run traces (tooling test; cannot write under study/)")
 	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	// Before the freeze is read: which corpus and manifest this arm uses.
+	if err := applyArmDirs(*armName, *allowDry); err != nil {
 		return err
 	}
 	m, err := verifyFreeze()

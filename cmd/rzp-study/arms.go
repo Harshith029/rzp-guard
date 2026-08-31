@@ -36,6 +36,15 @@ type arm struct {
 	Labels string `json:"labels"`
 	Report string `json:"results"`
 
+	// Corpus and freeze, per arm. Empty means the arm A/B defaults, so
+	// existing entries keep working untouched. Arm C sets all three: its
+	// briefs are enumerated rather than authored, and folding them into
+	// manifest.json would change freeze_sha256 and retroactively
+	// invalidate two published arms.
+	Briefs   string `json:"briefs,omitempty"`
+	Mandates string `json:"mandates,omitempty"`
+	Manifest string `json:"manifest,omitempty"`
+
 	// What this arm ACTUALLY ran under. Empty until the arm has run; filled by
 	// `arms record`, which reads the traces rather than being told.
 	FreezeSHA      string `json:"freeze_sha256,omitempty"`
@@ -88,6 +97,55 @@ func (a *arm) tracePath() string  { return a.path(a.Traces) }
 func (a *arm) sheetPath() string  { return a.path(a.Sheet) }
 func (a *arm) labelPath() string  { return a.path(a.Labels) }
 func (a *arm) reportPath() string { return a.path(a.Report) }
+
+func (a *arm) briefsDir() string {
+	if a.Briefs == "" {
+		return "briefs"
+	}
+	return a.Briefs
+}
+
+func (a *arm) mandatesDir() string {
+	if a.Mandates == "" {
+		return "mandates"
+	}
+	return a.Mandates
+}
+
+func (a *arm) manifestName() string {
+	if a.Manifest == "" {
+		return "manifest.json"
+	}
+	return a.Manifest
+}
+
+// applyArmDirs points the process at one arm's corpus and freeze. It must run
+// BEFORE verifyFreeze, which reads whichever manifest these name.
+//
+// Process-global rather than threaded through every call site: this is a CLI
+// that runs exactly one arm per invocation, and threading a corpus argument
+// through the whole study would be a far larger diff against code that is
+// load-bearing for two already-published arms.
+func applyArmDirs(name string, tolerateMissing bool) error {
+	reg, err := loadArms()
+	if err != nil {
+		if tolerateMissing {
+			return nil
+		}
+		return err
+	}
+	a, err := reg.find(name)
+	if err != nil {
+		if tolerateMissing {
+			return nil
+		}
+		return err
+	}
+	briefsSub = a.briefsDir()
+	mandatesSub = a.mandatesDir()
+	manifestFile = a.manifestName()
+	return nil
+}
 
 func (r *armsRegistry) save() error {
 	b, err := json.MarshalIndent(r, "", "  ")
