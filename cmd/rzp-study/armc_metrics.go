@@ -385,12 +385,55 @@ func cmdArmCReport(args []string) error {
 	p("reading is that the **grid and policy freeze are pre-registered while the\n")
 	p("blinding surface is not**.\n\n")
 	p("---\n\n## 5. Exclusions\n\n")
+	p("Nothing is dropped silently. Every emitted call has a row, every row has a\n")
+	p("projection status, and every exclusion is counted here with its reason.\n\n")
 	p("| | n |\n|---|---|\n")
-	p("| Unlabelable (excluded by rater) | %d |\n", len(agr.Unlabelable))
+	p("| Excluded as unlabelable | %d |\n", len(agr.Unlabelable))
 	p("| Disagreements adjudicated | %d |\n", len(agr.Disagreements))
 	p("| Labels with no matching call | %d |\n\n", len(orphanLabels))
+
+	// Group the raters' stated reasons so an exclusion cannot be a bare count.
 	if len(agr.Unlabelable) > 0 {
-		p("Excluded keys: %s\n\n", strings.Join(agr.Unlabelable, ", "))
+		byReason := map[string]int{}
+		for _, k := range agr.Unlabelable {
+			r := "(no reason given)"
+			if lr, ok := e1[k]; ok && strings.TrimSpace(lr.Reason) != "" {
+				r = strings.TrimSpace(lr.Reason)
+			}
+			byReason[r]++
+		}
+		p("### Excluded as unlabelable, by reason\n\n")
+		p("| reason | n |\n|---|---|\n")
+		var rs []string
+		for r := range byReason {
+			rs = append(rs, r)
+		}
+		sort.Strings(rs)
+		for _, r := range rs {
+			p("| %s | %d |\n", r, byReason[r])
+		}
+		p("\n")
+	}
+
+	// And the machine-readable projection statuses, which are independent of
+	// what any rater wrote.
+	if prj, err := loadProjectionRecord(); err == nil {
+		mal, abs := 0, 0
+		for _, r := range prj.Rows {
+			switch {
+			case r.TargetStatus == "malformed" || r.AmountStatus == "malformed":
+				mal++
+			case r.TargetStatus == "absent" || r.AmountStatus == "absent":
+				abs++
+			}
+		}
+		p("### Projection statuses, recorded independently of the raters\n\n")
+		p("| | n |\n|---|---|\n")
+		p("| Calls projected | %d |\n", len(prj.Rows))
+		p("| With a malformed target or amount | %d |\n", mal)
+		p("| With an absent target or amount | %d |\n\n", abs)
+		p("A malformed or absent call still has a row and a status. It can be\n")
+		p("excluded deliberately by a rater; it cannot vanish.\n\n")
 	}
 
 	if err := os.WriteFile(resultsP, []byte(w.String()), 0o644); err != nil {
@@ -428,4 +471,20 @@ func cellLabel(c map[string]string) string {
 	}
 	return fmt.Sprintf("coverage=%s pressure=%s scope=%s size=%s",
 		c["coverage"], c["pressure"], c["scope"], c["size"])
+}
+
+// loadProjectionRecord reads what the projection did to each call. It carries no
+// guard decision and no label, so reading it here does not breach the ordering
+// rule that labels are frozen before any join.
+func loadProjectionRecord() (*projectionRecord, error) {
+	b, err := os.ReadFile(filepath.Join(studyDir(), "adjudication",
+		"projection-armC.json"))
+	if err != nil {
+		return nil, err
+	}
+	var pr projectionRecord
+	if err := json.Unmarshal(b, &pr); err != nil {
+		return nil, err
+	}
+	return &pr, nil
 }
