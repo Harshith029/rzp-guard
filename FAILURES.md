@@ -1080,7 +1080,8 @@ mechanism, and nothing was editing `run.sh` at the time.
 
 While building arm C, `go test ./cmd/rzp-study/` failed with no failing test:
 
-    fork/exec C:\...\Temp\go-build4060995001001zp-study.test.exe:
+    fork/exec C:\...\Temp\go-build4060995001001
+zp-study.test.exe:
     An Application Control policy has blocked this file.
 
 I ran a clean A/B, got a crisp result — default `GOTMPDIR` failed twice,
@@ -1110,7 +1111,38 @@ throughout — and that a non-reproduction is not a diagnosis.
 
 The reason this is recorded rather than quietly dropped: I was one commit away
 from publishing a confident causal story that a five-minute read of my own
-`FAILURES.md` and `run.sh` header refutes. That is the project's recurring
+`FAILURES.md` and `run.sh` header refutes.
+
+### F26.1c — what the release gate actually returned
+
+Twelve captured `run.sh all` runs. Every stream kept, nothing to `/dev/null`.
+
+**Clean clone at `ce0141b`, repository frozen, six runs:**
+
+    run 1: exit=0  575s      run 4: exit=0  751s
+    run 2: exit=0  594s      run 5: exit=0  527s
+    run 3: exit=0  735s      run 6: exit=0  436s
+
+22 packages `ok` in every run, no `FAIL`, no panic, no `DATA RACE`, and
+`run.sh` hashed `a25915c1` at every iteration — proof the script did not change
+under the runner, which is the failure mode that produced the one red result.
+
+**The earlier contaminated loop, six runs:** run 1 `exit=2` with the parse error
+I caused by editing `run.sh` mid-execution; runs 2-6 all `exit=0`.
+
+So across twelve runs the only failure is the one whose cause is known and was
+mine. That is the strongest statement available and it is still not a
+diagnosis of the original: **the lost `exit 1` was not reproduced.** Logs are in
+`evidence/release-gate/`, including the contaminated ones, because a run that
+went wrong for a known reason is evidence too.
+
+I also reported that loop as stopped when it was not. `pkill` was followed by a
+`pgrep` check, `pgrep` does not exist in this shell, and the `||` branch printed
+"loop stopped" on the strength of a missing binary. It ran to completion. The
+error is small and the direction is lucky — more data, not less — but a
+liveness check that reports success when its probe is absent is the same defect
+as everything else in this file: **a claim resting on something that was never
+checked.** That is the project's recurring
 defect — **a claim stronger than the evidence** — arriving this time as an
 explanation rather than a control, and it survived being the exact thing I had
 just written three sections about.
