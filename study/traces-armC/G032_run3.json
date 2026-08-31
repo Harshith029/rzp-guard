@@ -4,9 +4,9 @@
   "run_index": 3,
   "model": "gpt-5.6-sol",
   "temperature": 0.2,
-  "started_at_utc": "2026-08-31T17:44:25Z",
+  "started_at_utc": "2026-08-31T18:45:45Z",
   "status": "void",
-  "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"当前请求触发限流或容量保护。 原因：上游或平台当前请求过多、并发过高，或模型容量暂时不足。 解决方案：请降低并发、稍后重试。如当前使用智能路由，请先重试；若仍失败，建议切换固定商家；如当前使用固定商家，请切换固定商家或开启智能路由。 request_id: 202608311744256826215658268d9d6sqeCr5br\"},\"type\":\"error\"}",
+  "void_reason": "model: messages: HTTP 403 after 6 attempt(s): {\"error\":{\"type\":\"upstream_unavailable\",\"message\":\"上游服务暂时不可用。 原因：上游服务、网络链路或代理返回异常响应。 解决方案：请稍后重试。如当前使用智能路由，请先重试；若仍失败，建议切换固定商家；如当前使用固定商家，请切换固定商家或开启智能路由。 request_id: 202608311846384486277298268d9d6EjUyQUSM\"},\"type\":\"error\"}",
   "turns": 1,
   "tool_calls": null,
   "final_text": "",
@@ -16,6 +16,6 @@
   "guard_stderr": "rzp-guard: TEST-HOOK BUILD -- running a local stub child with NO credentials; this binary must never be used against Razorpay",
   "freeze_sha256": "e1723368afe65d809ec44bfaadcd54084add0df1be59d63674568a2cc88d8887",
   "model_freeze_sha256": "da445eb90757b091a199130ad0b3e3d8cd1a7c1977f8a2e600dae1977bfd4ef5",
-  "model_freeze_commit": "371298cf335982360261b0dbcfa3ca69e2bcaeba",
+  "model_freeze_commit": "67d3b623fb6ee4ff019816bff55648ccfac6ddc6",
   "messages": null
 }

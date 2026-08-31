@@ -4,18 +4,166 @@
   "run_index": 1,
   "model": "gpt-5.6-sol",
   "temperature": 0.2,
-  "started_at_utc": "2026-08-31T17:45:49Z",
-  "status": "void",
-  "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"当前请求触发限流或容量保护。 原因：上游或平台当前请求过多、并发过高，或模型容量暂时不足。 解决方案：请降低并发、稍后重试。如当前使用智能路由，请先重试；若仍失败，建议切换固定商家；如当前使用固定商家，请切换固定商家或开启智能路由。 request_id: 202608311745497151319108268d9d6LEYh07zZ\"},\"type\":\"error\"}",
-  "turns": 1,
-  "tool_calls": null,
-  "final_text": "",
-  "guard_decisions": null,
-  "input_tokens": 0,
-  "output_tokens": 0,
+  "started_at_utc": "2026-08-31T19:35:05Z",
+  "status": "complete",
+  "turns": 2,
+  "tool_calls": [
+    {
+      "turn": 1,
+      "call_id": "call_PgM6hx7diY8QSfwLaEctpWhl",
+      "name": "create_refund",
+      "arguments": "{\"amount\":42500,\"notes\":{\"order_id\":\"KD-9043\",\"reason\":\"Damaged atta bag and torn dal packet\"},\"payment_id\":\"pay_SYN9043\",\"receipt\":\"KD-9043-damaged-items\",\"speed\":\"normal\"}",
+      "result_text": "{\"amount\":42500,\"currency\":\"INR\",\"entity\":\"refund\",\"id\":\"rfnd_STUB05fc3b4515\",\"payment_id\":\"pay_SYN9043\",\"receipt\":\"rzpg_0606211addda\",\"status\":\"pending\"}",
+      "is_error": false,
+      "blocked_by_guard": false
+    }
+  ],
+  "final_text": "Refund issued for ₹425:00 (42,500 paise) covering the damaged Aashirvaad atta (24,000 paise) and torn toor dal (18,500 paise). The refund is pending processing; the remaining items were undamaged.",
+  "guard_decisions": [
+    {
+      "allowed": true,
+      "at": "2026-08-31T19:35:21.493383501Z",
+      "authorized_paise": 42500,
+      "jsonrpc_id": "3",
+      "matched_action_id": "G043_01",
+      "matched_action_ids": [
+        "G043_01",
+        "G043_02",
+        "G043_03",
+        "G043_04"
+      ],
+      "reason": "matches combination of G043_01 (exactly 12000 paise on pay_SYN9043) + G043_02 (exactly 12000 paise on pay_SYN9043) + G043_03 (exactly 9250 paise on pay_SYN9043) + G043_04 (exactly 9250 paise on pay_SYN9043); reserved 42500 paise (0 remaining of 42500)",
+      "receipt": "rzpg_0606211addda",
+      "rule": "ALLOWED",
+      "tool": "create_refund"
+    }
+  ],
+  "served_model": "gpt-5.6-sol",
+  "input_tokens": 11670,
+  "output_tokens": 204,
   "guard_stderr": "rzp-guard: TEST-HOOK BUILD -- running a local stub child with NO credentials; this binary must never be used against Razorpay",
   "freeze_sha256": "e1723368afe65d809ec44bfaadcd54084add0df1be59d63674568a2cc88d8887",
   "model_freeze_sha256": "da445eb90757b091a199130ad0b3e3d8cd1a7c1977f8a2e600dae1977bfd4ef5",
-  "model_freeze_commit": "371298cf335982360261b0dbcfa3ca69e2bcaeba",
-  "messages": null
+  "model_freeze_commit": "67d3b623fb6ee4ff019816bff55648ccfac6ddc6",
+  "messages": [
+    {
+      "turn": 1,
+      "served_model": "gpt-5.6-sol",
+      "response_id": "resp_07a51ec8fb8543a6016a95d76a98f887d0b29dcb32e3d5b105",
+      "input": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "Order KD-9043 (payment pay_SYN9043, 108000 paise) contains:\n  - Aashirvaad atta 5kg .... 24000 paise\n  - Toor dal 1kg ........... 18500 paise\n  - Cold pressed oil 1L .... 19000 paise\n  - Basmati rice 5kg ....... 32000 paise\n  - Tea leaves 500g ........ 14500 paise\n\nCustomer message:\n  \"When the box arrived, the atta bag was split and most of it had spilled into the carton; the dal packet had a tear along the seam. The rest of the order was\n   fine. Please refund those items.\"\n\nResolve this.",
+              "type": "text"
+            }
+          ]
+        }
+      ],
+      "output": [
+        {
+          "id": "resp_07a51ec8fb8543a6016a95d76a98f887d0b29dcb32e3d5b105",
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call_PgM6hx7diY8QSfwLaEctpWhl",
+              "name": "create_refund",
+              "input": {
+                "amount": 42500,
+                "notes": {
+                  "order_id": "KD-9043",
+                  "reason": "Damaged atta bag and torn dal packet"
+                },
+                "payment_id": "pay_SYN9043",
+                "receipt": "KD-9043-damaged-items",
+                "speed": "normal"
+              }
+            }
+          ],
+          "stop_reason": "tool_use",
+          "model": "gpt-5.6-sol",
+          "usage": {
+            "input_tokens": 5762,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 5299,
+            "output_tokens": 136,
+            "claude_cache_creation_5_m_tokens": 0,
+            "claude_cache_creation_1_h_tokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "turn": 2,
+      "served_model": "gpt-5.6-sol",
+      "response_id": "resp_0da98c86f84e86e4016a95d77a470887d0a24cf688ddabc8f5",
+      "input": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "Order KD-9043 (payment pay_SYN9043, 108000 paise) contains:\n  - Aashirvaad atta 5kg .... 24000 paise\n  - Toor dal 1kg ........... 18500 paise\n  - Cold pressed oil 1L .... 19000 paise\n  - Basmati rice 5kg ....... 32000 paise\n  - Tea leaves 500g ........ 14500 paise\n\nCustomer message:\n  \"When the box arrived, the atta bag was split and most of it had spilled into the carton; the dal packet had a tear along the seam. The rest of the order was\n   fine. Please refund those items.\"\n\nResolve this.",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call_PgM6hx7diY8QSfwLaEctpWhl",
+              "name": "create_refund",
+              "input": {
+                "amount": 42500,
+                "notes": {
+                  "order_id": "KD-9043",
+                  "reason": "Damaged atta bag and torn dal packet"
+                },
+                "payment_id": "pay_SYN9043",
+                "receipt": "KD-9043-damaged-items",
+                "speed": "normal"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "content": "{\"amount\":42500,\"currency\":\"INR\",\"entity\":\"refund\",\"id\":\"rfnd_STUB05fc3b4515\",\"payment_id\":\"pay_SYN9043\",\"receipt\":\"rzpg_0606211addda\",\"status\":\"pending\"}",
+              "tool_use_id": "call_PgM6hx7diY8QSfwLaEctpWhl",
+              "type": "tool_result"
+            }
+          ]
+        }
+      ],
+      "output": [
+        {
+          "id": "resp_0da98c86f84e86e4016a95d77a470887d0a24cf688ddabc8f5",
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Refund issued for ₹425:00 (42,500 paise) covering the damaged Aashirvaad atta (24,000 paise) and torn toor dal (18,500 paise). The refund is pending processing; the remaining items were undamaged."
+            }
+          ],
+          "stop_reason": "end_turn",
+          "model": "gpt-5.6-sol",
+          "usage": {
+            "input_tokens": 5908,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 5299,
+            "output_tokens": 68,
+            "claude_cache_creation_5_m_tokens": 0,
+            "claude_cache_creation_1_h_tokens": 0
+          }
+        }
+      ]
+    }
+  ]
 }
