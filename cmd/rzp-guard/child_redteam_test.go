@@ -4,10 +4,12 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The previous attempt at this guarantee was an environment switch that
@@ -136,5 +138,83 @@ func TestRedteamChildIgnoresTheShellVariableEntirely(t *testing.T) {
 	joined := strings.Join(c.Args, " ")
 	if strings.Contains(joined, "docker") || strings.Contains(joined, "pwned") {
 		t.Fatalf("the shell variable reached the child: %v", c.Args)
+	}
+}
+
+// THE LAUNCH PATH, actually exercised.
+//
+// Every other test here inspects the *Cmd that newChild returns without ever
+// starting it. Review pointed out the consequence: the claim "the lane prepares
+// a stub the guard will execute" was supported by nothing -- N4 audits source
+// and N6 builds a different binary elsewhere, so no test had ever run the child
+// at redteamChildPath.
+//
+// This starts it, feeds it, and reads its answer. Synthetic on purpose: a tiny
+// program rather than the real stub, because what is under test is the LAUNCH,
+// not the stub's behaviour, and building mcp-stub inside a unit test would make
+// this slow and dependent on that package compiling.
+func TestRedteamChildActuallyLaunchesAndCommunicates(t *testing.T) {
+	withChildDir(t)
+
+	// A child that echoes one line back with a marker, then exits.
+	script := "#!/bin/sh\nread line\nprintf 'CHILD-SAW:%s\n' \"$line\"\n"
+	if err := os.WriteFile(redteamChildPath, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	c, err := newChild(ctx, "k", "s")
+	if err != nil {
+		t.Fatalf("newChild: %v", err)
+	}
+	stdin, err := c.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := c.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Start(); err != nil {
+		t.Fatalf("the child at %s is not executable: %v", redteamChildPath, err)
+	}
+
+	if _, err := io.WriteString(stdin, "hello\n"); err != nil {
+		t.Fatal(err)
+	}
+	_ = stdin.Close()
+
+	out, err := io.ReadAll(stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Wait(); err != nil {
+		t.Fatalf("child exited badly: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "CHILD-SAW:hello" {
+		t.Fatalf("child produced %q, want CHILD-SAW:hello; the guard did not "+
+			"actually launch and talk to the process at %s", got, redteamChildPath)
+	}
+}
+
+// And the negative half: if the path holds something that cannot execute, the
+// failure must surface at Start rather than looking like a healthy session.
+func TestRedteamChildSurfacesANonExecutableFile(t *testing.T) {
+	withChildDir(t)
+	if err := os.WriteFile(redteamChildPath, []byte("not a program"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := newChild(context.Background(), "k", "s")
+	if err != nil {
+		// Refusing before Start is also acceptable.
+		return
+	}
+	if err := c.Start(); err == nil {
+		_ = c.Process.Kill()
+		t.Fatal("started a non-executable file as the child; a guard would then " +
+			"appear to have a working child and forward into nothing")
 	}
 }

@@ -1005,3 +1005,89 @@ configurable child" becomes a positive AST invariant that survives renaming
 rather than a list of spellings; the stub assertion parses instead of matching;
 and there is now a demonstration — hostile stub, both paths, side by side — of
 exactly what the boundary does and does not stop.
+
+
+---
+
+## Round 14 — the structural proof was defeated by an import alias — reviewer: ChatGPT — 2026-08-31
+
+**Five raised: four accepted, one accepted in part after checking the premise.**
+The reviewer did not run anything this round (their host denied the Bash
+service) and said so; these were source-audited findings, and four of five were
+right on the source alone.
+
+### P14.1 — "The runner does not actually build the default redteam child."
+**ACCEPT IN PART — the conclusion is right, one premise is not.**
+
+The premise was that `go build -o /tmp/rzp-redteam-child/mcp-stub` fails because
+the parent does not exist. Checked: **`go build -o` creates the parent**, exit
+0, file present. So the build was in fact working and the earlier observation of
+the stub at that path was real.
+
+The finding stands anyway, for the other reason given: `|| true` **discarded any
+failure**, so the claim could have been false on every clean run and nothing
+would have said so. And no test exercised the launch — N4 audits source, N6
+builds a different binary at `/tmp/nt/stub`, and every child test inspected the
+returned `*Cmd` without starting it.
+
+Fixed: `mkdir -p` first, the build failure now aborts the lane with an
+explanation, and two new tests actually **start** the child and talk to it —
+`TestRedteamChildActuallyLaunchesAndCommunicates` writes a line and requires it
+back, and `TestRedteamChildSurfacesANonExecutableFile` requires a non-executable
+file to fail at Start rather than look like a healthy session.
+
+### P14.2 — "The AST auditor is still not invariant 'whatever it is named'."
+**ACCEPT — P1, and the weakest-claim callout again.** It matched the textual
+selector, so `import runner "os/exec"` defeated it. Demonstrated:
+
+    // aliased import, hardcoded shell command, no env read
+    runner.CommandContext(ctx, "sh", "-c", "cat /src/.env")
+
+    redteam child: exactly one launch, exec.CommandContext(ctx,
+    redteamChildPath), no configuration reads (3 files audited)
+    AUDIT EXIT=0
+
+The audit **passed, exit 0**, with a hidden shell launch reading credentials in
+the file. A positive structural claim that a rename defeats is not a structural
+claim.
+
+Now each file's imports are resolved to package paths, so a call is identified
+by what it resolves to rather than how it is spelled; dot-imports are refused
+outright because they make calls unattributable; and `CgoFiles` are audited
+alongside `GoFiles`. The identical mutation now fails:
+
+    the redteam build contains 2 process launches, want exactly 1
+        child_redteam.go:91:10: os/exec.CommandContext(ctx, "sh", "-c", "cat /src/.env")
+        child_redteam.go:93:7:  os/exec.CommandContext(ctx, redteamChildPath)
+
+### P14.3 — "N7 only bans one spelling of the old escape."
+**ACCEPT — P1.** It grepped for a top-level literal `gorun`; a `cmd_test`,
+`cmd_lifecycle` or bare `docker run` reached the same unsafe runner and passed.
+Widened to those, and — more importantly — the claim is narrowed in the code to
+what it actually checks: that THIS FUNCTION runs untrusted code only via
+`cmd_redteam`. It does not prove the unsafe runner is unreachable from elsewhere
+in run.sh, and no longer implies it.
+
+### P14.4 — "Do not use a real `.env` to prove containment again."
+**ACCEPT — P2, and it is the defense-only bar, not just hygiene.** Round 13's
+containment demonstration edited `cmd/mcp-stub` to read the real credential file
+and make a live outbound request. It printed only byte counts, was reverted, and
+was never committed — but for a track where anything offense-capable is
+disqualified, mutating a program to read real credentials is the wrong method
+even when the finding is real.
+
+Replaced with **N8**, a repeatable test using an invented sentinel in a
+gitignored path plus a DNS lookup against `example.com`. It proves the same
+three things — gitignored files absent from the export, `.env` absent, no egress
+— and touches no credential at all.
+
+### P14.5 — "Do not report a skipped case as blocked."
+**ACCEPT — P2.** I wrote "6 blocked, 0 bypassed" for a run where N1 SKIPped. The
+summary now prints `blocked / bypassed / skipped` and, when anything skipped,
+says explicitly that the local result is not clean and that the Linux CI output
+must be cited for those cases.
+
+**Net effect of Round 14:** the auditor stopped being defeatable by an import
+alias; the child launch path is exercised rather than assumed; the stub build
+can no longer fail silently; containment is proven by a sentinel instead of a
+real credential; and the local summary stops reading better than the run was.

@@ -251,7 +251,21 @@ cmd_redteam() {
         # Failure is not fatal: most red-team commands never spawn a child, and
         # a guard binary that needs one already refuses clearly when it is
         # absent.
-        go build -o /tmp/rzp-redteam-child/mcp-stub ./cmd/mcp-stub 2>/dev/null || true
+        # mkdir first and DO NOT swallow the failure.
+        #
+        # This was `go build ... 2>/dev/null || true`, which discarded any error.
+        # Go does create the parent for -o (checked), so the build was in fact
+        # working -- but a silently-discarded failure means the claim "the stub
+        # is built at the path the constant names" could have been false on every
+        # clean run and nothing would have said so. Review was right that it was
+        # unproven; it is now enforced.
+        mkdir -p /tmp/rzp-redteam-child
+        if ! go build -o /tmp/rzp-redteam-child/mcp-stub ./cmd/mcp-stub; then
+          echo "redteam lane: FAILED to build the child stub at" >&2
+          echo "  /tmp/rzp-redteam-child/mcp-stub -- a guard built with -tags" >&2
+          echo "  redteam will refuse to start until this succeeds" >&2
+          exit 1
+        fi
         exec "$@"
       ' -- "$@"
 }
@@ -297,9 +311,10 @@ cmd_redteam_selfcheck() {
 # must FAIL. If one of them starts passing, the lane has regressed to a state it
 # has already been in once.
 cmd_redteam_negative() {
-  local pass=0 fail=0
+  local pass=0 fail=0 skip=0
   ok()   { echo "  BLOCKED   $1"; pass=$((pass+1)); }
   bad()  { echo "  BYPASSED  $1" >&2; fail=$((fail+1)); }
+  skipped() { echo "  SKIP      $1"; skip=$((skip+1)); }
 
   echo "=== negative tests: each of these once worked ==="
 
@@ -318,7 +333,7 @@ cmd_redteam_negative() {
       ok "N1 untracked symlink refused"
     fi
   else
-    echo "  SKIP      N1 (this host cannot create symlinks)"
+    skipped "N1 (this host cannot create symlinks; CI runs it on Linux)"
   fi
   rm -f ".redteam-negative-link"; rm -rf "$tmpdir"
 
@@ -367,7 +382,7 @@ cmd_redteam_negative() {
   # the bypass.
   if cmd_redteam sh -c '
         set -e
-        files=$(go list -tags redteam -f "{{range .GoFiles}}{{\$.Dir}}/{{.}} {{end}}" ./cmd/rzp-guard)
+        files=$(go list -tags redteam -f "{{range .GoFiles}}{{\$.Dir}}/{{.}} {{end}}{{range .CgoFiles}}{{\$.Dir}}/{{.}} {{end}}" ./cmd/rzp-guard)
         go run ./cmd/redteam-audit child $files
       ' >/dev/null 2>&1; then
     ok "N4 redteam child has exactly one launch and no configurable path"
@@ -416,16 +431,62 @@ cmd_redteam_negative() {
     bad "N6 stub accepted a fabricated pay_SYN id, or the reply was not a real tool error"
   fi
 
-  # N7 -- Round 13. The evidence command must not itself leave the lane. Any
-  # gorun inside this function is the bypass returning.
-  if sed -n '/^cmd_redteam_negative()/,/^}/p' run.sh | grep -qE '^[[:space:]]*gorun '; then
-    bad "N7 the negative suite calls gorun; it runs untrusted code with .env mounted"
+  # N7 -- Rounds 13 and 14. The evidence command must not itself leave the lane.
+  #
+  # SCOPE, stated exactly because the first version overclaimed: this checks that
+  # THIS FUNCTION contains no call to any container runner other than
+  # cmd_redteam. It greps for `gorun`, a bare `docker run`, and the other cmd_*
+  # wrappers that use gorun. It does NOT prove the lane is unreachable from
+  # elsewhere in run.sh -- only the two execution sites that once escaped, N4 and
+  # N6, plus anything added to this function later.
+  local body escapes
+  body="$(sed -n '/^cmd_redteam_negative()/,/^}/p' run.sh)"
+  escapes="$(printf %s "$body" | grep -nE '^[[:space:]]*(gorun |docker run |cmd_test\b|cmd_race\b|cmd_lifecycle\b|cmd_vet\b|cmd_build\b)' || true)"
+  if [ -n "$escapes" ]; then
+    echo "  BYPASSED  N7 the negative suite runs code outside the isolated lane:" >&2
+    printf '%s\n' "$escapes" >&2
+    fail=$((fail+1))
   else
-    ok "N7 the negative suite never leaves the isolated lane"
+    ok "N7 this function runs untrusted code only via cmd_redteam"
   fi
 
+  # N8 -- Round 14. CONTAINMENT, with a dummy sentinel and no real credential.
+  #
+  # Round 13 proved containment by temporarily editing cmd/mcp-stub to read the
+  # real .env and make an outbound HTTPS request. It worked and it was reverted,
+  # but review was right that it is poor hygiene for a strictly defense-only
+  # track: never mutate a program to read real credentials or demonstrate live
+  # egress when a sentinel proves the same thing.
+  #
+  # So: a gitignored sentinel with invented content, and a DNS lookup. Neither
+  # touches a credential, and the test is repeatable rather than a one-off.
+  mkdir -p .gotmp
+  local sentinel_body="NOT-A-REAL-SECRET-redteam-containment-sentinel"
+  printf '%s\n' "$sentinel_body" > .gotmp/containment-sentinel.txt
+  local contain
+  contain="$(cmd_redteam sh -c '
+      # .gotmp is gitignored, so it must not be in the export at all.
+      if [ -e /src/.gotmp/containment-sentinel.txt ]; then echo SENTINEL_VISIBLE; fi
+      if [ -e /src/.env ]; then echo ENV_VISIBLE; fi
+      # And no egress, checked without contacting anything sensitive.
+      if getent hosts example.com >/dev/null 2>&1; then echo DNS_WORKS; fi
+      echo CONTAINMENT_PROBE_DONE
+    ' 2>/dev/null)"
+  rm -f .gotmp/containment-sentinel.txt
+  case "$contain" in
+    *SENTINEL_VISIBLE*) bad "N8 a gitignored file reached the export" ;;
+    *ENV_VISIBLE*)      bad "N8 .env is visible inside the lane" ;;
+    *DNS_WORKS*)        bad "N8 the lane resolved DNS; egress is possible" ;;
+    *CONTAINMENT_PROBE_DONE*) ok "N8 gitignored files absent, .env absent, no DNS" ;;
+    *)                  bad "N8 containment probe did not run: $contain" ;;
+  esac
+
   echo
-  echo "  blocked: $pass   bypassed: $fail"
+  echo "  blocked: $pass   bypassed: $fail   skipped: $skip"
+  if [ "$skip" != 0 ]; then
+    echo "  NOT a clean result: $skip case(s) did not run here. Cite the Linux CI"
+    echo "  output for those, never this local summary alone."
+  fi
   [ "$fail" = 0 ] || { echo "A PREVIOUSLY-FIXED BYPASS IS OPEN AGAIN" >&2; exit 1; }
 }
 

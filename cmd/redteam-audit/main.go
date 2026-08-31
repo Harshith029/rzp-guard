@@ -72,6 +72,7 @@ func auditChild(files []string) error {
 	fset := token.NewFileSet()
 	var launches []launch
 	var configReads []token.Position
+	var problems []string
 	sawChildFile := false
 
 	for _, f := range files {
@@ -87,17 +88,50 @@ func auditChild(files []string) error {
 			sawChildFile = true
 		}
 
+		// Map each file's LOCAL import names to their package paths, so a call
+		// is identified by what it actually resolves to.
+		//
+		// This audit previously matched the textual selector: `exec.Command…`.
+		// Review pointed out that `import runner "os/exec"` then
+		// `runner.CommandContext(ctx, "sh", "-c", …)` is invisible to that, and
+		// a demonstration confirmed it -- the audit printed "exactly one launch,
+		// no configuration reads" and exited 0 with a hidden shell launch in the
+		// file. A positive structural claim that a rename defeats is not a
+		// structural claim.
+		imports := map[string]string{}
+		for _, imp := range file.Imports {
+			path := strings.Trim(imp.Path.Value, `"`)
+			switch {
+			case imp.Name == nil:
+				parts := strings.Split(path, "/")
+				imports[parts[len(parts)-1]] = path
+			case imp.Name.Name == ".":
+				// A dot import makes os/exec calls appear bare and unqualified.
+				// Rather than try to resolve that, refuse it: there is no reason
+				// for one here, and permitting it would be a hole by design.
+				problems = append(problems, fmt.Sprintf(
+					"%s: dot-import of %q; calls become unqualified and cannot be "+
+						"attributed, so it is refused in these files",
+					fset.Position(imp.Pos()), path))
+			case imp.Name.Name == "_":
+				// Blank: cannot be called through.
+			default:
+				imports[imp.Name.Name] = path
+			}
+		}
+
 		ast.Inspect(file, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
-			name := calleeName(call.Fun)
+			name := resolvedCallee(call.Fun, imports)
 
 			// Every way a Go program starts a process.
 			switch name {
-			case "exec.Command", "exec.CommandContext",
-				"syscall.Exec", "syscall.ForkExec", "os.StartProcess":
+			case "os/exec.Command", "os/exec.CommandContext",
+				"syscall.Exec", "syscall.ForkExec", "syscall.StartProcess",
+				"os.StartProcess":
 				launches = append(launches, launch{
 					pos: fset.Position(call.Pos()), callee: name,
 					argCount: len(call.Args), argsDesc: describeArgs(call.Args),
@@ -110,7 +144,8 @@ func auditChild(files []string) error {
 			if isChildFile {
 				switch name {
 				case "os.Getenv", "os.LookupEnv", "os.Environ",
-					"flag.String", "flag.Bool", "flag.Lookup":
+					"flag.String", "flag.Bool", "flag.Lookup",
+					"flag.StringVar", "flag.Parse":
 					configReads = append(configReads, fset.Position(call.Pos()))
 				}
 			}
@@ -122,8 +157,6 @@ func auditChild(files []string) error {
 		return fmt.Errorf("child_redteam.go is not among the compiled files; the " +
 			"redteam build is not selecting the child it is supposed to")
 	}
-
-	var problems []string
 
 	if len(launches) != 1 {
 		problems = append(problems, fmt.Sprintf(
@@ -138,7 +171,7 @@ func auditChild(files []string) error {
 			problems = append(problems, fmt.Sprintf(
 				"the only process launch is in %s, want child_redteam.go", l.pos.Filename))
 		}
-		if l.callee != "exec.CommandContext" {
+		if l.callee != "os/exec.CommandContext" {
 			problems = append(problems, fmt.Sprintf(
 				"%s: launch is %s, want exec.CommandContext so the child is "+
 					"cancellable with the session", l.pos, l.callee))
@@ -172,13 +205,21 @@ func auditChild(files []string) error {
 	return nil
 }
 
-func calleeName(fun ast.Expr) string {
+// resolvedCallee names a call by the IMPORT PATH it resolves to, so
+// `runner.CommandContext` with `import runner "os/exec"` reads as
+// "os/exec.CommandContext" -- the same as the unaliased spelling.
+func resolvedCallee(fun ast.Expr, imports map[string]string) string {
 	switch f := fun.(type) {
 	case *ast.SelectorExpr:
-		if id, ok := f.X.(*ast.Ident); ok {
-			return id.Name + "." + f.Sel.Name
+		id, ok := f.X.(*ast.Ident)
+		if !ok {
+			return f.Sel.Name
 		}
-		return f.Sel.Name
+		if path, ok := imports[id.Name]; ok {
+			return path + "." + f.Sel.Name
+		}
+		// Not an imported package: a local variable or receiver.
+		return id.Name + "." + f.Sel.Name
 	case *ast.Ident:
 		return f.Name
 	}
