@@ -310,6 +310,68 @@ cmd_redteam_selfcheck() {
 # Every case below is a real bypass from a previous round, re-run as a test that
 # must FAIL. If one of them starts passing, the lane has regressed to a state it
 # has already been in once.
+cmd_preflight() {
+  # PRE-PUSH HISTORY SCAN. Run this before the repository is published, and
+  # before any push that adds commits.
+  #
+  # Round 15, external review. F26 purged a self-authorizing refund launcher
+  # from history. The tripwire that existed at the time checked HEAD for runner
+  # spellings -- but the defect was reachable HISTORICAL content, which no
+  # HEAD-only check can see. A clone carries its history; the rule Track 2
+  # applies is about the repository, not the working tree.
+  #
+  # WHAT THIS CHECKS, precisely: that no reachable blob, in any commit, grants a
+  # refund action whose target is interpolated from a caller-supplied value.
+  # That is the shape of a launcher -- a tool writing its OWN mandate around an
+  # id the caller chose. Every legitimate fixture in this repository names a
+  # LITERAL payment id, which is what makes the distinction mechanical.
+  #
+  # WHY IT DOES NOT GREP THE NAME: four commits still contain the identifier
+  # `cmd_live_refund` deliberately -- they are exit-2 tombstones that explain
+  # the removal. Counting the identifier would flag those safe carriers and
+  # would miss the same code under any other name. The shape is the invariant;
+  # the name is not.
+  #
+  # WHAT IT DOES NOT PROVE: the absence of every conceivable offense-capable
+  # construction. It rejects the one shape that actually occurred here, and any
+  # renaming or re-spelling of it, across all reachable history. It is a
+  # tripwire against regression, not a proof of universal safety.
+  #
+  # Validated against the pre-rewrite history: these patterns flag exactly the
+  # four carrier commits and nothing else, and flag nothing in the current
+  # repository. `redteam-negative` N9 keeps that true.
+  echo "=== pre-push history scan ==="
+
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    echo "  not a git repository" >&2; exit 2
+  fi
+
+  local revs found hits pat
+  revs="$(git rev-list --all)"
+  if [ -z "$revs" ]; then echo "  no commits"; return 0; fi
+  found=0
+
+  for pat in     '"payment_id"[[:space:]]*:[[:space:]]*"\$'     '"amount_paise"[[:space:]]*:[[:space:]]*\$'     '"payment_id"[[:space:]]*:[[:space:]]*"%s"' ; do
+    hits="$(git grep -nE "$pat" $revs 2>/dev/null || true)"
+    if [ -n "$hits" ]; then
+      found=1
+      echo "REFUSING: a reachable commit grants a refund to a caller-supplied" >&2
+      echo "target. This is the launcher shape (FAILURES.md F18, F26)." >&2
+      echo "  pattern: $pat" >&2
+      printf '%s
+' "$hits" | head -20 >&2
+    fi
+  done
+
+  echo "  commits scanned: $(printf '%s
+' "$revs" | grep -c .)"
+  if [ "$found" != 0 ]; then
+    echo "  RESULT: FAILED -- do not publish this history" >&2
+    exit 1
+  fi
+  echo "  RESULT: no reachable commit can launch a caller-selected refund"
+}
+
 cmd_redteam_negative() {
   local pass=0 fail=0 skip=0
   ok()   { echo "  BLOCKED   $1"; pass=$((pass+1)); }
@@ -480,6 +542,51 @@ cmd_redteam_negative() {
     *CONTAINMENT_PROBE_DONE*) ok "N8 gitignored files absent, .env absent, no DNS" ;;
     *)                  bad "N8 containment probe did not run: $contain" ;;
   esac
+
+  # N9 -- Round 15. The pre-push history scan must be able to FAIL.
+  #
+  # F26 purged a self-authorizing refund launcher from reachable history, and
+  # cmd_preflight is the tripwire that stops one coming back under another
+  # name. A tripwire that has only ever passed is not evidence of anything --
+  # that was the Round 11 lesson, and this is the same mistake waiting to be
+  # made again.
+  #
+  # So: a throwaway repository containing the SHAPE and nothing else. One line
+  # of mandate JSON whose payment id is interpolated. It is a labelled fixture,
+  # not a launcher -- there is no key, no request, no guard, nothing to run --
+  # and the scan must refuse it.
+  local n9dir n9out n9rc
+  n9dir="$(mktemp -d 2>/dev/null || echo "./.gotmp/n9.$$")"
+  mkdir -p "$n9dir"
+  (
+    cd "$n9dir" || exit 1
+    git init -q .
+    git config user.email redteam@example.invalid
+    git config user.name redteam
+    # ASSEMBLED AT RUNTIME, never written literally here.
+    #
+    # The literal form of this line matches cmd_preflight's own rule, so
+    # committing it made the gate refuse this repository's history -- the
+    # scanner correctly flagging its own test fixture. Same self-inflicted
+    # refusal as the credential scan in N2, same fix: the source carries a
+    # placeholder, the fixture file carries the real shape.
+    printf '%s
+' '{ "authorized_refund_actions": [ { "payment_id": "PAYVAR", "amount_paise": AMTVAR } ] }'       | sed 's/PAYVAR/'"$(printf %s '$')"'PAY/; s/AMTVAR/'"$(printf %s '$')"'AMT/' > fixture.json
+    git add -A
+    git commit -qm "synthetic launcher-shape fixture (N9)"
+  ) >/dev/null 2>&1
+  cp run.sh "$n9dir/run.sh"
+  n9out="$( cd "$n9dir" && sh ./run.sh preflight 2>&1 )"
+  n9rc=$?
+  rm -rf "$n9dir"
+  if [ "$n9rc" = 0 ]; then
+    bad "N9 the history scan PASSED a self-authorizing refund shape"
+  else
+    case "$n9out" in
+      *REFUSING*) ok "N9 the history scan refuses an interpolated refund grant" ;;
+      *)          bad "N9 the scan failed for the wrong reason: $n9out" ;;
+    esac
+  fi
 
   echo
   echo "  blocked: $pass   bypassed: $fail   skipped: $skip"
@@ -903,6 +1010,7 @@ case "${1:-help}" in
   redteam) shift; cmd_redteam "$@" ;;
   redteam-selfcheck) cmd_redteam_selfcheck ;;
   redteam-negative) cmd_redteam_negative ;;
+  preflight) cmd_preflight ;;
   fuzz) shift; cmd_fuzz "$@" ;;
   bench) cmd_bench ;;
   release) shift; cmd_release "$@" ;;

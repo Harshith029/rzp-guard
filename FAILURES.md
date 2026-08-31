@@ -1041,14 +1041,107 @@ Verified, not assumed:
 - freeze still verifies: `freeze intact: 34 files, freeze_sha256 92900c58…`
 
 The suite was run three times across the rewrite. Two were clean (`exit 0`, 22
-packages ok, no race, no panic). **One exited 1 and I cannot say why**: it was the
-second back-to-back `run.sh all` in a single command and I had redirected its
-output to `/dev/null`, so the evidence is gone. Discarding the output of a run
-whose exit code I had not yet checked was the mistake; the failure is unexplained,
-not absent. The likeliest cause is lock contention from the immediately preceding
-run — `internal/bootstrap` opens SQLite with `locking_mode=EXCLUSIVE` and Windows
-holds handles briefly after exit — but that is a hypothesis, not a diagnosis, and
-it is recorded here rather than rounded down to "all green".
+packages ok, no race, no panic). **One exited 1 and I cannot say why**: it was
+the second back-to-back `run.sh all` in a single command and I had redirected
+its output to `/dev/null`, so the evidence is gone. Discarding the output of a
+run whose exit code I had not yet checked was the mistake.
+
+Review then made the correct call: **that is a release gate, not a caveat.**
+An unexplained non-zero exit from the full suite means no test-green claim is
+supportable, and "likely Windows lock contention" — which is what I first wrote
+here — is a guess wearing the clothes of a diagnosis. It is struck. The
+requirement is a captured run that either reproduces the failure or accounts
+for the exit code, with complete stdout, stderr and exit status recorded for
+every retry and nothing redirected to `/dev/null`.
+
+### The first attempt at that was contaminated, and the contamination is the lesson
+
+Six back-to-back runs were started with every stream captured. Run 1 failed —
+`exit=2`, not 1 — with:
+
+    ./run.sh: line 1011: unexpected EOF while looking for matching `"'
+
+I caused it. I was editing `run.sh` to add `cmd_preflight` and N9 *while the
+loop was executing it*. Bash reads a script incrementally rather than slurping
+it, so a file that changes underneath a running shell gets read at a stale byte
+offset and parses as garbage. The failing run was measuring my editor, not the
+product.
+
+Two things follow. The narrow one: the experiment was void and was rerun with
+the repository frozen, results in the commit that follows. The broad one, which
+is worth more — **`run.sh` must not be modified while a release-gate run is in
+flight**, and a CI runner that checks out a new revision mid-job would hit the
+same class of failure. The contaminated logs are kept rather than deleted.
+
+It does not explain the original `exit 1`. Different exit code, different
+mechanism, and nothing was editing `run.sh` at the time. That one stays open
+until the frozen run says otherwise.
+
+### F26.2 — the tripwire that would have caught this looked at the wrong thing
+
+Review's second point: the CI check in place when the launcher was purged
+inspected `HEAD` for runner spellings. The defect was **reachable historical
+content**, which no `HEAD`-only check can see. So the class of bug was
+undetectable by design, not merely undetected.
+
+`./run.sh preflight` is the replacement. It scans every commit reachable from
+`git rev-list --all` and refuses if any grants a refund action whose target is
+interpolated from a caller-supplied value — a tool writing its own mandate
+around an id the caller chose. Every legitimate fixture in this repository
+names a *literal* payment id, which is what makes the distinction mechanical
+rather than a judgement call.
+
+It deliberately does **not** grep for the name. Four commits still contain
+`cmd_live_refund` on purpose — the exit-2 tombstones — so counting the
+identifier would flag safe carriers and miss the same code renamed. The shape
+is the invariant; the name is not.
+
+Validated in both directions, because a check that has only ever passed proves
+nothing:
+
+    current history      0 hits   -> preflight exits 0
+    pre-rewrite history  4 hits   -> preflight REFUSES, naming
+                                     b9e4275 d41d202 bc62fca bb7fc14
+
+N9 in `redteam-negative` keeps it honest with a synthetic fixture — one line of
+mandate JSON with an interpolated id, no key, no request, nothing to run — that
+the scan must refuse.
+
+What it does not prove: the absence of every conceivable offense-capable
+construction. It rejects the shape that actually occurred, and renamings of it.
+
+### F26.3 — "no remote configured" is not "never published"
+
+The third point, and the one I had glossed. I wrote that the repository had
+never been pushed on the strength of `git remote -v` being empty. That proves
+only what the *current local config* says.
+
+What can actually be established here is a little stronger, and still not proof:
+
+- `refs/remotes/` is empty and `packed-refs` holds no remote entries
+- no `remote.*` key has ever been recorded in the local config
+- `.git/FETCH_HEAD` does not exist — nothing was ever fetched
+- the pre-rewrite backup bundle contains exactly `refs/heads/master` and `HEAD`,
+  no remote-tracking branch of any kind
+- the old commit `bb7fc14` is gone from the object store entirely, not merely
+  unreachable; `git fsck --unreachable` reports nothing
+
+A `git push` straight to a URL leaves almost no trace beyond the reflog, and
+`filter-repo` expires reflogs, so absence of evidence is weak here by
+construction. The claim is *plausible and locally consistent*, not proven.
+
+**And one copy demonstrably does exist outside this object store.** The working
+tree lives at `C:/Users/harsh/OneDrive/Desktop/Razorpay` — a OneDrive-synced
+path, with `.git` inside it — and `OneDrive.exe` and `OneDrive.Sync.Service.exe`
+are both running. The pre-rewrite pack files were therefore uploaded to
+Microsoft's cloud, which retains version history and a recycle bin. That copy is
+not public, but the purge is not complete there, and restoring an earlier
+version of the folder would bring the launcher back.
+
+So the honest statement is: **the launcher is purged from this repository's
+history; it is not purged from every copy of it that exists.** Publication
+readiness needs the external checks in `OPERATIONS.md`, which only the account
+holder can perform.
 
 ### The part that had to be got right rather than done fast
 

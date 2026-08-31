@@ -423,6 +423,25 @@ jobs:
           print('%d sentinels, all returned by real code and pinned by a test' % len(names))
           EOF
 
+  # PUBLICATION GATE. Round 15.
+  #
+  # F26: a self-authorizing refund launcher survived in reachable history long
+  # after it was deleted from the tip. Every check that existed at the time
+  # looked at HEAD, and none of them could see it. A clone carries its history,
+  # and Track 2's defense-only rule is about the repository.
+  #
+  # fetch-depth: 0 is load-bearing here -- a shallow checkout would make this
+  # job pass by seeing almost nothing.
+  history-cannot-launch-a-refund:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: No reachable commit may grant a refund to a caller-supplied target
+        run: bash ./run.sh preflight
+
+
   # The red-team isolation lane, proved rather than described.
   #
   # Three review rounds in a row found this boundary weaker than its own

@@ -139,3 +139,44 @@ rather than papered over here.
 guard runs is unsafe — the guard holds an exclusive lock and a copy taken
 mid-transaction is not guaranteed consistent. There is no supported online
 backup path today.
+
+---
+
+## Before the repository is published, or any push
+
+Run the gate:
+
+```sh
+./run.sh preflight
+```
+
+It scans **all reachable history** and refuses if any commit grants a refund
+action to a caller-supplied target — the shape of a self-authorizing launcher.
+`FAILURES.md` F26 is why this exists: such a command survived in history for
+four commits after it was deleted from the tip, and every check in place at the
+time looked only at `HEAD`. A clone carries its history.
+
+It keys on the shape, not the name. Four commits still contain the identifier
+`cmd_live_refund` on purpose — they are exit-2 tombstones explaining the
+removal — so counting the name would flag safe carriers and miss a rename.
+`redteam-negative` N9 builds a synthetic fixture with the dangerous shape and
+requires the scan to refuse it, so the tripwire is known to be able to fail.
+
+**The scan is not sufficient on its own.** It proves a property of *this*
+repository's history. It cannot tell you whether the pre-purge objects exist
+somewhere else. Before first publication, also confirm by hand:
+
+- no GitHub/GitLab repository, fork, or gist ever received a push
+- no CI artifact, release asset, or build cache holds the old objects
+- no clone exists on another machine, or in a backup or sync service
+
+That last one is not hypothetical here. This working copy lives under a
+**OneDrive-synced path**, with `.git` inside it, and the OneDrive client is
+running. The pre-rewrite pack files were therefore uploaded, and OneDrive keeps
+version history and a recycle bin. The purge is complete in this repository's
+object store; it is *not* complete in that cloud copy, and restoring an earlier
+version of the folder would bring the old objects back. Treat the sync copy as
+out of scope for the purge and do not share that folder.
+
+A local backup bundle of the pre-rewrite history was also taken deliberately, so
+the rewrite stayed reversible. Delete it once you are satisfied with the result.
