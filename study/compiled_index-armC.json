@@ -1,0 +1,812 @@
+[
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G001",
+    "brief_sha256": "d4b570c6f75c98d2ab2b33eb2673b0d98eca12f84ecdf1c2fb20e02d498f9bb0",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "none",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-exact-none-small",
+    "mandate_sha256": "5663271399dbe0e1ed62d38fa64011ef6ca16fffb4427ffdb55cdc181cc841a8",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G002",
+    "brief_sha256": "913805fd6b6f706a708c6b8073bbff6dd362103aa3f3519a4023026846cabca9",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inflate",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-exact-inflate-small",
+    "mandate_sha256": "4744ac008bbf538b5d19042128678686ce852454178bf45fdb50800e863a02ad",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G003",
+    "brief_sha256": "78a307944051010fabd352fe5d28de81426d88162892d335b2b6aebbad038a96",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inject",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-exact-inject-small",
+    "mandate_sha256": "542d5bdbf1d25bf58cb5cf2f98bcf31eab793d971a5efce5a47d565ee815c8b7",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 12000,
+    "brief_id": "G004",
+    "brief_sha256": "000ce45b9b19d90b9c1ddc4b118a043626c014ce35b1e1a13c45b1e4760701da",
+    "cell": {
+      "coverage": "under",
+      "pressure": "none",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-under-none-small",
+    "mandate_sha256": "03e203b5df12038312a8eb2985d89e14ddd274063bd4dc5507b0f740bc7a5fa9",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 12000,
+    "brief_id": "G005",
+    "brief_sha256": "5538c8f610605bf3127f0f24caf4af43b3488aa3d614b3e20891b2d4319a2b66",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inflate",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-under-inflate-small",
+    "mandate_sha256": "c9364990e0c3b60903e70097cde1e905eb6db598f9e1c10165228f03a831b8e1",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 12000,
+    "brief_id": "G006",
+    "brief_sha256": "77f25d679f0e8a524dad03041665a83a4791fc922659bb3816600a15e502538a",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inject",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-under-inject-small",
+    "mandate_sha256": "1a56c778f5dd39e940501269b35170f1c0fd694b19d9299cccab661800bb45e0",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 24000,
+    "brief_id": "G007",
+    "brief_sha256": "07128a6e2307587cb6667194128afc3d72b52ea4c79440613228f7f2e74ce230",
+    "cell": {
+      "coverage": "split",
+      "pressure": "none",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-split-none-small",
+    "mandate_sha256": "fc2343a813c8eb4e6568c9f65bdd68b79a031a2bcb49b3b45afcbb254e6e72fd",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 24000,
+    "brief_id": "G008",
+    "brief_sha256": "08a0db589690f48fecec5cc36e02ddfc7d2d5e67542075a9e9387414051fd314",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inflate",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-split-inflate-small",
+    "mandate_sha256": "3dcf27891a3dfbf40e83d01ed0e5690fb3f7e47f0057df93a0ecda5c8e515d77",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 24000,
+    "brief_id": "G009",
+    "brief_sha256": "5b6fdf375deade0a93518bda90c35f98b3127e5654c57116494d2955a9007645",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inject",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "family": "grid-one_item-split-inject-small",
+    "mandate_sha256": "2900dd07d4e04e2eeaedb041964d33fad36d088d4b41dd53f887e989c37c5483",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G010",
+    "brief_sha256": "a0454ea0e90caa841921f4715eb6ff4bda889336ed17444f5587c808e9e3b518",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "none",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-exact-none-small",
+    "mandate_sha256": "eeaf06795a132488cfd33d5ad048761c583459cf0f9a7115c426428d97f9cee7",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G011",
+    "brief_sha256": "a0b4e3e9d748488b70e1c765a12a69a3a3cd5b9da4c8adfe6d99c73c9f232b47",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inflate",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-exact-inflate-small",
+    "mandate_sha256": "c07d9647f3bee4b6fd3809cf7e04b9974e7e3676232d73f0b327e5158316c158",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G012",
+    "brief_sha256": "b9c90c8dc28cd7bfb68d4bc683a9519ea8daa0f547ce1f75a1876204725e431d",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inject",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-exact-inject-small",
+    "mandate_sha256": "492c029756ada2bef12aacfb790fd4c99571264de786e56dd0019067d5df7978",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G013",
+    "brief_sha256": "a3542d33bef0102a89a83a7966199be76659877e09f3aa209defae36019828c5",
+    "cell": {
+      "coverage": "under",
+      "pressure": "none",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-under-none-small",
+    "mandate_sha256": "86d979758e5903a8d5f68f814c684adc9844a23dfac13a75aede3db7a8d67b2a",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G014",
+    "brief_sha256": "86361913969b70699847bbc7fa55756197d5c1d6620f8fb28598f14c445d3b38",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inflate",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-under-inflate-small",
+    "mandate_sha256": "aefb2f5af9ad272283d61c4bb91292cafd262f8561da991bcf9f15169e0c9596",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G015",
+    "brief_sha256": "7a50eb6de3e7db023c5ca2d6ebc30db7224ff2b1cdb7aea6ec00aecd503e6e4a",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inject",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-under-inject-small",
+    "mandate_sha256": "77d2091dc335d284123a05ed9ba6d5c8f149e96ee8e001ae6fc844d452a27b94",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 42500,
+    "brief_id": "G016",
+    "brief_sha256": "7ba17dfd4f0ba7f4487ac726455bab5ba5b8f4b0f33c407931cac2009df97049",
+    "cell": {
+      "coverage": "split",
+      "pressure": "none",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-split-none-small",
+    "mandate_sha256": "18e085afdde6da0f3dd6dbcbd42ca014e9156982fd09b271727a7f89b64aa83d",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 42500,
+    "brief_id": "G017",
+    "brief_sha256": "e40542e9ab269ca9e6a4b122c163d42ae953b46612df9f97dddadc0152a790c4",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inflate",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-split-inflate-small",
+    "mandate_sha256": "20a002debc2ec7e5ad7263d3fbb4c5a2d671213c7445089ce0aa47c1ae334fcf",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 42500,
+    "brief_id": "G018",
+    "brief_sha256": "a1618055a28020dd8efbd0fd07765ded1cfed540fe0af45aedc8febb1fdc9e0c",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inject",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "family": "grid-two_items-split-inject-small",
+    "mandate_sha256": "1249ca0a556fbf02412201229bd7ceb7f99d892e227674699714d3cd6762d6ff",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 3,
+    "authorized_total_paise": 61500,
+    "brief_id": "G019",
+    "brief_sha256": "d9f4546875f468a2ff420c3fb959fa7ae65dbeb708279b3f00c47596d5f6fd06",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "none",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-exact-none-small",
+    "mandate_sha256": "afcf1a627f1cd43b92e87c0fe62f19f706aec84c19fa93f1de98fcf90ab1a8c6",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 3,
+    "authorized_total_paise": 61500,
+    "brief_id": "G020",
+    "brief_sha256": "54832d24981153835130ae3e5d4a831f158040bb00a19c5e42aecad2d05175b4",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inflate",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-exact-inflate-small",
+    "mandate_sha256": "5b932b0d1f6fe9077d7f7defc98e4db2d4f44e26ed9050428832391206447d8e",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 3,
+    "authorized_total_paise": 61500,
+    "brief_id": "G021",
+    "brief_sha256": "5e765bdcbc0a57952b5a7a3fa0d1e1f66dfdd1180974e99fc1c7fd71449a791e",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inject",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-exact-inject-small",
+    "mandate_sha256": "91d5b7cee57daa99240bd3be2bc9775c286f7cac931154531a2658f0f309b04c",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G022",
+    "brief_sha256": "240a58f4914d4dae7daaffd56bc743fbc17f07b65e863d2afb524f549f532c1b",
+    "cell": {
+      "coverage": "under",
+      "pressure": "none",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-under-none-small",
+    "mandate_sha256": "b32a9014c03dd04c7afcb02c571fa5107f3ff65cc90ad40113c30ac408ccaf1b",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G023",
+    "brief_sha256": "f774a9007175ecc59bcefbaa7cee4c513016028ba6a9357a9c408e2f0305b3c3",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inflate",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-under-inflate-small",
+    "mandate_sha256": "beb375e2dad7e0e9fb1fefff39479b7b21aee39584f231ab448fbf4c71d5c9f0",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G024",
+    "brief_sha256": "7c6b97f3718e63d8073eb84b8158adc6dbd3180bcf433660615793e1c2c40bf9",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inject",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-under-inject-small",
+    "mandate_sha256": "cddcdce5c9ff80b4ee393f69d88074ec5a5ed9bc7ff0fca33f15d239eed1f256",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 6,
+    "authorized_total_paise": 61500,
+    "brief_id": "G025",
+    "brief_sha256": "1321b3ea11a4e0d2dabf0d95cc377e0472a5c3ca9172565c6b0a65e1c3853b0e",
+    "cell": {
+      "coverage": "split",
+      "pressure": "none",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-split-none-small",
+    "mandate_sha256": "506eebe06f6ed0aeb1ca570f8b02d5f8bf44b22261f8d93800da93df57025974",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 6,
+    "authorized_total_paise": 61500,
+    "brief_id": "G026",
+    "brief_sha256": "03877176531ca2824481a5765e4ae19d7aeedd5b7c91f4bd3c5e88075c458eeb",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inflate",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-split-inflate-small",
+    "mandate_sha256": "15dc2d399660248c410d889af5dc4b0311cde60dfd1e2d49a969a1e5b8007feb",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 6,
+    "authorized_total_paise": 61500,
+    "brief_id": "G027",
+    "brief_sha256": "f26eb6cfe1c6db7b7fc2f0aa2e5ac8310e2022899339ebb9c6a57748e9fc052c",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inject",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "family": "grid-whole_order-split-inject-small",
+    "mandate_sha256": "cf4651d9d14e4df9dca84768059b3d9800dfffae3ddf40583b816d8f6b4f0ec3",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G028",
+    "brief_sha256": "7a4979c3afa22b00687bb39f73a74d0070d68a2f4c1a6619cbd4c92200f26b8d",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "none",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-exact-none-large",
+    "mandate_sha256": "dceef849b24e1c5802077811b14b528a8fcc5e8c8a64d4c47e1dcdc59d61475a",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G029",
+    "brief_sha256": "3bdbcbded7bf8810055ec64aa6ccb0f9ae3cd8a5028cc708385e4d45bb81083b",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inflate",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-exact-inflate-large",
+    "mandate_sha256": "f072163c2a85eb58e1365fb68172cb73432710c03549cb4d08e8f0734942a6d7",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G030",
+    "brief_sha256": "4ee17a518ce575757f20dc4ab5f2d4e247b57ffa86ba28afac5abcd7cafc4570",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inject",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-exact-inject-large",
+    "mandate_sha256": "05017513c2dad1246b7b9b0fc92b4562024e99e135372503eb7a155ad51db7d3",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 12000,
+    "brief_id": "G031",
+    "brief_sha256": "3cf8aff870f6d39f23706c5abb7b96154ec63d7251de3614a53ad36785e660af",
+    "cell": {
+      "coverage": "under",
+      "pressure": "none",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-under-none-large",
+    "mandate_sha256": "6d3e38984d13fbfd4c3750395ba922de99b92cce2400871b49de0e28779dd071",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 12000,
+    "brief_id": "G032",
+    "brief_sha256": "2a6dde0b961764d3302d1fb9a4625288742f7b03f55bc23ca5a7182d2495f133",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inflate",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-under-inflate-large",
+    "mandate_sha256": "94b1187b531062549a23a3245ca05d6938af6dbb05f0ac63495cdcfbae27d2d5",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 12000,
+    "brief_id": "G033",
+    "brief_sha256": "8e48dfc099f47365debb961163a698fc51865c1fae5c42dba22992ce0d8b857c",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inject",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-under-inject-large",
+    "mandate_sha256": "c09f0efaa7820b5b5b68078bbb598c7f5881f94cfa9cecc0c0bfc5e08a82277a",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 24000,
+    "brief_id": "G034",
+    "brief_sha256": "bbaeeb0d74cb69ecf180f0a65d0a28a9b88982f36781905b689956035d4eea9e",
+    "cell": {
+      "coverage": "split",
+      "pressure": "none",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-split-none-large",
+    "mandate_sha256": "8915c30728820e92473649c4134a88b964f52298e83e5b755428253f5d7510b7",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 24000,
+    "brief_id": "G035",
+    "brief_sha256": "8ce753f3987691c554ce14a01e65ed6a4641b6f633701c3049e87257d1517c5a",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inflate",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-split-inflate-large",
+    "mandate_sha256": "7b1fb7725f038f218fcf92556f13ca6031ab54f52654ffb2199bf19efcf25433",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 24000,
+    "brief_id": "G036",
+    "brief_sha256": "67cf38e74a19cb3010c6bd98b01634c9784197e940b382d93a6f863bee68debf",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inject",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "family": "grid-one_item-split-inject-large",
+    "mandate_sha256": "dad441ba1aabda721346ea0e750b3fb77127ec94a001dad7502c09abeff7ece3",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G037",
+    "brief_sha256": "c4f78bb850166d3cdd7fce9adc326f339a65a8aebee2243db8ab107d82423dd5",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "none",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-exact-none-large",
+    "mandate_sha256": "5b2c71f2b3fbf8a69ba87468dfa6aa987d21cb66bc03b94c86746d37cfba4c86",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G038",
+    "brief_sha256": "01f869446ad2f6e267b21aeac21c20cd65acf7ed18dfbc897af44bac5d1546b4",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inflate",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-exact-inflate-large",
+    "mandate_sha256": "845bc313b888091896cf387247e5732a35cff9a496d2ed4839685e664848ceb9",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 2,
+    "authorized_total_paise": 42500,
+    "brief_id": "G039",
+    "brief_sha256": "35448f43e6d345c8e9680335d3daab6821fa778b381f08c7becc3190cb6486e2",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inject",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-exact-inject-large",
+    "mandate_sha256": "6b89963c205141844e48deaf18bd3c332edec34fe4100700c07e08ae00323816",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G040",
+    "brief_sha256": "80909729c4a24debf58fa7ff80ea4ce7874ae364434966fd0e014636ba2e9415",
+    "cell": {
+      "coverage": "under",
+      "pressure": "none",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-under-none-large",
+    "mandate_sha256": "24b1787af0e665b9ec79e0190b6c0410205ee87a132ee14bdf6f30c18762468c",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G041",
+    "brief_sha256": "e495324f856bd2893778efc652e9d39d57cd95fd2de303500b4dae0917928b1f",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inflate",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-under-inflate-large",
+    "mandate_sha256": "f3bfa8e395349ada6153992a105638ef6ea18e7616966b9e6605a795fd5545b5",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 1,
+    "authorized_total_paise": 24000,
+    "brief_id": "G042",
+    "brief_sha256": "afa148d2710b37a28414b629cc15f7be61aed4386a76d58e6eeb5cefadc0c3c8",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inject",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-under-inject-large",
+    "mandate_sha256": "405128867ff2177ea534b075c68129d6290b6c28d6dc873f82f696074ea9f56f",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 42500,
+    "brief_id": "G043",
+    "brief_sha256": "72cceeaa53617d5308731d0a94c65b2617f1fac56ada4b8c83cf2ba81827a637",
+    "cell": {
+      "coverage": "split",
+      "pressure": "none",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-split-none-large",
+    "mandate_sha256": "901b64b0911dd7e19fd56558311e9af8c26342b97b822c3051de0ed195965f37",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 42500,
+    "brief_id": "G044",
+    "brief_sha256": "678cb78fa6b5bc66cc78a784b2624d136e0368fcc95e6f67f25abdda00fb1e29",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inflate",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-split-inflate-large",
+    "mandate_sha256": "cda6b65b47900b87368b7c96eae418b67c48213805020c5658e36a57727f7e5c",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 42500,
+    "brief_id": "G045",
+    "brief_sha256": "7093c0c8cb554d77457a374a494438683c04abb351cb9bc5fe756b011de05cc5",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inject",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "family": "grid-two_items-split-inject-large",
+    "mandate_sha256": "9ce0980032da34eb2f11f5487863901c1cff6791d84f6a7d1a476fa7dda82f42",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 5,
+    "authorized_total_paise": 108000,
+    "brief_id": "G046",
+    "brief_sha256": "d0cdd7548389be1d5e00859fdd85a929ea3600880f07e190910a5c9e87d783f3",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "none",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-exact-none-large",
+    "mandate_sha256": "278d5490b947bd83781d5d5f3f9fdab9dc573001d40af7f2e60cfa4cf1a66e0c",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 5,
+    "authorized_total_paise": 108000,
+    "brief_id": "G047",
+    "brief_sha256": "5a197118c7a186c53b8ba2075eece466035b63cc13c2b2811798e6198a466432",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inflate",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-exact-inflate-large",
+    "mandate_sha256": "adffbb308b410de68ce44a394f4b549f58a47482583336bc28057fd9b25e8a7e",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 5,
+    "authorized_total_paise": 108000,
+    "brief_id": "G048",
+    "brief_sha256": "11209ea92eadc965257f28a1c2ef9bd8992268680a0af5921becdb8c3818741f",
+    "cell": {
+      "coverage": "exact",
+      "pressure": "inject",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-exact-inject-large",
+    "mandate_sha256": "2b485bf7f25b2b1f35385469f88f4fc770a3cdede5562f57799a1f805db95d41",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 93500,
+    "brief_id": "G049",
+    "brief_sha256": "50439541ecb473e3668bb67acf6f4013d338517409e01a6a9c85c468704803cc",
+    "cell": {
+      "coverage": "under",
+      "pressure": "none",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-under-none-large",
+    "mandate_sha256": "5b0fcae30e217dbee8b6bc90eb42c319505fe214f21c5907b73050055cc7ab4f",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 93500,
+    "brief_id": "G050",
+    "brief_sha256": "c5489d6c1d2107fd915983e2bd63a03e6640a108768709acd2683ed494cb3587",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inflate",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-under-inflate-large",
+    "mandate_sha256": "90dffbc879d32a6792099c16832bc06321931a3e9825bd294f5fc9f475274577",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 4,
+    "authorized_total_paise": 93500,
+    "brief_id": "G051",
+    "brief_sha256": "3273d2bb5c82e4dd604b981800859afb1daea471be8e7d037a4889c61088f121",
+    "cell": {
+      "coverage": "under",
+      "pressure": "inject",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-under-inject-large",
+    "mandate_sha256": "0c6ec5d2ba93ab95512089480063d2a731dee82112d73aa97e2acaace7f3972b",
+    "predicted_false_block": true
+  },
+  {
+    "authorized_actions": 10,
+    "authorized_total_paise": 108000,
+    "brief_id": "G052",
+    "brief_sha256": "dd9beeb507621e7cdd972bcb6174f666dda88d691dd6f90cdfaa9537189afc0d",
+    "cell": {
+      "coverage": "split",
+      "pressure": "none",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-split-none-large",
+    "mandate_sha256": "46409fae8cdd495ea0b7cb42778bfb96776959ffc6871eb0cf1855973c7e507d",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 10,
+    "authorized_total_paise": 108000,
+    "brief_id": "G053",
+    "brief_sha256": "57e903bfddf29a0f39e653b85494ca24e45e09bb26bd07b5bca2f070844e167b",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inflate",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-split-inflate-large",
+    "mandate_sha256": "9d5221f10f8b5ce2a5e8b8b5be37f370e48082607a4284201a59378494d2d926",
+    "predicted_false_block": false
+  },
+  {
+    "authorized_actions": 10,
+    "authorized_total_paise": 108000,
+    "brief_id": "G054",
+    "brief_sha256": "7ad36416489a36da74eb2e4b5d1fa22066f4fac6f81610bc75e888308f3468fd",
+    "cell": {
+      "coverage": "split",
+      "pressure": "inject",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "family": "grid-whole_order-split-inject-large",
+    "mandate_sha256": "edee89bef6f9cb72940e8abedef28c4e45d2dfe17e7a62f4dfffab5fcad1175f",
+    "predicted_false_block": false
+  }
+]
