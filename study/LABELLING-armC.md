@@ -109,7 +109,9 @@ published, so overusing it silently shrinks the evaluation.
 
 ## Filling the file
 
-Open `study/adjudication/worksheet-armC-r1.json` (rater 2 uses the `-r2` copy).
+Open the worksheet file you were given — `worksheet-armC-e1.json`,
+`-e2.json` or `-author.json`. All three are identical apart from the `rater`
+field.
 Rows carry opaque ids in a shuffled order, so neither the corpus structure nor
 the grouping of a scenario's runs is visible as you scroll. For every row set:
 
@@ -127,23 +129,32 @@ destroys the only independent measurement in this evaluation.
 
 ---
 
-## Who labels, and the residual limit
+## Who labels
 
-**Rater 2 must be a human who has not worked on the implementation** and has not
-read `study/grid.py`. They receive the worksheet file and this rubric, nothing
-else — for them the blinding is complete, because the id→scenario map lives in a
-separate file they are not given.
+**`e1` and `e2` — external raters. These are the ones that count.**
 
-An LLM is **not** an acceptable second rater here, and the option was withdrawn
-in [Amendment 1](PROTOCOL-armC-AMENDMENT-1.md): the corpus came from a model
+Each must be a human who has not worked on the implementation and has not read
+`study/grid.py`. They receive **only** the worksheet file and this rubric: not
+the repository, not the generator, not the join map, not trace filenames, not
+any result. **Their agreement is the meaningful kappa**, and their labels are
+the ground truth the metric is computed against.
+
+**`author` — supplementary, and not blinded.**
+
+The implementation author wrote the corpus generator and knows how every case
+was constructed. Hiding row metadata does not undo that, so these labels are
+**never described as blinded**, never form primary ground truth, and are never
+pooled with the external sets. An author/external agreement figure says how
+often an informed rater matched an uninformed one. It is **not** an
+independence check and must not be quoted as one.
+
+**If only one external rater can be found**, arm C reports one independent
+rater plus an author-rater and states plainly that this weakens the ground
+truth. There is then no primary kappa. A missing kappa is a stated limitation;
+a fabricated one is a false claim of independence.
+
+An LLM is **not** an acceptable rater, and the fallback was withdrawn in
+[Amendment 1](PROTOCOL-armC-AMENDMENT-1.md): the corpus came from a model
 through a proxy measured substituting models, so a second model rater cannot be
 shown to be independent, its errors correlate with the first pass, and ground
-truth would end up sharing a source with the traffic. If no human is available,
-arm C reports single-rater labelling and says so — a missing kappa is a stated
-limitation, a fabricated one is a false claim.
-
-**Rater 1 is the implementation author, and cannot be fully blinded.** The
-worksheet hides the guard's decision, the cell and the scenario id, so the
-specific judgement is made without them. It does not erase knowing how the grid
-was built. That asymmetry is why rater 2 matters and why agreement is published
-before anything is adjudicated.
+truth would share a source with the traffic.
