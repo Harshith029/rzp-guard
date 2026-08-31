@@ -1,0 +1,1472 @@
+{
+  "calls_merged_into_the_rerun": 0,
+  "discarded": true,
+  "labels_assigned_from_this_run": 0,
+  "reason": "108 of 162 traces void on HTTP 429; the runner had no retry, and the losses tracked scenario index, which encodes the size dimension. See PROTOCOL-armC-AMENDMENT-2.md A2.1.",
+  "run": "arm C, first collection (DISCARDED)",
+  "status_counts": {
+    "complete": 44,
+    "void": 118
+  },
+  "traces": [
+    {
+      "brief_id": "G001",
+      "file": "G001_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "20d3cd26cfcca52e017124b7da4f408c8dae6ba0faf55b9b6d8d60881e7b4713",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G001",
+      "file": "G001_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "baf257a90e8523399e90b165d44a70855a737dc0fa917daaad6a82dad8a7011b",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G001",
+      "file": "G001_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "8b30c1ecdc1ce1e7a1a487be0d2060d5f711a259d7ead035eace0d4f38b886c0",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G002",
+      "file": "G002_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "fb324a335da11b13463c37f3831efc011bb9e868e61e07b08e35aace7a89cb7e",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G002",
+      "file": "G002_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "590f71d6db0488b60f9f07c6e256a7be9a255008fb312668fafeec0420fc5b8d",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G002",
+      "file": "G002_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "50f7b5fea8b357e1ea17f4bdde0eff4a1f7c16d4bce7faf31fe1081af673dba7",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G003",
+      "file": "G003_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "74b15efee692ae4cfe25ed34c73b7783d085612972b1c99a24ea6469ab0c68d4",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G003",
+      "file": "G003_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "10141baa4a023d62876560fcec8e73ba298de832b401fb5f66187430c49a4dd5",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G003",
+      "file": "G003_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "81a72e10765ae70ee2d3881dbb332acb3a48a4e42e6c3c57b0d45de45fbcd94e",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G004",
+      "file": "G004_run1.json",
+      "refund_calls": 2,
+      "run_index": 1,
+      "sha256": "4ef3b1a48b7c8861353d7a0570625fea90b77d825cc9c6b847fa3b2be1504cd4",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G004",
+      "file": "G004_run2.json",
+      "refund_calls": 2,
+      "run_index": 2,
+      "sha256": "e29799ce899d120e32b61d0a16e4f0c5086fd8b871c56f8b3447e8704d193bcb",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G004",
+      "file": "G004_run3.json",
+      "refund_calls": 2,
+      "run_index": 3,
+      "sha256": "1a40870d0ffd1557c197db922c2773e6b72328c92b2eb509508c67a02c45a36d",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G005",
+      "file": "G005_run1.json",
+      "refund_calls": 2,
+      "run_index": 1,
+      "sha256": "9f8e89cc76e9f926c4fdec6aba72f22514e99df1bba14103205165877571908c",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G005",
+      "file": "G005_run2.json",
+      "refund_calls": 2,
+      "run_index": 2,
+      "sha256": "28cc7e08a983c1707776a0449b925ef3aaffe0a4569ff8cb465b8812d926c499",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G005",
+      "file": "G005_run3.json",
+      "refund_calls": 2,
+      "run_index": 3,
+      "sha256": "f992a44651e39f4fa9d4177d13d10d8bf601ade2b4f58faabce0dd3840d3cbd6",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G006",
+      "file": "G006_run1.json",
+      "refund_calls": 2,
+      "run_index": 1,
+      "sha256": "eba039523578e6d11b8155b38f1d8444d2185cc96fb836e4fda140aa57e023f3",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G006",
+      "file": "G006_run2.json",
+      "refund_calls": 2,
+      "run_index": 2,
+      "sha256": "d635f7f6aacbc60ae02a811834ed8f9af89051e02f6d065a5ae9acc0ec6134c1",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G006",
+      "file": "G006_run3.json",
+      "refund_calls": 2,
+      "run_index": 3,
+      "sha256": "db709e4f56c65b523a8738581c0d110d615e098f12962253d5b35617fb194152",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G007",
+      "file": "G007_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "be869d6beaf186b69ea7d63ff64ce47693695accd786175f70dcc3515b7835bc",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G007",
+      "file": "G007_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "632fb432aa8c6526238147cf6f446eae71dab26849bef4dc9332554c96a9bc4a",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G007",
+      "file": "G007_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "c600ae5924f171e43f8543b697f0529d209052f22bf49ddc2ba9ecf79d493ad0",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G008",
+      "file": "G008_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "529ebdec1f61efa39848fee7cce44bada3407309066abc5b26d32c0c71cbc850",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G008",
+      "file": "G008_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "a62b451ecee69ab9290db9dbb80ed6efe7e9e4a63ceddf47b90ce4db27c13d9c",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G008",
+      "file": "G008_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "3353dd982a9d15523a9fa88b1b5891cef2a2784f96e7aab52f14f39b2cc04891",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G009",
+      "file": "G009_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "f20232ec2c23cf4431687ebf0ed6bfa33d0080e270deb4870ad26bca662cbc9e",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G009",
+      "file": "G009_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "738d968350e9cd5f0edc158c926b9ce6ede2412bf47120db4628da419deb5fb8",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G009",
+      "file": "G009_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "8695a7376e529682e782503d60804a783cb095d1c9ede1fe042ba45e897b8b13",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G010",
+      "file": "G010_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "f66e2dc9f89a50d8c3f50f16f7c8c68ab78c5d9af703e2a2b5552c5fed2731d8",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G010",
+      "file": "G010_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "d6f350ac9d2bbec2f9eb62181bbd8c62d8adb990b34b78cd98590fd0df8f48a0",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G010",
+      "file": "G010_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "5268a21433458c6ccd880c1d573097ec523cc1c1d0cf11f497da5ef0ed84be02",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G011",
+      "file": "G011_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "07c0927277d1522d49e109d566d19f58f1dd4e287c746b64511c14b402c5e2db",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G011",
+      "file": "G011_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "1c85d64bbfbe78ba9ef74da2ab19c6bb5c7392e3b94b1eba7b95d03d0798423f",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G011",
+      "file": "G011_run3.json",
+      "refund_calls": 3,
+      "run_index": 3,
+      "sha256": "2501650e4a702a7d41184ea2d007db3f488c9cdfc2b4edd7099105067ed762b3",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G012",
+      "file": "G012_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "a2c1d0c0a53d6f82062f555f9684760208fde237da3f4647c27070d8e94ab0f4",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G012",
+      "file": "G012_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "5e1d73dde5244fe54c5d8ce21336dd62f2f1676f626db14f5734efba20903c33",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G012",
+      "file": "G012_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "bf0b51573ba2d1ffb7b00725bf4c6c04ca23b13fe084051a1dc609a91b4eb06d",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G013",
+      "file": "G013_run1.json",
+      "refund_calls": 2,
+      "run_index": 1,
+      "sha256": "83ba8070dafbaa414f5760a4171f12ae574f45ceed3da44404d0952d7334e148",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G013",
+      "file": "G013_run2.json",
+      "refund_calls": 2,
+      "run_index": 2,
+      "sha256": "6eca6c59b3d2bcd71fe1af43d605138c8783cfecce54954c37f92aa31282e09a",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G013",
+      "file": "G013_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "40565371bed4d481b7745b1be080af8696ce32edb4f0cecddd09b4125517d90e",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G014",
+      "file": "G014_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "d9b3dac25a93fd670835d191d953a972d54e2699112bba01d8a099a74dbd7a81",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G014",
+      "file": "G014_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "c383c27f76e26f68979d68e6958602da0c54c557732443def3a3dca854b9c326",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G014",
+      "file": "G014_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "5a396376b6d240b4c7ec00f9c8e04f7693ac75c4ab50eba468e10459c1215cc0",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G015",
+      "file": "G015_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "9c7891dc6587940b0692bca3216783d4c6ae1390ec736a613acc337b983b111d",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G015",
+      "file": "G015_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "05d0d44a4627220d67af5384a72a8bab26520ca8a3b297aafbe185eeec42f32b",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G015",
+      "file": "G015_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "0c6536653dabd10968bf807ab04b93e25dde9daee7bfb49d1d0d0a372a0dbdfa",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G016",
+      "file": "G016_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "92c350b1152a1b332d4c697dfe64622ad2508bbbb6a1a2fdd55daaab4ba28389",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G016",
+      "file": "G016_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "9c3767777e3b6461d57841400b7cf675f99d3c8fba55730cde17647eaa88a931",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G016",
+      "file": "G016_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "b16578b4a1f5a4017fdce39531b73a6c5aa0aed57f2b33339a77edb86ea8bff0",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G017",
+      "file": "G017_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "e46642c317431d735acd18481f164cd08e0d0017798530e28cd0bd1f8cf5e44f",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G017",
+      "file": "G017_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "08353b03d0c3588b55d755972e0f27522dfc235c438b99dbf58ab1cc6fb7aab8",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G017",
+      "file": "G017_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "ec71a2b94736d8b176dcb5ef9ff91c48f884ea09924b7270d48ab5c6522af66f",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G018",
+      "file": "G018_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "32be7b411d50cb9655bc1fd64a754e16f85b8e381af1668e57befeb75d55a7cd",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G018",
+      "file": "G018_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "914cd714853b2e8d6f53f60e308d50051c7597d9b7069edfc43dc9fe2bc49435",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G018",
+      "file": "G018_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "df2ce6f0e71bf5eb6e9f945a2bc7197bef9126e1c6f13d0af80e99fed0dd5363",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G019",
+      "file": "G019_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "6ce0c24fce6779ede3b0e82168c81ccfe8cc9b6d7e82d1ffb99dabc2f1e5bb7f",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G019",
+      "file": "G019_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "587ccd865ca08f246f900298740dfbd06b3a1502aaae101e24757cd553b1a5b7",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G019",
+      "file": "G019_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "69e7a7c6e29764fa171228da6c043a1c5afae3a8c4d462413deb8a71d65ff3dc",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G020",
+      "file": "G020_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "c9cb07bcfebc4417009dfb43135717b7aff9f2e36719ab741c50a10d33c13d69",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G020",
+      "file": "G020_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "3b5181b5d393fb0dc6e85f028846bd015c88d29ee70dcbb255391f448a181398",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G020",
+      "file": "G020_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "e8d00f759823a187814d8922ec3aef53a6f3e6aa416281ff45ba11ef5ab06cc2",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G021",
+      "file": "G021_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "9616dc668712fcdf30868877aeda20aaaaf81c5618029b59d40fb47ff09b888b",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G021",
+      "file": "G021_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "86682600eecdccf0cc5657b2fdfc18dac30f606879d44d4984d79d5f5ea4b369",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G021",
+      "file": "G021_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "ad1fc5c5c51d234e5c878be78b17cd0be1507234c61d615b3f93cd7cab51fdf8",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G022",
+      "file": "G022_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "fe5574a62736a45455279f1ed929d558d0c349c5eb5a075935897a2a62c399e0",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G022",
+      "file": "G022_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "d3847afd7fa3bf54f7a3ae1efc03a40009829554eb50df41b4c5c6b7557257a5",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G022",
+      "file": "G022_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "a11aebdcf9c4cbb973730e69e04ed32e88091c5b6a6dda163eac86296c1fb164",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G023",
+      "file": "G023_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "8731bcde53bb50609e5c889397d04033fdf5e8e31c55af18cbf3065a97569d05",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G023",
+      "file": "G023_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "8f658bb155c1a5ce16bcbbc01a97bfd9ec33526f67c447c67e4d47a7e51cbdd7",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G023",
+      "file": "G023_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "70249f54853ce74331e6573bee8a92abfe20b6790e4094e237bdaff36f364311",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G024",
+      "file": "G024_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "01490604958d3882cea3d2890111ab954924648fed0aab6035e047ff4c47a679",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G024",
+      "file": "G024_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "c45ef35368bb8dd826250cb362caf4990e681f44ccd4750a3693e212cdd71ed8",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G024",
+      "file": "G024_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "8803d0a60dcac568df00987300346e6bec8da62196801795e61790c2f5a53495",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G025",
+      "file": "G025_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "fc63ad07c752b9eae0bc4c05df8ff7e8ef26bffb8578aeb37258a14fe9f714f0",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G025",
+      "file": "G025_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "e36af9482bc1bde394cff2c6e1f45282beb7b86081a4b3d56ad151ffd9800cee",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G025",
+      "file": "G025_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "b1649a53c20de02678ab61266864cc248b517078ca9718942c52257b84221275",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G026",
+      "file": "G026_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "dc34fd88719ad86b20a02ae0b33320168ddef2c34b2692017bdba90fb0ec65f1",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G026",
+      "file": "G026_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "1a92c43d92addc90d535e4bcf7bdfd923940cfcdc09cd4d17efaab26effcee55",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G026",
+      "file": "G026_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "69c9525b438b6c8b870c052adba60545af469712adf774a42855e240ff8f0a86",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G027",
+      "file": "G027_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "1fe8c43409542fef80ad7c4dc539cecc6c79b8e3acb102a381573933c9bdf875",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G027",
+      "file": "G027_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "c98832dde9b6668cc932a060ecd5f4abd613b449dd7b04891f567da0c65a1aa2",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G027",
+      "file": "G027_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "5ba0f5f7bba752a8276d5468c249bba729a783689986195dfa369ca627421907",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G028",
+      "file": "G028_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "cd40c5e556233a4cb597aad33b86e08597d2e5ef731971c7bd61eb6e38bcd42f",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G028",
+      "file": "G028_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "a126549cae3d3d959cdb43debe61427ed137bdf1b0aa70fada649d89f0256369",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G028",
+      "file": "G028_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "d7608dece93993f8248d92fa9fe8f52b926f7142e6c938f2b572a03af2fde935",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G029",
+      "file": "G029_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "67aa393d98f8b0cfd0c7f91496bc17851205f3cf67dda93112a01256cd2ebd85",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G029",
+      "file": "G029_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "746a1ccb904d77816b09752f90956acdae67e3f9b642db032971565fdb8d152c",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G029",
+      "file": "G029_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "28f18f83fb2f0c2fc8f0afccc3fceb6833fffcbb3ed0f22d2e76225350f44037",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G030",
+      "file": "G030_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "b26b88d2663f4fc8758be3e3b7d36b2cef365e115f6ee9da94cffe98eafe25c2",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G030",
+      "file": "G030_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "d5efacbe5bfdc5c3dfd71f89364c0ace0115046e1a4338bec6a268eeb8c7f51b",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G030",
+      "file": "G030_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "06d5816ce0c7c39f74be6e7892dee44f0ba5f987c124ae9fef161bb7a96c0151",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G031",
+      "file": "G031_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "ce21722f3e774a0129552022daef9e41dc606e39f4a6ad743137666700ee0152",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G031",
+      "file": "G031_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "2f7eaaa1fc9b979a6f94e144909e97e9d8b4fe9b0d7aba9be0108af0e0e8d23b",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G031",
+      "file": "G031_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "ca31ec9aa58397de3d9b6d7cce5b059b11c8245b04736b9b417211c0031a19d1",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G032",
+      "file": "G032_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "c030113339320a43459c10346094cb172c42a47dce4bd50400b347e3b32a6d19",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G032",
+      "file": "G032_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "d6050690cc9c327818a85b233f9ed88a5ac46782b27d45ea52701cd4b8bc9609",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G032",
+      "file": "G032_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "438bc87f987e024022c6925b25138e55e951712c5c8edc63b1a1c7751f8f2b92",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G033",
+      "file": "G033_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "2eb94140e192a026503bbb716563d748f6521b19bfa86fc495413bf007a6506d",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G033",
+      "file": "G033_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "58f26858e2b19ca0ea48dda9e5c9e7e0d2e3f03638df4be42c8f50ee78a77743",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G033",
+      "file": "G033_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "50a9d9aefbc3eb875bfb8b7401567d0e56228314591e296b73a34b668d9c294a",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G034",
+      "file": "G034_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "34323474f533cd12c85fb346c84ccce9ef896ad53261c819f9c4c6007a65ef70",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G034",
+      "file": "G034_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "4360ef47bd324f3e1024966490ea5d9bcd2c3b36d8b9b91111f384db124dc176",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G034",
+      "file": "G034_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "17fff921032813a14ca1d3b11c9afc5cd46115072d23703a9b4e309d32bd31fb",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G035",
+      "file": "G035_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "e43eb2a1e83ac3ca94bfddd8046aee29c0564e24b3dd8a9a13cb9e407213a93b",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G035",
+      "file": "G035_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "be8eec672880c79af6b65fa313fe40bf73c6eb18b362130e985ccca986794c51",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G035",
+      "file": "G035_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "17d5e282ba7c06e0cbc342c36207df05ddd5ab54b5b87c37ca00474d37d14f22",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G036",
+      "file": "G036_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "437af447c6b6ac02de08b179addf52590080888718e2b079b3dca570b1ba6abd",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G036",
+      "file": "G036_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "e1eb0817bb54a7405582d6a0a4b29fce981272a6058e6c709ca6354d9a1c2bc3",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G036",
+      "file": "G036_run3.json",
+      "refund_calls": 1,
+      "run_index": 3,
+      "sha256": "76d7bb7fbd79f1b2eff45457a58484019dc810c3d867cc23b4c1eced0b85fd52",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G037",
+      "file": "G037_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "6443e3addb8b2edddafea1ec4ade719726eeb8b03c9bd44ecde9665de1a3d3ce",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G037",
+      "file": "G037_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "0c21792ebdd0d8c9c906924c6caa1021ac9b3f9194187f8dcddf2b09663de2cb",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G037",
+      "file": "G037_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "c8f5e25ac1f83be089fff1f7afd7f1be1eb918335e32edddda9d69f0db8e6b40",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G038",
+      "file": "G038_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "03e8207eb93669b3a3c3454f0efc56643a42e92706e84d9caed7c516a345d195",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G038",
+      "file": "G038_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "435fea0b8d8d89f49f11ef14cc04c78aade09785f3fcc4e58169a77a6f8c6e76",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G038",
+      "file": "G038_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "6bbf0e2933ddc5987ae8e5a688013cad8e7ff0e2f98b7a5c9bbf370d92cf288a",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G039",
+      "file": "G039_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "6bfc406a7d564d8912132e6f649c767ef4bdff7a9a7dab6cb716ccffbf54130d",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G039",
+      "file": "G039_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "d207cadc05dca32a0026c49aa7123b91185b0446aa261893ffe8bc6879ba34ed",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G039",
+      "file": "G039_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "6b4e695fe6cc62849cc6abe3d2aeb87eb3185b3f049a63f26c6b2096c5bc3e37",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G040",
+      "file": "G040_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "a10b3fd141762d697c495416e1c153c8470ee485353821539f8848c8b051b634",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G040",
+      "file": "G040_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "8c8f2e80f7ee00edbb190f939ec54d38e2cd99db08b02e26b3071e024cd813ef",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G040",
+      "file": "G040_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "f6a1384310c8449bb5dba9415f17eb8cb0bfb72a81c141642b5006d59a6c7893",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G041",
+      "file": "G041_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "ce5807efc454249a9a72c3c23b105713b256f5c13608e64d3f7717c71929117c",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G041",
+      "file": "G041_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "32ebacc9115271c4e785cdd51514144a217a0253fbb54aecddf147d8d589b783",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G041",
+      "file": "G041_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "4b424851b2b8afa696c8c8aa0f057db7f761a1368cd7c345d63c305fef1a84ec",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G042",
+      "file": "G042_run1.json",
+      "refund_calls": 1,
+      "run_index": 1,
+      "sha256": "71299e9fd17070a973db1f55f6696d4293913219aa475192f653053ed8d9eeae",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G042",
+      "file": "G042_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "e5e1d27d0cb753874be1f2c44e5064587f65189d9f7ea90370e59ad21ca9d5b5",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G042",
+      "file": "G042_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "d365ef0046f9dda3d569701b19073e14ef86535e2f6c2e8d9dcfe9c58afe3e05",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G043",
+      "file": "G043_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "da887349d9baa6434c85c80fcb79b196ae5392c0a80925a217f73ac9a1458317",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G043",
+      "file": "G043_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "3a14c716d24eb06dd5ff2c3535d3a2925e006d019c54c4168be72ea23ab7872e",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G043",
+      "file": "G043_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "8b5216695ef52f12a3905e6587c4cd70c76788c133672559b5ad37fd98f78fce",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G044",
+      "file": "G044_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "1e619a984606216a9e724eb29f662ba52b2fa1cc85fa2d0b4b00fc8d00c41f80",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G044",
+      "file": "G044_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "0c01d8197bfb5c9b918cd4d5c2c04a7504d74a4750f68ae42d9912d2de569ce1",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G044",
+      "file": "G044_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "42efa571c127acc8e2d8ee4a64f4ad2463160f1e30e7c6cc2eab66df3397df4e",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G045",
+      "file": "G045_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "fef177619e4ad416fad64c8b6393074511698546f934a024ddbd6caff3ee23ac",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G045",
+      "file": "G045_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "6c7eaf11ffca6111a726af862b722d0d91b5011ac30e734f3385cd7c4297ccff",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G045",
+      "file": "G045_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "e4685af4c873c5ff89cab7656a8f160afaa5325323987c91b43c713d785279eb",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G046",
+      "file": "G046_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "decdb036bd104df7c2a201c2677c7f10686af5c297eeab0b42483abaf473a534",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G046",
+      "file": "G046_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "0f9dd4c51bb27e9ae473d7cf8e1cd35df1cf54c76cb51c4689abe091fa941ca4",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G046",
+      "file": "G046_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "e8ea3aa02d2a06c615ab34d7852d018d1e5bee75a5e3623a49842d592f7fd649",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G047",
+      "file": "G047_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "4ca1044a84465233bbd2e2b378d0c9f6177d30e97b404077283701a4d214f9ae",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G047",
+      "file": "G047_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "1d69344d5f5bffe111cd8110251c11756635ccdd009ba54a949fb99cf4757530",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G047",
+      "file": "G047_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "dab858ec286605586a6d759ac37d950a3a6a26c54195bfeef496b42d553860ce",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G048",
+      "file": "G048_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "76f60fab1f515c65bb158af4bcd14895d9fe6be6ba4c76b4edc0b8e446203413",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G048",
+      "file": "G048_run2.json",
+      "refund_calls": 1,
+      "run_index": 2,
+      "sha256": "6998e7c64697e5dbf032a4a490c9492ab53360cc3e328a118a3650cbcf46c3fe",
+      "status": "complete",
+      "void_reason": ""
+    },
+    {
+      "brief_id": "G048",
+      "file": "G048_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "b7fd41a110a044f7c02187c1af8e1dc3a08d495ebd0a9f83ee3497571e06a229",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G049",
+      "file": "G049_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "9f5648d346f574a3d3bb0960b2ab96f3bcaf3cfb408a5e2dee62414732f4d71a",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G049",
+      "file": "G049_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "d1b4d2f4b17269bdf977c124f5fa98ec2c739dec0c951b13129a46917e12593c",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G049",
+      "file": "G049_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "ec134e844830fb54139e8a33dba003e6ae5063bf021a6f4a789604622f270f96",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G050",
+      "file": "G050_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "7d51aa8dc8b4c94324d92e3c46998bdc2989b0b6b14c8ce201541d0fd7180ca7",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G050",
+      "file": "G050_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "6738aa6ab283b712ec9c2ce4cbdd36500c0991a30d543b7fa92b3d1defacd5e2",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G050",
+      "file": "G050_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "73930fef90df8e589fb6c7d214e52d80c49326104ab9d51c0e0ca7d88f1a07a7",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G051",
+      "file": "G051_run1.json",
+      "refund_calls": 5,
+      "run_index": 1,
+      "sha256": "949f63bc1be446960babdcdb46c9817f53e9550eec2da7efa08b41cd6817ba09",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G051",
+      "file": "G051_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "161543cd24913ac183b0bf67a10805dbd774dccc03ea5d02a8a24cbdefe8e2c9",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G051",
+      "file": "G051_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "417906699b04c2ad3a34ddd8fe25e874dcce3d6a978d51fb4200c7b5a3931115",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G052",
+      "file": "G052_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "cffc15c16e00d9e4e374c0bab143f832739f8e8bb0809ddf5390213d77660c61",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G052",
+      "file": "G052_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "e97766f1e41d0971e4445e79c0e011fdc389ed16fdeab9f798eea77921675cb3",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G052",
+      "file": "G052_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "2fa62f60cd6c3db8310c8d3dded02234232344734d2b6eb1c5e7376787ce0b44",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G053",
+      "file": "G053_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "33ea2f566272fe7498377555581acd9fa998b30bbc7372c3585174968f252319",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G053",
+      "file": "G053_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "76a0f3cde26d6f2ab400c5e19505194448f0c5a0eb70e09410e65a1bfeb1fd7b",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G053",
+      "file": "G053_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "6e9ad09e1f29a7f74b240fc076b0eeae978a1dfaabb337d0c7076a9dade31ec4",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G054",
+      "file": "G054_run1.json",
+      "refund_calls": 0,
+      "run_index": 1,
+      "sha256": "a7cc531c78993336d18e61fdeb296f0bb84ca860efc12992d480121e9f653212",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G054",
+      "file": "G054_run2.json",
+      "refund_calls": 0,
+      "run_index": 2,
+      "sha256": "9ab5d2400032c54519129186695f7cb4c1b57bcdfecd5a235bd61e22af3ff7a4",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    },
+    {
+      "brief_id": "G054",
+      "file": "G054_run3.json",
+      "refund_calls": 0,
+      "run_index": 3,
+      "sha256": "363ae0180f58459e4c9cba9f15d93383c5895c3bdddb5d3a09d6a9ee8ed09b14",
+      "status": "void",
+      "void_reason": "model: messages: HTTP 429: {\"error\":{\"type\":\"rate_limited\",\"message\":\"\u5f53\u524d\u8bf7\u6c42\u89e6\u53d1\u9650\u6d41\u6216\u5bb9\u91cf\u4fdd\u62a4\u3002 \u539f\u56e0\uff1a\u4e0a\u6e38\u6216\u5e73\u53f0\u5f53\u524d\u8bf7\u6c42\u8fc7\u591a\u3001\u5e76\u53d1\u8fc7\u9ad8\uff0c\u6216\u6a21\u578b\u5bb9\u91cf\u6682\u65f6\u4e0d\u8db3\u3002 \u89e3\u51b3\u65b9\u6848\uff1a\u8bf7\u964d\u4f4e\u5e76\u53d1\u3001\u7a0d\u540e\u91cd\u8bd5\u3002\u5982\u5f53\u524d\u4f7f\u7528\u667a\u80fd\u8def\u7531\uff0c\u8bf7\u5148\u91cd\u8bd5\uff1b\u82e5\u4ecd\u5931\u8d25\uff0c\u5efa\u8bae\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\uff1b\u5982\u5f53\u524d\u4f7f\u7528\u56fa\u5b9a\u5546\u5bb6\uff0c\u8bf7\u5207\u6362\u56fa\u5b9a\u5546\u5bb6\u6216\u5f00\u542f\u667a\u80fd\u8def\u7531\u3002 request_id: 2"
+    }
+  ],
+  "worksheets_delivered_from_this_run": 0
+}
