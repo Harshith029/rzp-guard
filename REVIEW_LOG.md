@@ -814,3 +814,96 @@ and became something that fails a build when it lapses; "only the stub can
 execute" was replaced by a compile-time guarantee plus an explicit statement of
 what it does not cover; and the fuzz command stopped pointing outside the
 boundary it was written to enforce.
+
+
+---
+
+## Round 12 — evidence discipline — reviewer: ChatGPT — 2026-08-31
+
+**Five raised, five accepted.** Fourth consecutive round on this boundary. The
+reviewer also noted they could not independently reproduce the test runs — a
+Windows host blocked Go's build cache — and declined to treat my green counts as
+verified. That is the correct posture and it sharpens the standing objection:
+
+> show the negative tests that would fail for each prior bypass, rather than
+> reporting a PASS banner as proof of the boundary.
+
+That objection is now the design of the suite.
+
+### P12.1 — "The export can still copy `.env` through a symlink."
+**ACCEPT — P0, reproduced before fixing.** `git ls-files -o --exclude-standard`
+lists an untracked symlink; `[ -f ]` follows it; `cp -p` copies the CONTENTS. So
+a link named anything at all could pull the gitignored `.env` into the export
+under an unrelated name, where the literal `.env` check never looks.
+
+Demonstrated on Linux first, because this host cannot create symlinks — which is
+precisely how the hole survived a round:
+
+    is the symlink selected?   yes
+    does [ -f ] accept it?     yes
+    what does cp -p produce?   a REGULAR FILE containing: secret
+
+Symlinks are now refused outright and that is the PRIMARY control, with the
+credential scan demoted to the backstop it always was. Verified after fixing, on
+Linux, with the same attack: refused.
+
+### P12.2 — "The credential backstop is bypassable with a space in the filename."
+**ACCEPT — P0.** The export loop was NUL-safe; the scan was
+`for f in $(grep -rlE ...)`, which word-splits. A file named `review artifact`
+became two nonexistent paths and was scanned as neither. Now `grep -rlZ` with
+`read -d ''`, and **a scanner that errors is treated as a refusal** — a scan that
+did not run is not a scan that passed.
+
+### P12.3 — "The runner does not build the 'only permitted' stub."
+**ACCEPT — P1, and the worst one.** `child_redteam.go` admitted it could not
+identify the file at the child path, then claimed the lane "addresses that by
+building the stub itself, immediately before use". `cmd_redteam` never built
+`cmd/mcp-stub` at all.
+
+A false claim, in the comment block written to stop false claims, in the commit
+whose message was about claims outrunning code. The lane now genuinely builds it
+— in the same container that runs the command, since `/tmp` does not survive
+between containers — and the comment says plainly that a build is not an identity
+check and that **nothing here detects substitution**. What makes a replaced stub
+harmless is the container: no credentials, no network, no socket.
+
+### P12.4 — "`redteam-selfcheck` does not prove the regressions it claims to prevent."
+**ACCEPT — P1.** "Working-tree files present" checked `run.sh`, which is
+*tracked*, so it proved nothing about the dirty-tree property it was named for.
+"No shell-child path" grepped for one legacy string, so renaming the variable
+would pass.
+
+Replaced with `./run.sh redteam-negative`: six cases, each a bypass that actually
+worked, each of which must fail. N3 creates an untracked sentinel and asserts it
+reaches the export. N4 resolves the files `go list -tags redteam` actually
+compiles and greps THOSE for any shell or child-from-config construct, whatever
+it is named. The self-check remains as a smoke check and is now labelled one.
+
+### P12.5 — "Fuzz isolation can regress with no CI failure."
+**ACCEPT — P1.** `cmd_fuzz` was fixed last round and nothing asserted it stayed
+fixed — the exact bypass, one round earlier, with no regression test. N5 now
+fails if `cmd_fuzz` stops routing through `cmd_redteam` or reacquires a `gorun`
+call.
+
+### Three of my own test bugs, found by running the suite
+
+The negative suite reported two BYPASSED on its first run, and neither was a
+regression:
+
+- **N2's fixture put a credential-shaped literal into `run.sh` itself**, so the
+  scanner correctly flagged `run.sh` and every export in the repository refused.
+  The fixture is now assembled at runtime.
+- **N3 chained `export && [ -f sentinel ]`**, so N2's induced refusal read as a
+  missing sentinel. Refusal and absence are now distinguished.
+- **N6 piped into `gorun`**, which runs docker without `-i`, so the stub read EOF
+  and produced nothing. It reads a file inside the mount now.
+
+Worth recording because the first two are the same error as the findings above:
+a test that fails for a reason other than the one it names is not evidence
+either.
+
+**Net effect of Round 12:** the boundary's evidence stopped being a banner and
+became six attacks that must fail; the symlink hole — the one that could
+actually move a secret into the container — is closed and demonstrated on the
+platform where it was exploitable; and a comment claiming the lane did something
+it did not was removed rather than made vaguer.

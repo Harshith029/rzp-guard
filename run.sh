@@ -134,16 +134,37 @@ cmd_operator_setup() {
 
 redteam_export() {
   local work="$1"
-  # Tracked AND untracked-but-not-ignored, from the working tree, so
-  # uncommitted work and new test files are present while .env is not.
-  ( cd "$PWD" && git ls-files -z -c -o --exclude-standard ) |
-    while IFS= read -r -d '' f; do
-      [ -f "$f" ] || continue
-      mkdir -p "$work/$(dirname "$f")"
-      cp -p "$f" "$work/$f"
-    done
 
-  local leaked=0 bad f
+  # SYMLINKS ARE REFUSED, and this is the PRIMARY control.
+  #
+  # The previous version listed untracked-not-ignored files, tested each with
+  # `[ -f ]`, and copied with `cp -p`. Both follow symlinks. An untracked,
+  # non-ignored link named anything at all could point at the gitignored .env,
+  # pass the regular-file test, and have its CONTENTS copied into the export
+  # under a different name -- where the literal `.env` name check never looks.
+  # Reproduced on Linux before fixing: the copy came out a regular file
+  # containing the secret.
+  #
+  # The credential scan below is a backstop for a mistake. This is the control.
+  # There is no reason for a symlink to exist in this lane.
+  local rejected=0
+  while IFS= read -r -d "" f; do
+    if [ -L "$f" ]; then
+      echo "REFUSING: $f is a symlink; the export copies file CONTENTS, so a" >&2
+      echo "          link can pull a host secret in under an unrelated name" >&2
+      rejected=1
+    fi
+  done < <( git ls-files -z -c -o --exclude-standard )
+  [ "$rejected" = 0 ] || exit 1
+
+  while IFS= read -r -d "" f; do
+    [ -L "$f" ] && continue          # belt and braces; already refused above
+    [ -f "$f" ] || continue
+    mkdir -p "$work/$(dirname "$f")"
+    cp -p "$f" "$work/$f"
+  done < <( git ls-files -z -c -o --exclude-standard )
+
+  local leaked=0 bad
   for bad in .env .env.local .gotmp dist evidence/live; do
     if [ -e "$work/$bad" ]; then
       echo "REFUSING: export contains $bad" >&2
@@ -151,16 +172,17 @@ redteam_export() {
     fi
   done
 
-  # Several credential shapes, not just Razorpay's. This is a BACKSTOP for an
-  # accident, not a secret scanner: it will miss anything it does not know the
-  # shape of, and the documentation says so rather than implying coverage.
+  # Credential shapes, NUL-delimited.
+  #
+  # This loop used to be `for f in $(grep -rlE ...)`, which word-splits: a
+  # copied file named "review artifact" became two nonexistent paths and was
+  # never scanned. Combined with the symlink hole that was a complete bypass.
   local pat='rzp_(test|live)_[A-Za-z0-9]{10,}|sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
-  for f in $(grep -rlE "$pat" "$work" 2>/dev/null || true); do
+  local scan_rc=0
+  while IFS= read -r -d "" f; do
     local tail hit=0 tok
-    for tok in $(grep -ohE "$pat" "$f"); do
+    for tok in $(grep -ohE "$pat" "$f" 2>/dev/null); do
       tail="$(printf %s "$tok" | sed -E 's/^(rzp_(test|live)_|sk-ant-|sk-|ghp_|github_pat_)//')"
-      # A placeholder collapses to one repeated character, or starts with a
-      # word the templates use.
       case "$(printf %s "$tail" | tr -s 'A-Za-z0-9')" in
         x|X|0|a|A) continue ;;
       esac
@@ -173,7 +195,15 @@ redteam_export() {
       echo "REFUSING: $f contains something shaped like a real credential" >&2
       leaked=1
     fi
-  done
+  done < <( grep -rlZE "$pat" "$work" 2>/dev/null || { scan_rc=$?; [ "$scan_rc" = 1 ] || echo FAIL; } )
+
+  # A scanner that errored is not a scanner that found nothing.
+  if [ "$scan_rc" != 0 ] && [ "$scan_rc" != 1 ]; then
+    echo "REFUSING: the credential scan failed (exit $scan_rc); a scan that did" >&2
+    echo "          not run is not a scan that passed" >&2
+    leaked=1
+  fi
+
   [ "$leaked" = 0 ] || exit 1
 }
 
@@ -209,7 +239,21 @@ cmd_redteam() {
       -e RAZORPAY_KEY_ID= -e RAZORPAY_KEY_SECRET= \
       -e NIHAL_CUSTOM_KEY= -e OPENAI_API_KEY= -e ANTHROPIC_API_KEY= \
       -e RZP_STUDY_PROVIDER= -e RZP_STUDY_PROXY_BASE= \
-      "$GO_IMAGE_PINNED" "$@"
+      "$GO_IMAGE_PINNED" \
+      sh -c '
+        # Build the stub the redteam child names, in the SAME container that
+        # will run the command -- /tmp does not survive between containers, and
+        # a comment in child_redteam.go claimed the lane did this "immediately
+        # before use" while nothing did. Building it here does NOT establish
+        # identity: anything that can write to the path afterwards can replace
+        # it. The comment now says that too.
+        #
+        # Failure is not fatal: most red-team commands never spawn a child, and
+        # a guard binary that needs one already refuses clearly when it is
+        # absent.
+        go build -o /tmp/rzp-redteam-child/mcp-stub ./cmd/mcp-stub 2>/dev/null || true
+        exec "$@"
+      ' -- "$@"
 }
 
 # Proves the lane's properties instead of asserting them in a comment. Run it
@@ -241,6 +285,121 @@ cmd_redteam_selfcheck() {
     echo
     [ "$fail" = 0 ] && echo "lane self-check PASSED" || { echo "lane self-check FAILED" >&2; exit 1; }
   '
+}
+
+# NEGATIVE TESTS: one per bypass that actually got through.
+#
+# Review's standing objection, and it was right: a PASS banner from
+# redteam-selfcheck is a list of symptoms, not evidence of a boundary. What
+# demonstrates a boundary is the attack that used to work and now does not.
+#
+# Every case below is a real bypass from a previous round, re-run as a test that
+# must FAIL. If one of them starts passing, the lane has regressed to a state it
+# has already been in once.
+cmd_redteam_negative() {
+  local pass=0 fail=0
+  ok()   { echo "  BLOCKED   $1"; pass=$((pass+1)); }
+  bad()  { echo "  BYPASSED  $1" >&2; fail=$((fail+1)); }
+
+  echo "=== negative tests: each of these once worked ==="
+
+  # N1 -- Round 12. An untracked, non-ignored SYMLINK to the gitignored .env.
+  # `git ls-files -o` listed it, `[ -f ]` followed it, `cp -p` copied the
+  # CONTENTS in under an unrelated name, and the literal .env check never saw it.
+  local tmpdir; tmpdir="$(mktemp -d)"
+  ln -s "$PWD/.gitignore" ".redteam-negative-link" 2>/dev/null
+  if [ -L ".redteam-negative-link" ]; then
+    if ( redteam_export "$tmpdir" ) >/dev/null 2>&1; then
+      bad "N1 untracked symlink was exported"
+    else
+      ok "N1 untracked symlink refused"
+    fi
+  else
+    echo "  SKIP      N1 (this host cannot create symlinks)"
+  fi
+  rm -f ".redteam-negative-link"; rm -rf "$tmpdir"
+
+  # N2 -- Round 12. A credential-shaped value in a file whose name contains a
+  # space. The scan was `for f in $(grep -rlE ...)`, which word-split the path
+  # into two nonexistent ones and scanned neither.
+  tmpdir="$(mktemp -d)"
+  # Assembled at runtime. Writing the literal here would put a credential-
+  # shaped string INTO run.sh, which the scanner then correctly flags --
+  # refusing every export in the repository. That happened on the first run.
+  local fake="rzp_""live_9f3kd82mQ7xZ01aB"
+  printf 'SECRET=%s\n' "$fake" > "review artifact.txt"
+  if ( redteam_export "$tmpdir" ) >/dev/null 2>&1; then
+    bad "N2 credential in a spaced filename was exported"
+  else
+    ok "N2 credential in a spaced filename refused"
+  fi
+  rm -f "review artifact.txt"; rm -rf "$tmpdir"
+
+  # N3 -- Round 11. `git archive HEAD` exported the last COMMIT, so a reviewer's
+  # new test silently did not run. The positive direction: an untracked sentinel
+  # must be present. selfcheck checked `run.sh`, which is tracked, and therefore
+  # proved nothing about this.
+  tmpdir="$(mktemp -d)"
+  local sentinel=".redteam-negative-sentinel"
+  printf 'uncommitted\n' > "$sentinel"
+  local n3out n3rc
+  n3out="$( ( redteam_export "$tmpdir" ) 2>&1 )" && n3rc=0 || n3rc=1
+  if [ "$n3rc" != 0 ]; then
+    bad "N3 export refused for an unrelated reason: $n3out"
+  elif [ -f "$tmpdir/$sentinel" ]; then
+    ok "N3 untracked sentinel reaches the export (dirty tree visible)"
+  else
+    bad "N3 untracked sentinel missing from the export"
+  fi
+  rm -f "$sentinel"; rm -rf "$tmpdir"
+
+  # N4 -- Round 11. "No configurable child" was checked by grepping the binary
+  # for ONE legacy string, so renaming the variable would pass. Check the SOURCE
+  # actually compiled under -tags redteam for any shell or child-from-config
+  # construct, whatever it is called.
+  local files
+  files="$(gorun go list -tags redteam -f '{{range .GoFiles}}{{$.Dir}}/{{.}} {{end}}' ./cmd/rzp-guard 2>/dev/null | tr -d '\r')"
+  files="$(printf %s "$files" | sed 's#/src/#./#g')"
+  if [ -z "$files" ]; then
+    bad "N4 could not list the redteam build's source files"
+  elif grep -nE '"sh"|exec\.Command\("(sh|bash|cmd)"|Getenv\([^)]*CHILD|Getenv\([^)]*CMD' $files >/dev/null 2>&1; then
+    echo "  BYPASSED  N4 a shell or configurable child appears in the redteam build:" >&2
+    grep -nE '"sh"|exec\.Command\("(sh|bash|cmd)"|Getenv\([^)]*CHILD|Getenv\([^)]*CMD' $files >&2
+    fail=$((fail+1))
+  else
+    ok "N4 no shell or configurable child in the redteam build's sources"
+  fi
+
+  # N5 -- Round 11. cmd_fuzz called gorun, so the brief's own fuzz command went
+  # around the lane. Assert the wrapper still routes through cmd_redteam.
+  if sed -n '/^cmd_fuzz()/,/^}/p' run.sh | grep -q 'cmd_redteam'; then
+    if sed -n '/^cmd_fuzz()/,/^}/p' run.sh | grep -qE '^\s*gorun '; then
+      bad "N5 cmd_fuzz still calls gorun"
+    else
+      ok "N5 cmd_fuzz routes through the isolated lane"
+    fi
+  else
+    bad "N5 cmd_fuzz does not go through cmd_redteam"
+  fi
+
+  # N6 -- Round 11. The stub accepted any pay_SYN* value and returned its
+  # refusal as a SUCCESS carrying an error-shaped body.
+  # Written to a file inside the mount, not piped: `gorun` runs docker
+  # without -i, so a pipe gives the container no stdin and the stub reads
+  # EOF. The first version of this test reported a bypass for that reason.
+  mkdir -p .gotmp
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYNfabricated","amount":100,"receipt":"r"}}}' > .gotmp/negative_req.jsonl
+  local out
+  out="$(gorun sh -c 'go build -o /tmp/s ./cmd/mcp-stub && /tmp/s < .gotmp/negative_req.jsonl' 2>/dev/null)"
+  rm -f .gotmp/negative_req.jsonl
+  case "$out" in
+    *'"isError":true'*) ok "N6 stub refuses a non-fixture id with a real tool error" ;;
+    *) bad "N6 stub accepted a fabricated pay_SYN id, or did not use isError" ;;
+  esac
+
+  echo
+  echo "  blocked: $pass   bypassed: $fail"
+  [ "$fail" = 0 ] || { echo "A PREVIOUSLY-FIXED BYPASS IS OPEN AGAIN" >&2; exit 1; }
 }
 
 # Fuzzing INSIDE the isolated lane.
@@ -612,7 +771,8 @@ rzp-guard
   ./run.sh bench             measure the decision and the durable writes
   ./run.sh fuzz [TARGET] [BUDGET]
                              fuzz in the pinned container (default 60s)
-  ./run.sh redteam-selfcheck proves the isolated lane's properties
+  ./run.sh redteam-selfcheck smoke-checks the isolated lane's properties
+  ./run.sh redteam-negative  re-runs every bypass that once worked; all must fail
   ./run.sh redteam <cmd...>  ISOLATED lane for external review: working-tree
                              export, --network=none, no docker socket, no
                              credentials, strict child. Use this one.
@@ -654,6 +814,7 @@ case "${1:-help}" in
   build) cmd_build ;;
   redteam) shift; cmd_redteam "$@" ;;
   redteam-selfcheck) cmd_redteam_selfcheck ;;
+  redteam-negative) cmd_redteam_negative ;;
   fuzz) shift; cmd_fuzz "$@" ;;
   bench) cmd_bench ;;
   release) shift; cmd_release "$@" ;;

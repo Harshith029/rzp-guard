@@ -15,8 +15,9 @@ Two things make a red-team of this repository useful rather than performative:
    setting nobody had chosen, an untrusted endpoint able to skip a check by
    omitting a field.
 
-> **The isolation is enforced by `./run.sh redteam`, not by this document —
-> and `./run.sh redteam-selfcheck` proves it.**
+> **The isolation is enforced by `./run.sh redteam`, not by this document.**
+> `./run.sh redteam-negative` is the evidence; `redteam-selfcheck` is a smoke
+> check and was previously oversold as proof.
 >
 > This took three review rounds to get right, and the failures are worth naming
 > because they are the same failure each time: a claim slightly stronger than
@@ -26,11 +27,18 @@ Two things make a red-team of this repository useful rather than performative:
 > mean "whatever is at a writable relative path", which the test written to
 > prove it accidentally demonstrated.
 >
-> What is enforced now: working-tree export excluding gitignored paths, a
-> credential-shape scan, `--network=none`, `--pull=never` on both stages, no
-> Docker socket, a module-cache volume created and destroyed per run and mounted
-> read-only, and a child compiled from a file with no shell branch in it. Eight
-> properties, each checked by the self-check and by CI.
+> A fourth round then found three more, and they are the reason the framing
+> changed. The export copied through **symlinks** — an untracked link named
+> anything could point at the gitignored `.env` and have its contents copied in
+> under that name, which the literal `.env` check never saw. The credential scan
+> word-split on **filenames containing a space**. And `child_redteam.go` claimed
+> the lane built the stub "immediately before use" while nothing built it at all.
+>
+> So: symlinks are now refused outright as the primary control, the scan is
+> NUL-delimited and a scanner error is itself a refusal, and the lane really does
+> build the stub. More importantly, **`./run.sh redteam-negative` re-runs every
+> one of those bypasses and each must fail.** A PASS banner is a list of
+> symptoms; the attack that used to work and now does not is the evidence.
 
 ---
 
@@ -69,12 +77,19 @@ read-only.
 
 **Confirm that for yourself before you start.** Do not take it on faith:
 
-    ./run.sh redteam-selfcheck
+    ./run.sh redteam-negative     # the evidence: six bypasses, all must fail
+    ./run.sh redteam-selfcheck    # a smoke check: eight symptoms of isolation
 
-It checks eight properties and prints PASS/FAIL for each: no `.env` in the
-export, credential variables empty, no Docker socket, no DNS, module cache
-read-only, working-tree files present, the `-tags redteam` build succeeds, and
-the string `RZP_GUARD_CHILD_CMD` does not appear in that binary.
+The negative suite is the one that matters. Each case is an attack that got
+through a previous version of this lane: an untracked symlink to a gitignored
+secret, a credential in a filename containing a space, a `git archive` export
+that hid uncommitted tests, a shell-child path detected only by one legacy
+variable name, a fuzz wrapper that went around the lane, and a stub that
+accepted any invented `pay_SYN` id. N1 needs a host that can create symlinks —
+it skips on Windows and runs in CI.
+
+The smoke check is useful and weaker: it confirms symptoms, not that the holes
+are closed. Treat a green self-check with a red negative suite as red.
 
 **Your uncommitted work is visible inside the lane.** The export is built from
 `git ls-files -c -o --exclude-standard` against the working tree, so a failing

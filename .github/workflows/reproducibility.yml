@@ -436,7 +436,15 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
 
-      - name: The lane must actually be isolated
+      # The self-check is a SMOKE CHECK: it lists symptoms of isolation. The
+      # negative suite is the evidence -- every bypass that actually worked in a
+      # previous round, re-run, each of which must fail. N1 in particular can
+      # only run here: the dev host cannot create symlinks, which is exactly how
+      # that bypass survived a round of review.
+      - name: Every previously-working bypass must still be blocked
+        run: bash ./run.sh redteam-negative
+
+      - name: The lane smoke-check
         run: bash ./run.sh redteam-selfcheck
 
       - name: The redteam build must contain no shell-child path

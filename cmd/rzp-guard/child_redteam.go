@@ -35,9 +35,19 @@ import (
 //	GUARANTEED  the child path is absolute and fixed at compile time, so it
 //	            does not depend on the working directory.
 //	NOT         that the file at that path is the real mcp-stub. Anyone who can
-//	            write to it can substitute it. The lane addresses that by
-//	            building the stub itself, inside a container with no network,
-//	            immediately before use -- not by trusting the filesystem.
+//	            write to it can substitute it, and NOTHING here detects that --
+//	            no hash, no signature, no identity check of any kind.
+//
+// An earlier version of this comment claimed the lane built the stub itself
+// "immediately before use". It did not: `cmd_redteam` downloaded modules and
+// ran the given command, and never built cmd/mcp-stub at all. That was a claim
+// outrunning the code, in the comment block written to stop claims outrunning
+// the code. The lane now does build it -- which makes the DEFAULT right without
+// making the guarantee stronger, because a build is not an identity check.
+//
+// What actually stops a substituted stub mattering is the container: no
+// credentials, no network, no Docker socket. A replaced child in there can
+// misbehave; it cannot move money.
 //
 // The honest summary: this removes the accident, not a determined operator who
 // controls the machine. The isolation that matters for a red-team -- no
