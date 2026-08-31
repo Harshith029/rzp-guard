@@ -176,6 +176,9 @@ func cmdRun(args []string) error {
 	stub := fs.String("stub", ".gotmp/linux/mcp-stub", "stub MCP child binary")
 	armName := fs.String("arm", "A", "which study arm (see study/arms.json)")
 	outDir := fs.String("out", "", "trace output directory (default: the arm's)")
+	recoverVoids := fs.Bool("recover", false,
+		"re-run ONLY traces whose recorded status is void, exactly once "+
+			"(PROTOCOL-armC-AMENDMENT-2 A2.2). Refuses to touch a completed trace.")
 	only := fs.String("only", "", "run a single brief id")
 	runs := fs.Int("runs", 0, "runs per brief (0 = the frozen 3)")
 	dry := fs.Bool("dry-run", false, "scripted fake model, no API calls")
@@ -225,6 +228,15 @@ func cmdRun(args []string) error {
 		}
 		if err := refuseStudyPath(*outDir); err != nil {
 			return err
+		}
+	case *recoverVoids:
+		// A recovery pass is not a full set by construction. The freedom the
+		// full-set rule removes -- choosing what to re-run -- is removed here a
+		// different way: the set is every trace whose RECORDED status is void,
+		// and a completed trace is refused outright below.
+		if *only != "" || *runs != 0 {
+			return fmt.Errorf("-recover selects by recorded status; it cannot be " +
+				"combined with -only or -runs, which would let a trace be chosen")
 		}
 	default:
 		if err := requireFullTraceSet(len(briefs), perBrief, m.DeclaredTraceCount, *only, *runs); err != nil {
@@ -286,8 +298,14 @@ func cmdRun(args []string) error {
 				return err
 			}
 		}
-		if err := requireEmptyTraceDir(r.outDir); err != nil {
-			return err
+		// A recovery pass overwrites ONLY files whose recorded status is void,
+		// and refuses any other at the point of writing. The immutability rule
+		// exists to stop a run being repeated until it reads better; recovering
+		// a trace that produced no result cannot do that.
+		if !*recoverVoids {
+			if err := requireEmptyTraceDir(r.outDir); err != nil {
+				return err
+			}
 		}
 		fm, err := loadFrozenModel(modelFreezePath)
 		if err != nil {
@@ -334,12 +352,46 @@ func cmdRun(args []string) error {
 	fmt.Printf("model  %s\n", r.model)
 	fmt.Printf("traces %d (%d briefs x %d runs)\n\n", total, len(briefs), perBrief)
 
+	// Recovery set: every trace whose RECORDED status is void. Computed from
+	// what is on disk, never from what this run produced, so it cannot be
+	// steered by an outcome.
+	voidSet := map[string]bool{}
+	if *recoverVoids {
+		n, err := loadVoidSet(r.outDir, voidSet)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			fmt.Println("no void traces to recover")
+			return nil
+		}
+		fmt.Printf("recovering %d void trace(s), one attempt each\n", n)
+	}
+
+	var recovered, stillVoid []string
 	done := 0
 	for _, br := range briefs {
 		for run := 1; run <= perBrief; run++ {
+			key := fmt.Sprintf("%s_run%d", br.BriefID, run)
+			if *recoverVoids && !voidSet[key] {
+				continue
+			}
 			done++
 			t := r.runTrace(br, run)
 			path := filepath.Join(r.outDir, fmt.Sprintf("%s_run%d.json", br.BriefID, run))
+			if *recoverVoids {
+				// Defensive: never overwrite a completed trace, whatever the set
+				// said. A completed trace is data, whatever it contains.
+				if st, err := recordedStatus(path); err == nil && st != "void" {
+					return fmt.Errorf("refusing to overwrite %s: recorded status is %q, "+
+						"not void", path, st)
+				}
+				if t.Status == "void" {
+					stillVoid = append(stillVoid, key)
+				} else {
+					recovered = append(recovered, key)
+				}
+			}
 			b, _ := json.MarshalIndent(t, "", "  ")
 			if err := os.WriteFile(path, append(b, '\n'), 0o644); err != nil {
 				return err
@@ -359,6 +411,12 @@ func cmdRun(args []string) error {
 		}
 	}
 	fmt.Printf("\ntraces written to %s\n", r.outDir)
+	if *recoverVoids {
+		if err := writeRecoveryLog(recovered, stillVoid); err != nil {
+			return err
+		}
+		fmt.Printf("recovered %d, still void %d\n", len(recovered), len(stillVoid))
+	}
 	return nil
 }
 

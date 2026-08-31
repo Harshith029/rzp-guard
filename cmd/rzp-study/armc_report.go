@@ -139,12 +139,20 @@ func attachContext(res *agreementResult) {
 	}
 }
 
+// loadIfPresent finds a rater's labels in whichever form they returned them.
+//
+// The CSV is checked FIRST because it is what raters actually work in; the JSON
+// path remains for anyone who edits the canonical file. If both exist the CSV
+// wins, and that is stated rather than left to be discovered.
 func loadIfPresent(rater string) (map[string]labelledRow, error) {
-	p := armCLabelPath(rater)
-	if _, err := os.Stat(p); err != nil {
-		return nil, nil
+	base := filepath.Join(studyDir(), "adjudication", "labels-armC-"+rater)
+	if _, err := os.Stat(base + ".csv"); err == nil {
+		return readLabelsCSV(base + ".csv")
 	}
-	return loadArmCLabels(p)
+	if _, err := os.Stat(base + ".json"); err == nil {
+		return loadArmCLabels(base + ".json")
+	}
+	return nil, nil
 }
 
 func cmdArmCAgreement(args []string) error {

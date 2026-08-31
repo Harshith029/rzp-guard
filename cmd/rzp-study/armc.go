@@ -485,6 +485,7 @@ func cmdArmCWorksheet(args []string) error {
 	if err := os.MkdirAll(*outDir, 0o755); err != nil {
 		return err
 	}
+	delivered := map[string]string{}
 	for _, rater := range armCRaters {
 		sheet := armCSheet{
 			Arm:     "C",
@@ -511,7 +512,18 @@ func cmdArmCWorksheet(args []string) error {
 			os.Remove(p)
 			return fmt.Errorf("REFUSING to deliver a worksheet: %w", err)
 		}
+		sum := sha256.Sum256(append(b, '\n'))
+		delivered[filepath.Base(p)] = fmt.Sprintf("%x", sum)
 		fmt.Printf("worksheet -> %s  (%d rows)\n", p, len(rows))
+
+		// The rater-facing working copy. Same fields, same order, nothing else.
+		cp := filepath.Join(*outDir, fmt.Sprintf("worksheet-armC-%s.csv", rater))
+		csum, err := writeArmCCSV(cp, rows)
+		if err != nil {
+			return fmt.Errorf("writing the rater CSV: %w", err)
+		}
+		delivered[filepath.Base(cp)] = csum
+		fmt.Printf("           -> %s\n", cp)
 	}
 
 	if err := writeJSON(filepath.Join(*outDir, "rowmap-armC.json"), rm); err != nil {
@@ -529,6 +541,10 @@ func cmdArmCWorksheet(args []string) error {
 			abs++
 		}
 	}
+	if err := writeDeliverySums(*outDir, delivered); err != nil {
+		return err
+	}
+	fmt.Println("hashes    -> SHA256SUMS-armC.txt       (check a returned file against it)")
 	fmt.Println("join map  -> rowmap-armC.json          (NEVER given to a rater)")
 	fmt.Println("projection-> projection-armC.json      (NEVER given to a rater)")
 	fmt.Printf("  rows with a malformed target/amount: %d\n", mal)
