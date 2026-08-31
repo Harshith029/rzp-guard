@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -84,34 +88,96 @@ type messagesReply struct {
 // pre-registered study: it served something other than what was asked for.
 var errModelSubstituted = fmt.Errorf("proxy served a different model than requested")
 
+// Retry policy for the proxy.
+//
+// Arm C's first run lost 108 of 162 traces to HTTP 429, and because the runner
+// walks the corpus in order and rate-limiting builds up over time, the losses
+// tracked scenario index -- which encodes a grid dimension. 96% of size=large
+// traces were void against 49% of size=small. Attrition that correlates with a
+// dimension is not attrition, it is a confound, and it destroyed the balanced
+// cross product the corpus exists to provide.
+//
+// So: retry 429 and 5xx with exponential backoff and jitter, honour Retry-After
+// when the server sends it, and never retry any other 4xx -- a malformed request
+// will stay malformed and retrying it only burns budget.
+const (
+	maxAttempts = 6
+	baseBackoff = 2 * time.Second
+	maxBackoff  = 90 * time.Second
+)
+
+func retryableStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code >= 500
+}
+
+// backoffFor returns how long to wait before attempt n (1-based), preferring the
+// server's own Retry-After when it supplies a sane one.
+func backoffFor(attempt int, retryAfter string) time.Duration {
+	if retryAfter != "" {
+		if secs, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil &&
+			secs > 0 && time.Duration(secs)*time.Second <= maxBackoff {
+			return time.Duration(secs) * time.Second
+		}
+	}
+	d := baseBackoff << (attempt - 1)
+	if d > maxBackoff {
+		d = maxBackoff
+	}
+	// Jitter, so concurrent callers do not resynchronise onto the same retry.
+	return d + time.Duration(rand.Int63n(int64(time.Second)))
+}
+
 func (c *anthropicClient) messages(req messagesRequest) (*messagesReply, []byte, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, nil, err
 	}
-	httpReq, err := http.NewRequest(http.MethodPost, c.baseURL+"/v1/messages", bytes.NewReader(body))
-	if err != nil {
-		return nil, nil, err
-	}
-	httpReq.Header.Set("x-api-key", c.key)
-	httpReq.Header.Set("anthropic-version", anthropicVersion)
-	httpReq.Header.Set("content-type", "application/json")
 
-	resp, err := c.http.Do(httpReq)
-	if err != nil {
-		return nil, nil, err
+	var raw []byte
+	var status int
+	for attempt := 1; ; attempt++ {
+		httpReq, err := http.NewRequest(http.MethodPost, c.baseURL+"/v1/messages", bytes.NewReader(body))
+		if err != nil {
+			return nil, nil, err
+		}
+		httpReq.Header.Set("x-api-key", c.key)
+		httpReq.Header.Set("anthropic-version", anthropicVersion)
+		httpReq.Header.Set("content-type", "application/json")
+
+		resp, err := c.http.Do(httpReq)
+		if err != nil {
+			if attempt < maxAttempts {
+				time.Sleep(backoffFor(attempt, ""))
+				continue
+			}
+			return nil, nil, err
+		}
+		raw, err = io.ReadAll(resp.Body)
+		status = resp.StatusCode
+		ra := resp.Header.Get("Retry-After")
+		resp.Body.Close()
+		if err != nil {
+			return nil, nil, err
+		}
+		if retryableStatus(status) && attempt < maxAttempts {
+			d := backoffFor(attempt, ra)
+			fmt.Fprintf(os.Stderr, "  transport: HTTP %d, retrying in %s (attempt %d/%d)\n",
+				status, d.Round(time.Second), attempt, maxAttempts)
+			time.Sleep(d)
+			continue
+		}
+		break
 	}
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
+
+	if status != http.StatusOK {
 		msg := truncate(string(raw), 500)
 		if req.Temperature != nil && bytes.Contains(raw, []byte("temperature")) {
 			return nil, raw, fmt.Errorf("%w: %s", errTemperatureUnsupported, msg)
 		}
-		return nil, raw, fmt.Errorf("messages: HTTP %d: %s", resp.StatusCode, msg)
+		// Reached only after the retry budget is spent, or on a status that is
+		// not worth retrying.
+		return nil, raw, fmt.Errorf("messages: HTTP %d after %d attempt(s): %s",
+			status, maxAttempts, msg)
 	}
 
 	var out messagesReply
