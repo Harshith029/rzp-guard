@@ -307,8 +307,11 @@ cmd_redteam_negative() {
   # `git ls-files -o` listed it, `[ -f ]` followed it, `cp -p` copied the
   # CONTENTS in under an unrelated name, and the literal .env check never saw it.
   local tmpdir; tmpdir="$(mktemp -d)"
-  ln -s "$PWD/.gitignore" ".redteam-negative-link" 2>/dev/null
-  if [ -L ".redteam-negative-link" ]; then
+  # Inside an `if`, not bare: `set -e` is on, and a host where symlink creation
+  # returns non-zero would abort the whole suite before reaching the SKIP.
+  # This host happens to return success (it copies), which is why the bug was
+  # invisible here.
+  if ln -s "$PWD/.gitignore" ".redteam-negative-link" 2>/dev/null && [ -L ".redteam-negative-link" ]; then
     if ( redteam_export "$tmpdir" ) >/dev/null 2>&1; then
       bad "N1 untracked symlink was exported"
     else
@@ -353,21 +356,23 @@ cmd_redteam_negative() {
   fi
   rm -f "$sentinel"; rm -rf "$tmpdir"
 
-  # N4 -- Round 11. "No configurable child" was checked by grepping the binary
-  # for ONE legacy string, so renaming the variable would pass. Check the SOURCE
-  # actually compiled under -tags redteam for any shell or child-from-config
-  # construct, whatever it is called.
-  local files
-  files="$(gorun go list -tags redteam -f '{{range .GoFiles}}{{$.Dir}}/{{.}} {{end}}' ./cmd/rzp-guard 2>/dev/null | tr -d '\r')"
-  files="$(printf %s "$files" | sed 's#/src/#./#g')"
-  if [ -z "$files" ]; then
-    bad "N4 could not list the redteam build's source files"
-  elif grep -nE '"sh"|exec\.Command\("(sh|bash|cmd)"|Getenv\([^)]*CHILD|Getenv\([^)]*CMD' $files >/dev/null 2>&1; then
-    echo "  BYPASSED  N4 a shell or configurable child appears in the redteam build:" >&2
-    grep -nE '"sh"|exec\.Command\("(sh|bash|cmd)"|Getenv\([^)]*CHILD|Getenv\([^)]*CMD' $files >&2
-    fail=$((fail+1))
+  # N4 -- Rounds 11 and 13. "No configurable child" was first one legacy string,
+  # then a deny-list of spellings -- which is the evasion class it claimed to
+  # solve. Now a POSITIVE structural assertion over the AST of exactly the files
+  # `go list -tags redteam` compiles: one process launch, exec.CommandContext(
+  # ctx, redteamChildPath), two arguments, no configuration reads.
+  #
+  # It runs INSIDE the lane. The previous version called gorun, which mounts the
+  # real tree including .env with networking on -- so the evidence command was
+  # the bypass.
+  if cmd_redteam sh -c '
+        set -e
+        files=$(go list -tags redteam -f "{{range .GoFiles}}{{\$.Dir}}/{{.}} {{end}}" ./cmd/rzp-guard)
+        go run ./cmd/redteam-audit child $files
+      ' >/dev/null 2>&1; then
+    ok "N4 redteam child has exactly one launch and no configurable path"
   else
-    ok "N4 no shell or configurable child in the redteam build's sources"
+    bad "N4 redteam child structure violated (run it directly for the detail)"
   fi
 
   # N5 -- Round 11. cmd_fuzz called gorun, so the brief's own fuzz command went
@@ -382,20 +387,42 @@ cmd_redteam_negative() {
     bad "N5 cmd_fuzz does not go through cmd_redteam"
   fi
 
-  # N6 -- Round 11. The stub accepted any pay_SYN* value and returned its
-  # refusal as a SUCCESS carrying an error-shaped body.
-  # Written to a file inside the mount, not piped: `gorun` runs docker
-  # without -i, so a pipe gives the container no stdin and the stub reads
-  # EOF. The first version of this test reported a bypass for that reason.
-  mkdir -p .gotmp
-  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_refund","arguments":{"payment_id":"pay_SYNfabricated","amount":100,"receipt":"r"}}}' > .gotmp/negative_req.jsonl
-  local out
-  out="$(gorun sh -c 'go build -o /tmp/s ./cmd/mcp-stub && /tmp/s < .gotmp/negative_req.jsonl' 2>/dev/null)"
-  rm -f .gotmp/negative_req.jsonl
-  case "$out" in
-    *'"isError":true'*) ok "N6 stub refuses a non-fixture id with a real tool error" ;;
-    *) bad "N6 stub accepted a fabricated pay_SYN id, or did not use isError" ;;
-  esac
+  # N6 -- Rounds 11 and 13. The stub once accepted any pay_SYN* value and
+  # returned its refusal as a SUCCESS carrying an error-shaped body.
+  #
+  # TWO defects in the test itself, both from review:
+  #   - it ran `gorun`, which BUILDS AND EXECUTES cmd/mcp-stub with the real
+  #     tree mounted -- .env included -- and network on. A hostile edit to the
+  #     stub could read /src/.env and make an outbound request while the
+  #     "safe" evidence command ran. That is the whole reason this suite exists,
+  #     reintroduced inside it.
+  #   - the assertion was a substring match for '"isError":true', which the
+  #     stub could satisfy from inside ordinary tool content.
+  #
+  # Now: built and executed inside the isolated lane, and the reply is PARSED.
+  if cmd_redteam sh -c '
+        set -e
+        mkdir -p /tmp/nt
+        # A tracked fixture, not a JSON literal built through three
+        # levels of shell quoting. The first attempt mangled the escapes
+        # and the stub received unparseable input, which the suite then
+        # reported as the stub accepting a bad id.
+        go build -o /tmp/nt/stub ./cmd/mcp-stub
+        /tmp/nt/stub < ./cmd/redteam-audit/testdata/nonfixture_refund.jsonl > /tmp/nt/out.jsonl
+        go run ./cmd/redteam-audit stub /tmp/nt/out.jsonl
+      ' >/dev/null 2>&1; then
+    ok "N6 stub refuses a non-fixture id with a parsed result.isError"
+  else
+    bad "N6 stub accepted a fabricated pay_SYN id, or the reply was not a real tool error"
+  fi
+
+  # N7 -- Round 13. The evidence command must not itself leave the lane. Any
+  # gorun inside this function is the bypass returning.
+  if sed -n '/^cmd_redteam_negative()/,/^}/p' run.sh | grep -qE '^[[:space:]]*gorun '; then
+    bad "N7 the negative suite calls gorun; it runs untrusted code with .env mounted"
+  else
+    ok "N7 the negative suite never leaves the isolated lane"
+  fi
 
   echo
   echo "  blocked: $pass   bypassed: $fail"

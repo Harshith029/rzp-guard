@@ -907,3 +907,101 @@ became six attacks that must fail; the symlink hole — the one that could
 actually move a secret into the container — is closed and demonstrated on the
 platform where it was exploitable; and a comment claiming the lane did something
 it did not was removed rather than made vaguer.
+
+
+---
+
+## Round 13 — the evidence command was the bypass — reviewer: ChatGPT — 2026-08-31
+
+**Four raised, four accepted.** Fifth round on this boundary, and the pattern is
+no longer deniable: **I fix the named instance and reintroduce the same defect
+in the code I write to prove the fix.** Round 11 it was the fuzz wrapper. Round
+12 it was a comment claiming the lane built a stub it never built. Round 13 it
+is the negative suite itself.
+
+### P13.1 — "`redteam-negative` leaves the lane and runs untrusted code with `.env` mounted."
+**ACCEPT — P0.** N4 called `gorun`. N6 called `gorun` to **build and execute
+`cmd/mcp-stub`**. `gorun` mounts the real `$PWD` — `.env` included — with normal
+networking. So the command the brief names as the evidence was itself the
+credential-exposure path it exists to detect.
+
+The reviewer said not to rerun it until fixed. I did not.
+
+Demonstrated rather than argued. A hostile `hostileProbe()` added to
+`cmd/mcp-stub` temporarily, then run both ways:
+
+    via gorun (what N4/N6 did):
+      HOSTILE: READ /src/.env -> 222 bytes
+      HOSTILE: READ .env      -> 222 bytes
+      HOSTILE: OUTBOUND HTTPS SUCCEEDED
+
+    inside the lane:
+      HOSTILE: cannot read /src/.env
+      HOSTILE: cannot read .env
+      HOSTILE: outbound blocked
+
+Both `gorun` calls now go through `cmd_redteam`. **N7 was added to make the
+regression impossible to reintroduce quietly**: it greps this very function for
+`gorun` and fails if one appears. The stub was reverted; the tree is clean.
+
+### P13.2 — "N4 does not prove 'whatever it is called'."
+**ACCEPT — P1.** The check was a deny-list of spellings — `exec.Command("sh"`,
+`Getenv(...CHILD` — which is precisely the rename class it claimed to close.
+`exec.CommandContext(ctx, "sh", "-c", …)`, `os.LookupEnv`, a flag, or a
+constructed name all walked past it.
+
+Replaced with `cmd/redteam-audit`, which parses the AST of exactly the files
+`go list -tags redteam` compiles and asserts POSITIVE structure: exactly one
+process launch across the whole build, it is
+`exec.CommandContext(ctx, redteamChildPath)`, it takes two arguments and no
+more, and `child_redteam.go` performs no configuration reads of any kind.
+
+Mutation-tested with the evasion the old check would have missed —
+`os.LookupEnv` plus `exec.CommandContext(ctx, "sh", "-c", alt)`:
+
+    the redteam build contains 2 process launches, want exactly 1
+        child_redteam.go:90:10: exec.CommandContext(ctx, "sh", "-c", alt)
+        child_redteam.go:92:7:  exec.CommandContext(ctx, redteamChildPath)
+    child_redteam.go:89:16: reads configuration; the child must not be
+                            selectable at runtime by any name
+
+### P13.3 — "N6's 'real isError' is only a substring search."
+**ACCEPT — P1.** `case "$out" in *'"isError":true'*` passes if that text occurs
+anywhere, including inside tool content the stub composes itself.
+`redteam-audit stub` now parses the JSON-RPC reply, requires `result.isError` to
+be boolean true, requires exactly one reply, and checks it answers the id that
+was sent.
+
+### P13.4 — "N1 can abort rather than skip on some Windows hosts."
+**ACCEPT — P1.** `set -euo pipefail` is on and `ln -s` was a bare statement. This
+host returns success (it copies), so the bug was invisible here — on a host where
+symlink creation fails, the whole suite would exit before printing SKIP. Now
+inside an `if`.
+
+### One more of my own test bugs
+
+N6's request JSON was built through three levels of shell quoting inside
+`sh -c '…'`; the escapes collapsed, the stub received unparseable input, and the
+suite reported that as the stub accepting a fabricated id. Replaced with a
+tracked fixture file, `cmd/redteam-audit/testdata/nonfixture_refund.jsonl`,
+which needs no quoting at all. Third round running in which a test failed for a
+reason other than the one it named.
+
+### An unreproduced failure, recorded rather than dismissed
+
+One full verification run in this round reported FAIL. It did not reproduce in
+five subsequent runs and I could not attribute it with certainty. The most
+likely cause is real and has been fixed: the redteam child tests share a FIXED
+absolute path (the constant is fixed by design), their setup used os.Remove, and
+one test deliberately creates a DIRECTORY there -- which os.Remove cannot
+delete. Leftover state would then fail the next test. Now os.RemoveAll.
+
+Recorded because "it passed the next time" is not a diagnosis, and a flake in
+the package that enforces this boundary is worth more suspicion than one
+elsewhere.
+
+**Net effect of Round 13:** the evidence command stops being the bypass; "no
+configurable child" becomes a positive AST invariant that survives renaming
+rather than a list of spellings; the stub assertion parses instead of matching;
+and there is now a demonstration — hostile stub, both paths, side by side — of
+exactly what the boundary does and does not stop.

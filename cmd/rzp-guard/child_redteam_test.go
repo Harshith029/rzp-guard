@@ -25,8 +25,14 @@ func withChildDir(t *testing.T) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	_ = os.Remove(redteamChildPath)
-	t.Cleanup(func() { _ = os.Remove(redteamChildPath) })
+	// RemoveAll, not Remove: one test below deliberately creates a DIRECTORY at
+	// this path, and os.Remove fails on a non-empty one. These tests share a
+	// fixed absolute path because the constant is fixed by design, so leftover
+	// state from one leaks into the next. A single unreproduced failure in this
+	// package pointed here; this is the most likely cause, hardened rather than
+	// dismissed.
+	_ = os.RemoveAll(redteamChildPath)
+	t.Cleanup(func() { _ = os.RemoveAll(redteamChildPath) })
 	return dir
 }
 
