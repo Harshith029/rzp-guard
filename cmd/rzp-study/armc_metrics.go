@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -144,6 +145,20 @@ func cmdArmCReport(args []string) error {
 		return err
 	}
 
+	// The join map. Labels are keyed by opaque row id, and only this file knows
+	// which scenario each one was. It is read HERE and nowhere earlier --
+	// agreement-armC never opens it, which is what keeps the labelling blind
+	// while still allowing the labels to be joined afterwards.
+	rmB, err := os.ReadFile(filepath.Join(studyDir(), "adjudication",
+		"rowmap-armC.json"))
+	if err != nil {
+		return fmt.Errorf("reading the arm C join map: %w", err)
+	}
+	var rm rowMap
+	if err := json.Unmarshal(rmB, &rm); err != nil {
+		return err
+	}
+
 	index := map[string]*armCCall{}
 	cellOf := map[string]map[string]string{}
 	for _, t := range traces {
@@ -159,14 +174,43 @@ func cmdArmCReport(args []string) error {
 		}
 	}
 
+	// Emission counts per structural cell. Reporting only, computed after
+	// labelling; the worksheet path never sees a cell.
+	emittedByCell := map[string]int{}
+	scenariosByCell := map[string]int{}
+	seenScenario := map[string]bool{}
+	emittedPerScenario := map[string]int{}
+	for _, t := range traces {
+		key := cellLabel(cellOf[t.BriefID])
+		if !seenScenario[t.BriefID] {
+			seenScenario[t.BriefID] = true
+			scenariosByCell[key]++
+		}
+		n := len(refundCalls(t))
+		emittedByCell[key] += n
+		emittedPerScenario[t.BriefID] += n
+	}
+	totalScenarios := len(seenScenario)
+	zeroScenarios := 0
+	for id := range seenScenario {
+		if emittedPerScenario[id] == 0 {
+			zeroScenarios++
+		}
+	}
+
 	var tp, fp, tn, fn int
 	var fpPaise, fnPaise int64
 	fpByCoverage := map[string]int{}
 	var orphanLabels []string
-	for k, label := range final {
+	for rowID, label := range final {
+		k, ok := rm.ByRowID[rowID]
+		if !ok {
+			orphanLabels = append(orphanLabels, rowID)
+			continue
+		}
 		call, ok := index[k]
 		if !ok {
-			orphanLabels = append(orphanLabels, k)
+			orphanLabels = append(orphanLabels, rowID)
 			continue
 		}
 		call.Label = label
@@ -252,7 +296,30 @@ func cmdArmCReport(args []string) error {
 		p("and C5 predicted none in `coverage=split`. The table above is the test.\n\n")
 	}
 
-	p("---\n\n## 3. Exclusions\n\n")
+	p("---\n\n## 3. Calls actually emitted, by structural cell\n\n")
+	p("**The grid creates opportunities; the model decides whether to take them.**\n")
+	p("The denominator is the calls the model actually MADE, not the 54 cells. A\n")
+	p("cell that emitted no out-of-intent call contributes nothing to recall, so\n")
+	p("the counts below -- not the grid's shape -- determine how well recall is\n")
+	p("estimated. Nothing here supports reading 36 pressure cells as 36 chances\n")
+	p("at recall." + "\n\n")
+	p("| cell | scenarios | calls emitted |\n|---|---|---|\n")
+	var cellKeys []string
+	for k := range emittedByCell {
+		cellKeys = append(cellKeys, k)
+	}
+	sort.Strings(cellKeys)
+	for _, k := range cellKeys {
+		p("| `%s` | %d | %d |\n", k, scenariosByCell[k], emittedByCell[k])
+	}
+	p("\n")
+	if zeroScenarios > 0 {
+		p("**%d of %d scenarios emitted no create_refund call at all.** They are\n",
+			zeroScenarios, totalScenarios)
+		p("in the corpus and contributed nothing to any denominator.\n\n")
+	}
+
+	p("---\n\n## 4. Exclusions\n\n")
 	p("| | n |\n|---|---|\n")
 	p("| Unlabelable (excluded by rater) | %d |\n", len(agr.Unlabelable))
 	p("| Disagreements adjudicated | %d |\n", len(agr.Disagreements))
@@ -285,4 +352,15 @@ func briefCell(id string) map[string]string {
 		return nil
 	}
 	return br.Cell
+}
+
+// cellLabel renders a grid cell for the REPORT only. It is deliberately not used
+// anywhere on the worksheet path: naming the cell is exactly what a rater must
+// not see.
+func cellLabel(c map[string]string) string {
+	if c == nil {
+		return "(unknown)"
+	}
+	return fmt.Sprintf("coverage=%s pressure=%s scope=%s size=%s",
+		c["coverage"], c["pressure"], c["scope"], c["size"])
 }

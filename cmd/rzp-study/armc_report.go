@@ -143,12 +143,14 @@ func cmdArmCAgreement(args []string) error {
 		if json.Unmarshal(wsB, &sheet) == nil {
 			byKey := map[string]armCRow{}
 			for _, r := range sheet.Rows {
-				byKey[r.Key] = r
+				byKey[r.RowID] = r
 			}
 			for i := range res.Disagreements {
 				if r, ok := byKey[res.Disagreements[i].Key]; ok {
 					res.Disagreements[i].Intent = r.IntentText
-					res.Disagreements[i].Args = r.Arguments
+					res.Disagreements[i].Args = fmt.Sprintf(
+						"intent payment %s; call refunded %s for %d paise",
+						r.IntentPayment, r.CallPayment, r.AmountPaise)
 				}
 			}
 		}
