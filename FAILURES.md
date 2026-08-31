@@ -984,3 +984,89 @@ positive calls, all from one injection brief, in one arm; the other arm has none
 That is a descriptive account of what happened on 15 hand-written briefs
 adjudicated by their own author — not a held-out detector evaluation, and the
 README should keep saying so in those words.
+
+
+---
+
+## F26 — Removing it from the tip is not removing it from the repository
+
+External review, delivered as a judging verdict rather than a bug report, and it
+found the one thing that could have ended the submission on a rule rather than
+on merit.
+
+F18 already records the reasoning: `cmd_live_refund()` took an arbitrary payment
+id and amount, **wrote its own mandate authorizing exactly that refund**, and
+executed it. A tool that authorizes itself is a refund launcher whatever the
+intent. It was deleted from the tip, F18 was written, and I treated the matter
+as closed.
+
+It was not closed. The body was still reachable in four commits. Track 2's rule
+is *strictly defense-only: anything offense-capable is disqualified*, and a
+cloned repository is its history — `git log -p` hands the launcher back intact.
+The removal commit did not remove anything; it moved the code one commit into
+the past.
+
+The reviewer cited two commits. Checking rather than accepting the number, the
+launcher's body was reachable from **four** — `b9e4275`, `d41d202`, `bc62fca`,
+`bb7fc14`. The commit they named as a carrier, `3525c74`, is the *removal*; its
+tree is clean and its parent is not. The finding was correct and slightly
+understated, which is the better direction for a finding to be wrong in.
+
+**The shape of this failure is the one this project keeps repeating**, in a new
+place: a claim scoped to what I had done rather than to what was true. "The
+launcher is gone" was true of the working tree and false of the repository, and
+I never asked which one the rule was about.
+
+### What made it cheap
+
+The repository had never been pushed. No remote, nothing public, no clone or
+fork holding the old ids. A rewrite therefore invalidated no published
+reference — but only until first publication, after which it becomes a
+disclosure with a paper trail instead of a quiet correction. The window was open
+by luck, not by design.
+
+### What was actually done
+
+`git filter-repo` with a blob callback replacing the function body, in every
+reachable commit, with a stub that names the removal and exits 2. Replaced
+rather than deleted so history stays coherent: the dispatch and help text still
+resolve, and a reader who finds it learns why it is gone instead of finding a
+gap.
+
+Verified, not assumed:
+
+- launcher body reachable from **0** commits, down from 4
+- `HEAD` tree byte-identical: `19de39a9…` before and after
+- 82 commits before, 82 after; messages, authors and dates intact
+- freeze still verifies: `freeze intact: 34 files, freeze_sha256 92900c58…`
+
+The suite was run three times across the rewrite. Two were clean (`exit 0`, 22
+packages ok, no race, no panic). **One exited 1 and I cannot say why**: it was the
+second back-to-back `run.sh all` in a single command and I had redirected its
+output to `/dev/null`, so the evidence is gone. Discarding the output of a run
+whose exit code I had not yet checked was the mistake; the failure is unexplained,
+not absent. The likeliest cause is lock contention from the immediately preceding
+run — `internal/bootstrap` opens SQLite with `locking_mode=EXCLUSIVE` and Windows
+holds handles briefly after exit — but that is a hypothesis, not a diagnosis, and
+it is recorded here rather than rounded down to "all green".
+
+### The part that had to be got right rather than done fast
+
+Rewriting history changes commit ids, and both arms' reports quote a model
+freeze commit as provenance. The tempting fix — edit the ids so everything
+resolves — would have meant **editing 90 frozen trace files to make a
+provenance value look tidy**, which is precisely the retroactive adjustment the
+whole pre-registration design exists to prevent. The traces record what was true
+when they ran; they are evidence, not presentation.
+
+So the stale ids stay, the generated reports now label them *pre-rewrite id*,
+and `study/HISTORY-REWRITE.md` carries the mapping. The freeze was never
+anchored on a commit id anyway — `main.go` compares content hashes and
+`enforce.go` requires only that the file be tracked, unmodified and present in
+`HEAD` — which is why it verifies unchanged across the rewrite. That property
+was designed in for a different reason and paid off here.
+
+I also told the user only arm B's id would move, having checked descent from
+`bb7fc14` alone. Both moved: arm A's freeze descends from one of the three
+earlier carriers. A check narrower than the claim it supported — the same defect
+as the finding itself, committed while fixing the finding.

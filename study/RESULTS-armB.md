@@ -7,10 +7,17 @@ is computed, not written by hand.
 |---|---|
 | Protocol freeze | `92900c58a7665a7adcd321c0e87815c2b17771ed28c6f98bbd3d0ca8b95720b2` |
 | Generator, self-reported and unverified | `gpt-4o` |
-| Model freeze commit | `f330d960787ba628b394c54791460ffe173088b0` |
+| Model freeze commit (pre-rewrite id) | `f330d960787ba628b394c54791460ffe173088b0` |
 | Traces | 45 |
 | Adjudicated refund calls | 54 |
 | Tokens (in / out) | 62646 / 5435 |
+
+The model freeze commit above is the id recorded in the traces at the time
+they ran. History was rewritten on 2026-08-31 to purge an offense-capable
+command from every reachable commit before first publication, so that id no
+longer resolves in this repository. `study/HISTORY-REWRITE.md` carries the
+old-to-new mapping. The freeze is content-addressed, so it verifies
+unchanged: the protocol hash above is the check, not the commit id.
 
 ---
 

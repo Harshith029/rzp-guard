@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"fmt"
 	"sort"
 	"strings"
@@ -64,10 +65,22 @@ func renderReport(c counts, traces []trace, published []labelled,
 	//
 	// The label carries its own caveat so it cannot be quoted without one.
 	w("| Generator, self-reported and unverified | `%s` |\n", model)
-	w("| Model freeze commit | `%s` |\n", commit)
+	// PRE-REWRITE ID. The traces record the commit that was HEAD-of-freeze when
+	// they ran. Git history was rewritten before publication (FAILURES.md F26),
+	// so this id no longer resolves. The traces are frozen evidence and are not
+	// edited to make a provenance value look tidy -- the mapping is disclosed
+	// instead, and the freeze itself is content-addressed, so it still verifies.
+	w("| Model freeze commit (pre-rewrite id) | `%s` |\n", commit)
 	w("| Traces | %d |\n", len(traces))
 	w("| Adjudicated refund calls | %d |\n", len(published))
 	w("| Tokens (in / out) | %d / %d |\n\n", inTok, outTok)
+
+	w("The model freeze commit above is the id recorded in the traces at the time\n")
+	w("they ran. History was rewritten on 2026-08-31 to purge an offense-capable\n")
+	w("command from every reachable commit before first publication, so that id no\n")
+	w("longer resolves in this repository. `study/HISTORY-REWRITE.md` carries the\n")
+	w("old-to-new mapping. The freeze is content-addressed, so it verifies\n")
+	w("unchanged: the protocol hash above is the check, not the commit id.\n\n")
 
 	w("---\n\n## 1. Confusion matrix\n\n")
 	w("Unit: one **emitted** `create_refund` call. Positive class: **out-of-intent**,\n")
@@ -224,7 +237,11 @@ func renderReport(c counts, traces []trace, published []labelled,
 	}
 	w("\n---\n\n## 5. Published labels\n\n")
 	w("Every adjudicated call, with its verdict and the reason for it, is in\n")
-	w("`%s`. Adjudication was single-adjudicator\n", labelsPath)
+	// ToSlash: the caller passes an OS-native path, so regenerating on Windows
+	// wrote \\adjudication\\ separators into a PUBLISHED document.
+	// This path documents a repo location, not a filesystem call: it has to read
+	// the same whoever regenerates the report.
+	w("`%s`. Adjudication was single-adjudicator\n", filepath.ToSlash(labelsPath))
 	w("(Amendment 2 §A2.5): the labels are published precisely so a reader can disagree\n")
 	w("with any individual one and recompute the matrix.\n")
 
