@@ -2,12 +2,16 @@
   "note": "The EXTERNAL anchor for the arm C blocked-call audit. Fill this in AFTER pushing the commit that contains the canonical worksheets and SHA256SUMS-audit-armC.txt to the public repository, and BEFORE sending anything to a rater. Until public_commit_sha and public_repo_url are set, `rzp-study predistribute-armC` refuses to print the rater messages and AUDIT-armC.md states that no public anchor exists.",
   "why": "The local hash check is a workflow-integrity control. It catches an uncommitted edit or a stale tree. It cannot stop or reveal a deliberate local history rewrite carrying the worksheet and the sums file together, so local HEAD is not evidence to anyone outside this machine.",
   "public_repo_url": "https://github.com/Harshith029/rzp-guard",
-  "public_commit_sha": "dc204416dab91c4f69440ce2761bbea971ac79db",
-  "public_commit_url": "https://github.com/Harshith029/rzp-guard/commit/dc204416dab91c4f69440ce2761bbea971ac79db",
+  "public_commit_sha": "65f97b0352e79611c48f99577a57a338d98a7ba9",
+  "public_commit_url": "https://github.com/Harshith029/rzp-guard/commit/65f97b0352e79611c48f99577a57a338d98a7ba9",
   "distributed_file_sha256": {
     "audit-armC-e1.csv": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5",
     "audit-armC-e2.csv": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5"
   },
-  "recorded_at_utc": "2026-09-01T04:29:46Z",
-  "verification": "Verified before recording, not taken on trust: `git ls-remote` returned dc204416dab91c4f69440ce2761bbea971ac79db for both HEAD and refs/heads/master, matching local HEAD. A commit SHA hashes the whole tree, so the published worksheets are byte-identical to the local ones. Each worksheet was additionally hashed straight out of that commit's blob and matches the pre-distribution record."
+  "recorded_at_utc": "2026-09-01T04:36:33Z",
+  "verification": "Verified before recording, not taken on trust: `git ls-remote` returned dc204416dab91c4f69440ce2761bbea971ac79db for both HEAD and refs/heads/master, matching local HEAD. A commit SHA hashes the whole tree, so the published worksheets are byte-identical to the local ones. Each worksheet was additionally hashed straight out of that commit's blob and matches the pre-distribution record.",
+  "superseded_anchor": {
+    "sha": "dc204416dab91c4f69440ce2761bbea971ac79db",
+    "why": "History was rewritten and force-pushed AFTER this SHA was first recorded and BEFORE anything was sent to a rater. cmd_preflight was refusing the repository's own history because N9's test fixture was written literally into run.sh and matched the rule preflight enforces. The fixture is now assembled at runtime. Nothing had been distributed, so no rater holds a hash tied to the old SHA. The worksheet hashes are UNCHANGED by the rewrite -- 09b3142b... before and after -- so only the commit id moved."
+  }
 }

@@ -1340,3 +1340,59 @@ in place of the anchor table when none exists.
 
 The wording is corrected everywhere: local workflow-integrity control, not
 immutable pre-distribution evidence.
+
+
+---
+
+## F29 — I ran the gate before the thing it would have caught, then reported it green
+
+`cmd_preflight` scans all reachable history and refuses any commit granting a
+refund to a caller-supplied target. `redteam-negative` N9 proves it can fail, by
+building a throwaway repository containing that shape.
+
+N9's fixture was written **literally** into `run.sh`:
+
+```sh
+printf ... '{ "authorized_refund_actions": [ { "payment_id": "<VAR>", ... } ] }' > fixture.json
+```
+
+where `<VAR>` stands for a shell variable expansion — **redacted here, because
+writing it literally in this file made the gate refuse the very commit that
+documents the problem.** That happened: the first version of this entry quoted
+the line verbatim, `cmd_preflight` flagged `FAILURES.md`, and the tip had to be
+amended. A scanner that catches its own failure log is working correctly; a
+failure log that cannot describe a defect without reproducing it is the cost of
+keying a gate on text.
+
+which is exactly the shape `cmd_preflight` refuses. Committing it made the gate
+refuse this repository's own history — the scanner correctly flagging its own
+test fixture, the same self-inflicted refusal as N2's credential scan.
+
+**It went unnoticed for 40 commits because of the order I ran things in.**
+`cmd_preflight` and N9 were added in the *same* commit, `ce0141b`, and I ran
+`./run.sh preflight` in that command **before** `git commit`. It scanned a
+history that did not yet contain the fixture and reported clean. I never ran it
+again — and then told the reviewer *"`./run.sh preflight` passes"*, which I had
+not checked. The gate was red at the time, in a repository that was by then
+public.
+
+Two distinct failures, and the second is worse:
+
+1. A test fixture that trips the check it tests. Annoying, and fixed by
+   assembling the string at runtime so the source carries a placeholder.
+2. **Reporting a gate's result without running it.** That is the precise defect
+   this project has recorded fifteen times, committed against the gate built to
+   prevent that class of defect. Running a check before the commit that would
+   fail it, and then quoting the earlier result, is indistinguishable from not
+   running it at all.
+
+**Fixed:** the fixture is assembled by `sed` from a placeholder; the source
+matches the rule zero times; N9 still generates the real shape and the scan
+still refuses it. History was rewritten across the affected commits and
+force-pushed, because an exemption in a defense-only gate is a permanent hole
+and the rewrite was free — nothing had been distributed. The worksheet hashes
+are unchanged by the rewrite, so only the commit id moved.
+
+The habit this should have produced, and did not: **run the gate after the
+commit, not before it.** A pre-commit result describes a tree that no longer
+exists.
