@@ -1,35 +1,49 @@
-# Negative suite — clean-clone result
+# Negative suite — both platforms, from a fresh clone of the public tip
 
-`clean-clone-d0dcdd0.log` is the authoritative run: a fresh clone of the public
-`origin/master` tip, not the development working tree.
+Commit `5063e875766ee26fd068d89dc4c259f3faf7c3de` on both.
 
-| | |
-|---|---|
-| Clone HEAD | `d0dcdd057db9ed0953a14c414c1298752701993d` |
-| Source | `git clone https://github.com/Harshith029/rzp-guard` |
-| Result | 8 blocked, 0 bypassed, 1 skipped, **total 9** |
-| Cases reporting | N1 N2 N3 N4 N5 N6 N7 N8 N9 — each exactly once |
-| Exit | 0 |
+## Linux — the one that matters
 
-**N1 is skipped, so this is not a clean local result.** N1 needs a host that can
-create symlinks; it runs in Linux CI. Cite CI for that case, never this log
-alone. The suite says so itself rather than leaving it to a reader.
+`../ci/redteam-negative-linux-33492881275.log`
+<https://github.com/Harshith029/rzp-guard/actions/runs/33492881275>
 
-## Why this log exists rather than a quoted summary
+```
+blocked: 10   bypassed: 0   skipped: 0   total: 10
+cases reporting: N1 N2 N3 N4 N5 N6 N7 N8 N9 N10
+```
 
-Every negative-suite summary quoted between N9's introduction and its repair was
-invalid. N9's command substitution tripped `set -e` — a non-zero exit is exactly
-what N9 verifies — so the suite aborted after N8 and exited 0 with **no summary
-at all**. Silence read as success, and an older run's numbers were repeated as
-though current. `FAILURES.md` F29 and the commit adding this directory record it.
+**Zero skipped.** `N1` needs a host that can create symlinks, so Linux is the
+only platform where it runs at all — which is why the Linux result is the
+authoritative one and is preserved rather than cited.
 
-Two things now make that failure impossible to repeat quietly:
+## Windows, native, fresh clone
 
-- the terminal summary is machine-checkable — every case N1–N9 must produce
-  exactly one terminal state, and `blocked + bypassed + skipped` must equal 9;
-- an EXIT trap outside the function fails the process if the suite leaves
-  without emitting a summary, whatever exit code it would have had.
+`native-windows-5063e87.log`
 
-A working-tree run taken just before this one showed the same case results but
-ended `EXIT=127`, because `run.sh` was edited while bash was executing it. That
-run is not published here: it measured an editor, not the product.
+```
+=== preflight ===          EXIT_PREFLIGHT=0
+=== redteam-negative ===   EXIT_NEGATIVE=0
+=== all (Go test lanes) === EXIT_ALL=0   22 packages ok, no FAIL, no race
+
+SKIP      N1 (this host cannot create symlinks; CI runs it on Linux)
+BLOCKED   N2 ... N10
+blocked: 9   bypassed: 0   skipped: 1   total: 10
+cases reporting: N1 N2 N3 N4 N5 N6 N7 N8 N9 N10
+NOT a clean result: 1 case(s) did not run here.
+```
+
+A run with any skip prints that it is not a clean result. Both platforms
+together are what makes the claim; neither alone does.
+
+## Why the earlier local log was withdrawn
+
+`clean-clone-d0dcdd0.log` was removed. It recorded 9 cases with N1 skipped and
+exited 0, and I published it as the verification. It was Windows-only, and on
+Linux the same commit reported `N4` and `N6` BYPASSED and died at exit 125 —
+docker refusing a `--pull=never` run with no local image. Publishing a
+single-platform pass as the result was the error; the file is gone rather than
+kept alongside a correction, because the numbers in it were never the whole
+picture.
+
+`N10` did not exist then. It was added after `N9` was found to invoke `run.sh`
+through `sh`, which is dash on Linux, so `N9` had never tested anything there.
