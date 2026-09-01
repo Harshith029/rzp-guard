@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -26,28 +28,30 @@ var forbiddenInRaterMessage = []string{
 	"in-intent", "out-of-intent",
 }
 
-// body is the message minus its first two lines, which are the attachment's
-// own name and hash. The file is called audit-armC-e1.csv and the rater will
-// see that name on the attachment no matter what this message says, so those
-// two lines are identity rather than context and are excluded from the scan.
-func body(t *testing.T, msg string) string {
+// body is the message with the two file names and their hashes removed. A rater
+// sees those names on the attachments whatever the message says, so they are
+// identity rather than context. Everything that remains has to be clean.
+//
+// Removal is by value rather than by line number, so the scan does not quietly
+// stop covering the message the next time its layout changes.
+func body(t *testing.T, msg, fileName, sha, instrName, instrSHA string) string {
 	t.Helper()
-	lines := strings.Split(msg, "\n")
-	if len(lines) < 3 {
-		t.Fatalf("rater message is only %d lines", len(lines))
+	for _, id := range []string{fileName, sha, instrName, instrSHA} {
+		if !strings.Contains(msg, id) {
+			t.Fatalf("the message no longer identifies %q, so it cannot be sent", id)
+		}
 	}
-	if !strings.HasPrefix(lines[0], "Attached:") || !strings.HasPrefix(lines[1], "SHA-256:") {
-		t.Fatalf("first two lines are no longer the attachment identity:\n%q\n%q",
-			lines[0], lines[1])
-	}
-	return strings.Join(lines[2:], "\n")
+	return strings.NewReplacer(
+		fileName, "", sha, "", instrName, "", instrSHA, "").Replace(msg)
 }
 
 func TestTheRaterMessageCarriesNoLinkAndNoStudyContext(t *testing.T) {
-	msg := raterMessage("audit-armC-e1.csv",
-		"09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5")
+	const file = "audit-armC-e1.csv"
+	const sum = "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5"
+	const instr, isum = "RATER-INSTRUCTIONS-armC.md", "aaaabbbbccccdddd"
+	msg := raterMessage(file, sum, instr, isum)
 
-	got := strings.ToLower(body(t, msg))
+	got := strings.ToLower(body(t, msg, file, sum, instr, isum))
 	for _, bad := range forbiddenInRaterMessage {
 		if strings.Contains(got, bad) {
 			t.Errorf("the rater message contains %q. A rater who can follow or "+
@@ -67,7 +71,8 @@ func TestTheRaterMessageLeaksNothingFromTheDistributionRecord(t *testing.T) {
 		CommitURL: "https://github.com/Harshith029/rzp-guard/commit/" +
 			"65f97b0352e79611c48f99577a57a338d98a7ba9",
 	}
-	msg := raterMessage("audit-armC-e1.csv", "09b3142b5e20c7cf9614")
+	msg := raterMessage("audit-armC-e1.csv", "09b3142b5e20c7cf9614",
+		"RATER-INSTRUCTIONS-armC.md", "aaaabbbbccccdddd")
 	for _, secret := range []string{rec.RepoURL, rec.CommitSHA, rec.CommitURL} {
 		if strings.Contains(msg, secret) {
 			t.Errorf("the rater message contains %q from the distribution record", secret)
@@ -80,16 +85,75 @@ func TestTheRaterMessageLeaksNothingFromTheDistributionRecord(t *testing.T) {
 // enough to label and return the file.
 func TestTheRaterMessageStillCarriesTheFileItsHashAndTheInstructions(t *testing.T) {
 	const file, sum = "audit-armC-e1.csv", "09b3142b5e20c7cf9614"
-	msg := raterMessage(file, sum)
-	for _, want := range []string{file, sum, "label", "reason", "return"} {
+	const instr, isum = "RATER-INSTRUCTIONS-armC.md", "aaaabbbbccccdddd"
+	msg := raterMessage(file, sum, instr, isum)
+	for _, want := range []string{file, sum, instr, isum, "label", "reason", "return"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("the rater message no longer contains %q", want)
 		}
 	}
-	if !strings.Contains(msg, "Do not look") {
-		t.Error("the rater message no longer tells the rater not to look the rows up, " +
-			"which is the only thing keeping them blind now that the anchor is gone " +
-			"from this message")
+	// The instrument the rater must NOT be given.
+	if strings.Contains(msg, "LABELLING-armC.md") {
+		t.Error("the rater message names LABELLING-armC.md, which is the internal " +
+			"rubric: it names the component under test, tells the rater which of its " +
+			"behaviours to disregard, and carries the design and analysis sections")
+	}
+	if !strings.Contains(msg,
+		"Do not browse or search this project until after returning labels") {
+		t.Error("the rater message no longer carries the do-not-browse instruction, " +
+			"which is the only thing keeping the rater blind now that the anchor is " +
+			"gone from this message")
+	}
+}
+
+// The scan is only worth anything if it refuses something. Fed the internal
+// rubric -- the document that WAS pre-registered for delivery -- it must refuse,
+// and fed the rater-only instrument it must pass. If both passed, the scan would
+// be decoration.
+func TestTheContextScanSeparatesTheTwoInstruments(t *testing.T) {
+	rater, err := os.ReadFile(filepath.Join("..", "..", "study", "RATER-INSTRUCTIONS-armC.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hits := scanForbiddenContext(string(rater)); len(hits) > 0 {
+		t.Errorf("the delivered rater instrument contains forbidden context: %v", hits)
+	}
+
+	internal, err := os.ReadFile(filepath.Join("..", "..", "study", "LABELLING-armC.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits := scanForbiddenContext(string(internal))
+	if len(hits) == 0 {
+		t.Fatal("the internal rubric passes the context scan, so the scan cannot be " +
+			"distinguishing the two instruments and proves nothing about either")
+	}
+	t.Logf("internal rubric refused on %d word(s): %v", len(hits), hits)
+}
+
+// Everything sent to a rater goes through the same scan, not just the document.
+func TestTheRaterMessageItselfPassesTheContextScan(t *testing.T) {
+	msg := raterMessage("audit-armC-e1.csv", "09b3142b5e20c7cf9614",
+		"RATER-INSTRUCTIONS-armC.md", "aaaabbbbccccdddd")
+	if hits := scanForbiddenContext(msg); len(hits) > 0 {
+		t.Errorf("the rater message contains forbidden context: %v", hits)
+	}
+}
+
+// And the reviewer record must NOT pass it -- it carries the anchor by design.
+// This is what stops the two outputs being quietly merged back together.
+func TestTheReviewerRecordIsNotRaterSafe(t *testing.T) {
+	rec := &distributionRecord{
+		RepoURL:   "https://github.com/Harshith029/rzp-guard",
+		CommitSHA: "65f97b0352e79611c48f99577a57a338d98a7ba9",
+		CommitURL: "https://github.com/Harshith029/rzp-guard/commit/x",
+	}
+	out := []deliverable{{rater: "e1", pin: canonicalPin{
+		File: "audit-armC-e1.csv", SHA256: "09b3142b5e20c7cf9614"}}}
+	if hits := scanForbiddenContext(reviewerRecord(rec, out)); len(hits) == 0 {
+		t.Fatal("the reviewer record passes the rater context scan. It carries the " +
+			"repository URL and commit on purpose, so if it passes, the scan is not " +
+			"catching the exact class of leak it exists for")
 	}
 }
 

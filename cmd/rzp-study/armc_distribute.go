@@ -113,30 +113,35 @@ func externalAnchorState() (remotes, upstream string) {
 //
 // armc_distribute_test.go asserts these absences on the real output rather than
 // trusting this comment.
-func raterMessage(fileName, sha256 string) string {
+func raterMessage(fileName, sha256, instrName, instrSHA string) string {
 	var b strings.Builder
 	p := func(f string, v ...any) { fmt.Fprintf(&b, f+"\n", v...) }
-	p("Attached: %s", fileName)
-	p("SHA-256:  %s", sha256)
+	p("Attached, two files:")
 	p("")
-	p("Please label every row and return the file with ONLY the `label` and")
-	p("`reason` columns edited. Do not add, remove, reorder or rename columns,")
-	p("and do not change any other cell -- the returned file is checked field by")
-	p("field against the copy that was sent and will be rejected if anything")
-	p("else differs.")
+	p("  %s", fileName)
+	p("  sha256 %s", sha256)
 	p("")
-	p("Please judge each row only on what the row itself contains. Do not look")
-	p("anything up about these rows, where they came from, or what produced")
-	p("them, and do not ask anyone about them, until after you have returned the")
-	p("file. If you already know where they came from, please say so instead of")
-	p("labelling.")
+	p("  %s", instrName)
+	p("  sha256 %s", instrSHA)
 	p("")
-	p("Please do not discuss the rows or your labels with anyone until you have")
-	p("returned the file.")
+	p("Please read %s first. It explains what each", instrName)
+	p("column means, the three labels you may use, and the rules, with worked")
+	p("examples.")
 	p("")
-	p("Please keep this message. The SHA-256 above is how the file you received")
-	p("is identified afterwards, and your copy of it is the one record of that")
-	p("which is not held by the person who sent it.")
+	p("Then label every row and return the CSV with ONLY the `label` and `reason`")
+	p("columns edited. Do not add, remove, reorder or rename columns, and do not")
+	p("change any other cell -- the returned file is checked field by field")
+	p("against the copy that was sent and will be rejected if anything else")
+	p("differs.")
+	p("")
+	p("Do not browse or search this project until after returning labels. Do not")
+	p("ask anyone about the rows, and do not discuss your labels with anyone")
+	p("until you have returned the file. If you already know where these rows")
+	p("came from, please say so instead of labelling.")
+	p("")
+	p("Please keep this message. The two hashes above are how the files you")
+	p("received are identified afterwards, and your copy of them is the one")
+	p("record of that which is not held by the person who sent it.")
 	return b.String()
 }
 
@@ -187,6 +192,18 @@ func cmdArmCPreDistribute(args []string) error {
 		out = append(out, deliverable{rater: r, file: canonical, pin: pin})
 	}
 
+	// The rater-only instrument, and the scan that decides whether it may be
+	// sent. LABELLING-armC.md is the internal rubric and is never delivered:
+	// see study/PROTOCOL-armC-AUDIT-AMENDMENT-3.md.
+	instrPath, instrBody, err := loadRaterInstructions()
+	if err != nil {
+		return err
+	}
+	instrSHA, err := sha256File(instrPath)
+	if err != nil {
+		return err
+	}
+
 	head, _ := git("rev-parse", "HEAD")
 	head = strings.TrimSpace(head)
 	remotes, upstream := externalAnchorState()
@@ -207,6 +224,15 @@ func cmdArmCPreDistribute(args []string) error {
 	fmt.Println("  This proves the worksheets have not changed since emission IN THIS")
 	fmt.Println("  WORKING TREE. It is not external evidence: local history can be")
 	fmt.Println("  rewritten carrying the CSV and the sums file together.")
+	fmt.Println()
+
+	fmt.Println("RATER-ONLY INSTRUMENT (context scan passed):")
+	fmt.Printf("  %-22s sha256 %s\n", filepath.Base(instrPath), instrSHA)
+	fmt.Printf("  %d bytes, scanned against %d forbidden context words, 0 hits\n",
+		len(instrBody), len(forbiddenContextWords))
+	fmt.Println("  LABELLING-armC.md is the INTERNAL rubric and is NOT delivered.")
+	fmt.Println("  A clean scan means no word this scan knows how to name appears.")
+	fmt.Println("  It is not proof that no context leaks; read the document too.")
 	fmt.Println()
 
 	fmt.Println("EXTERNAL anchor:")
@@ -253,10 +279,16 @@ func cmdArmCPreDistribute(args []string) error {
 	}
 
 	for _, d := range out {
-		fmt.Printf("=== BEGIN RATER MESSAGE (%s) -- send exactly this, and nothing else ===\n\n",
-			d.rater)
-		fmt.Print(raterMessage(d.pin.File, d.pin.SHA256))
-		fmt.Printf("\n=== END RATER MESSAGE (%s) ===\n\n", d.rater)
+		fmt.Printf("=== BEGIN RATER PACKET (%s) ===\n\n", d.rater)
+		fmt.Println("  Send exactly these two files and the message below. Nothing else:")
+		fmt.Printf("    %s\n", filepath.ToSlash(d.file))
+		fmt.Printf("    %s\n", filepath.ToSlash(instrPath))
+		fmt.Println()
+		fmt.Println("  --- message ---")
+		fmt.Println()
+		fmt.Print(raterMessage(d.pin.File, d.pin.SHA256,
+			filepath.Base(instrPath), instrSHA))
+		fmt.Printf("\n=== END RATER PACKET (%s) ===\n\n", d.rater)
 	}
 
 	fmt.Println("=== BEGIN REVIEWER / RELEASE RECORD -- NOT for raters ===")

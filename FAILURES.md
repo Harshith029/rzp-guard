@@ -1749,3 +1749,65 @@ The command now also states plainly that it makes **no network calls**: it does
 not fetch the recorded commit, does not confirm it exists on the public host,
 and does not confirm the published files hash to the recorded values. Everything
 in that section is read from local configuration and a local JSON file.
+
+---
+
+## F34 — The pre-registered rater delivery carried the study it was blinding
+
+**Severity: P0.** Found while preparing to distribute, before any worksheet was
+sent. Nothing had been delivered, so this is a defect caught rather than a
+result contaminated.
+
+F33 removed the public commit URL from the rater message. It did not look at the
+*other* half of the packet. `PROTOCOL-armC-AUDIT.md` §Files pre-registers the
+delivery as the worksheet CSV **plus `LABELLING-armC.md`**, and that rubric is
+the project's internal instrument.
+
+**It names the component under test.** §"What you must NOT consider" tells the
+rater to disregard "what the guard did", "whether you think the guard blocked
+it", "what any mandate contained", and "whether the amount was reachable by
+combining several authorizations" — calling these "a property of the system
+under test".
+
+Written in good faith, and self-defeating. Every row in this worksheet is a
+blocked call; the audit asks what fraction of them were in-intent. A rater told
+not to consider whether the guard blocked a row can infer that it did, which is
+precisely the fact the protocol says raters are not told. **The instruction
+protecting the blinding revealed it.**
+
+**It describes the design.** §"Who labels" names `study/grid.py`, the kappa
+plan, the supplementary author-rater, Amendment 1 and the one-rater fallback.
+
+**It instructs a different file.** §"Filling the file" tells the rater to open
+`worksheet-armC-e1.json` and edit JSON keys. That file exists — it is the
+340-row worksheet the same protocol records as *never delivered*. A rater would
+have gone looking for a file they were not sent while holding a CSV the rubric
+never describes.
+
+### Fix
+
+`LABELLING-armC.md` is **not edited and not deleted**; it stays as the internal
+record of the instrument. `study/RATER-INSTRUCTIONS-armC.md` is a new
+rater-only document: the task, the columns, the three labels, R1–R6 carried
+across unchanged in substance, neutral worked examples, CSV editing
+instructions, and the instruction not to browse or search the project until
+labels are returned. The substitution is recorded in
+`PROTOCOL-armC-AUDIT-AMENDMENT-3.md`, dated and made before any label exists.
+
+The enforcement is a scan, not an intention. `predistribute-armC` refuses to
+print the packet at all if the delivered instrument or the rater message
+contains any forbidden context word, matched case-insensitively on substrings so
+`author` also catches `authorization`, `authorized` and `authority`.
+
+Tests assert **both** directions: the delivered instrument passes, and
+`LABELLING-armC.md` fails on 17 distinct words. A scan that passed both would be
+decoration. The reviewer record is asserted to fail it too — it carries the
+anchor URL by design — which is what stops the two outputs being merged back
+together later.
+
+### The lesson, which is the same one twice
+
+F33 fixed the rater *message* and shipped the rater *packet* unchanged. The
+review found the message defect; I did not then ask what else was in the
+envelope. Fixing the instance in front of me and not the class is how the same
+defect arrives twice from two directions.
