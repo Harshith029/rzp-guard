@@ -399,6 +399,41 @@ cmd_preflight() {
 # read as success, and a stale summary from an earlier run was quoted as
 # current. This makes that impossible: if the suite leaves without emitting its
 # terminal summary, the process fails whatever its exit code would have been.
+# require_redteam_lane refuses to run the suite when the isolated lane cannot
+# execute at all.
+#
+# N4, N6 and N8 drive cmd_redteam, which runs `docker run --pull=never`. On a
+# machine where the pinned image is not local -- every fresh CI runner -- docker
+# exits 125 and those tests reported BYPASSED. That is a false security alarm:
+# "the bypass worked" and "the lane could not start" are completely different
+# facts, and the suite was printing the first when the second was true. Linux CI
+# showed N4 and N6 bypassed for months of pushes for exactly this reason.
+#
+# An environment failure is not a finding. If the lane cannot run, the suite
+# says so and stops, rather than emitting security verdicts it did not test.
+require_redteam_lane() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "CANNOT RUN: docker is not available, so the isolated lane cannot start." >&2
+    echo "  This is an ENVIRONMENT failure, not a security finding. No bypass" >&2
+    echo "  verdict below would have been tested." >&2
+    RN_SUMMARY_EMITTED=1
+    exit 2
+  fi
+  if ! docker image inspect "$GOIMAGE" >/dev/null 2>&1; then
+    echo "CANNOT RUN: the pinned image is not present locally and the isolated" >&2
+    echo "  lane uses --pull=never by design, so docker exits 125." >&2
+    echo "  image: $GOIMAGE" >&2
+    echo "" >&2
+    echo "  This is an ENVIRONMENT failure, not a security finding. Pull the" >&2
+    echo "  image by digest first, in a separate visible step:" >&2
+    echo "    docker pull $GOIMAGE" >&2
+    echo "  The execution stage keeps --pull=never; bootstrapping the image is a" >&2
+    echo "  distinct, auditable action and does not weaken it." >&2
+    RN_SUMMARY_EMITTED=1
+    exit 2
+  fi
+}
+
 rn_exit_guard() {
   if [ "${RN_SUMMARY_EMITTED:-0}" != 1 ]; then
     echo "" >&2
@@ -428,6 +463,7 @@ cmd_redteam_negative() {
   skipped() { echo "  SKIP      $1"; RN_SKIP=$((RN_SKIP+1)); rn_mark "$1"; }
   local pass=0 fail=0 skip=0
 
+  require_redteam_lane
   echo "=== negative tests: each of these once worked ==="
 
   # N1 -- Round 12. An untracked, non-ignored SYMLINK to the gitignored .env.

@@ -28,6 +28,18 @@ __pycache__/
 venv/
 /gate-verify
 /gate-verify.exe
+/rzp-study
+/rzp-study.exe
+
+# Catch-all for root build artifacts.
+#
+# The list above was per-binary, so `go build ./...` produced rzp-study.exe,
+# `git add -A` committed 10MB of it, and CI's CR check failed on a compiled
+# binary being treated as text by the eol=lf default. Enumerating binaries is
+# the same whack-a-mole .gitattributes already lost once.
+/*.exe
+/*.test
+/*.out
 /rzp-guard-testhook
 /rzp-guard-testhook.exe
 /rzp-guard-operator

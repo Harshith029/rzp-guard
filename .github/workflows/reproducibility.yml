@@ -460,6 +460,25 @@ jobs:
       # previous round, re-run, each of which must fail. N1 in particular can
       # only run here: the dev host cannot create symlinks, which is exactly how
       # that bypass survived a round of review.
+      # BOOTSTRAP THE PINNED IMAGE, deliberately as its own visible step.
+      #
+      # The isolated lane runs docker with --pull=never, so nothing it executes
+      # can fetch an image. On a fresh runner the pinned image is absent, docker
+      # exits 125, and N4/N6/N8 reported BYPASSED -- an environment failure
+      # printed as a security finding. Every CI run had been failing this way.
+      #
+      # Pulling here, by digest, in a separate step does NOT weaken the
+      # execution stage: --pull=never stays exactly as it was, the digest is
+      # read out of run.sh rather than duplicated so it cannot drift, and the
+      # bootstrap is auditable in the job log rather than hidden inside the lane.
+      - name: Pull the pinned image by digest (bootstrap only)
+        run: |
+          img=$(grep -oE 'golang@sha256:[0-9a-f]{64}' run.sh | head -1)
+          test -n "$img" || { echo "no pinned digest found in run.sh" >&2; exit 1; }
+          echo "pinned image: $img"
+          docker pull "$img"
+          docker image inspect "$img" >/dev/null
+
       - name: Every previously-working bypass must still be blocked
         run: bash ./run.sh redteam-negative
 
