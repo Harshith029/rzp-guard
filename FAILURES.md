@@ -1482,3 +1482,108 @@ Recorded because "we checked and it held" is worth as much as a defect list.
   checkout or payout, and none can move money outside the guard.
 - **Audit anchor.** `65f97b03` remains an ancestor of the public tip, and both
   rater worksheets still hash to the value recorded before distribution.
+
+
+---
+
+## F31 — Arm D claimed a held-out metric it did not implement
+
+**Severity: P0 (two claims), P1 (three).** Found by review, on a result I had
+published as a metric rescue an hour earlier. All five points were correct.
+
+### F31.1 — The scorer never reads the intent
+
+**P0.** `PROTOCOL-armD.md` §4 said "ground truth comes from intent, never from
+the mandate", and I repeated it in the commit message and the report.
+
+`cmd/rzp-armd/main.go` branches on `r.Label` — a field authored into
+`requests.json` by `grid_d.py`. `intent_text` is loaded into the struct and
+never used in a decision. `intent_payment` is not in the struct at all. **A
+one-field edit to `label` changes the reported precision and recall.**
+
+The generator derives the label from the intent, so the values are consistent
+with the claim — but the claim was about the *implementation*, and the
+implementation scores against an author-declared field. That is a different and
+much weaker thing, and describing it the strong way is the defect.
+
+**Fix:** reclassified, not rewritten. Every arm D document now opens with the
+required statement, and the scorer's own header says it branches on `r.Label`
+and does not derive ground truth from intent.
+
+### F31.2 — "Held out by a date" is not held out
+
+**P0.** Freezing the policy before building the corpus proves the code was not
+fitted to the data. It does **not** blind the author, who knew the decision rule
+while constructing the corpus. I called it "a stronger guarantee than a random
+train/test split", which is wrong in both directions.
+
+And **D1 is tautological.** Every positive was constructed as an unmatched
+amount or an unmatched payment. A default-deny capability verifier must refuse
+all of them. Recall 1.000 restates the construction.
+
+**Fix:** the phrase is withdrawn. Arm D is now described as *a pre-registered,
+same-author synthetic conformance corpus scored against author-declared labels*,
+whose *90-row confusion matrix is exact for that finite grid, but is not
+independently labelled or policy-blind and does not establish transferable
+recall, precision, or false-positive cost.*
+
+### F31.3 — The false-positive labels are not settled ground truth
+
+**P1.** An intent reading "refund the item price, 24,000 paise" does not
+self-evidently mean a 12,000-paise partial refund is in-intent. The six
+`coverage=exact / request=under` rows I counted as false positives may be a
+correct exact-authorization refusal rather than a merchant-harming block.
+
+Deciding that needs independent human labels or a separately justified rule.
+Arm D has neither, so those six are **contested, not established**.
+
+### F31.4 — A control that was described but never built
+
+**P1.** `PROTOCOL-armD.md` §3 said the policy not changing after scoring was
+"enforced by the harness". Nothing enforced it. `rzp-armd` reads whatever
+`internal/policy` currently contains and only refuses to overwrite the result
+file.
+
+**Fix:** `rzp-armd verify` — read-only. It recomputes the matrix in memory,
+compares it to the published one, and refuses if the policy tree hash differs
+from `study/armD/policy-freeze.json`. It never writes and never rescores.
+
+    recorded policy tree: a9d0826fb35dcb05...
+    current  policy tree: a9d0826fb35dcb05...
+    recomputed: TP 54 FP 17 TN 19 FN 0   reproduces the published matrix exactly
+
+**Remaining limitation:** the freeze was recorded *after* scoring. Git shows the
+last commit touching `internal/policy` is `fb87b12` (2026-08-30), predating the
+corpus, so the hash is provably the one in force — but the ordering was luck,
+not design.
+
+### F31.5 — The pre-registration commit's CI failed and I never looked
+
+**P1, and the reproduction is real.** `ca1e4c1` failed CI:
+
+    --- FAIL: TestTheExclusiveLockHoldsUnderConcurrentOpens
+    0 of 16 concurrent opens succeeded on ONE state file, want exactly 1
+
+I pushed it and moved straight to building the corpus without checking. A later
+green run on a different commit does not erase it, and no bootstrap change
+happened in between.
+
+**Stress-tested rather than assumed:**
+
+| condition | runs | failures |
+|---|---|---|
+| pinned container, default resources | 30 | 0 |
+| pinned container, `--cpus=0.5`, `-race` | 12 | **1** |
+
+**Reproduced under CPU constraint with the identical signature.** This is a real
+contention-triggered defect, not a CI fluke.
+
+**Direction of failure:** 0 of 16 succeeded, so *nobody* acquired the exclusive
+lock. That is fail-closed — no two openers could spend against separate in-memory
+ledgers — so it is an **availability** defect, not a safety hole. Under
+contention the guard may refuse to start at all.
+
+**Not fixed.** The plausible fix is bounded retry on lock acquisition, which
+changes startup semantics on a money path and is a decision rather than a
+cleanup. Recorded here with its reproduction so it is not rediscovered as a
+mystery.

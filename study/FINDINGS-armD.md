@@ -1,5 +1,52 @@
 # Arm D findings — two predictions held, two failed
 
+> ## What arm D is
+>
+> **Arm D is a pre-registered, same-author synthetic conformance corpus scored
+> against author-declared labels.**
+>
+> **Its 90-row confusion matrix is exact for that finite grid, but it is not
+> independently labelled or policy-blind and does not establish transferable
+> recall, precision, or false-positive cost.**
+>
+> It is an engineering regression and conformance suite. It is **not** the metric
+> rescue, it does not meet the Track 2 metric bar, and it does not repair arm C.
+> Arm C's failed agent-trace result stands unchanged in
+> `PRELABEL-FINDING-armC.md`.
+>
+> ### Why the original framing was wrong
+>
+> **The scorer never reads the intent.** `cmd/rzp-armd/main.go` branches on
+> `r.Label`, a field authored into `requests.json`. `intent_text` is loaded and
+> never used in a decision, and `intent_payment` is not even in the struct. A
+> one-field edit to `label` changes the reported precision and recall. The claim
+> "ground truth comes from intent, never the mandate" was false **as an
+> implementation claim**, whatever the generator intended.
+>
+> **Freezing the policy first does not blind the author.** The same person who
+> knew the decision rule constructed the corpus afterwards. A date proves the
+> code was not fitted to the data; it does not make the data independent of the
+> author's knowledge of the code.
+>
+> **D1 is tautological.** Every positive was constructed as an unmatched amount
+> or an unmatched payment. A default-deny capability verifier must refuse all of
+> them. Recall 1.000 restates the construction; it does not measure detection.
+>
+> **The false-positive labels are not settled ground truth.** An intent reading
+> "refund the item price, 24,000 paise" does not self-evidently mean a
+> 12,000-paise partial refund is in-intent. The six `coverage=exact /
+> request=under` rows counted as false positives may be a correct exact-
+> authorization refusal rather than a merchant-harming block. Deciding that needs
+> independent human labels or a separately justified rule, and has neither.
+>
+> ### The minimum path to a literal Track-qualifying claim
+>
+> Independent blinded labels for these 90 rows: each rater shown the intended
+> payment, the intent, and the requested refund — and **not** the mandate or the
+> guard's decision. Until that exists, nothing here is a metric result.
+
+
+
 `RESULTS-armD.md` carries the numbers. This carries what they mean, including
 the two predictions that did not survive contact with the corpus.
 
