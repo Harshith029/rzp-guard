@@ -1290,3 +1290,53 @@ Also corrected in the same round, both mine:
   guard denies authority reachable under unbounded combining in order to bound
   agent-controlled work. The nine cases still matter; what they measure is the
   price of that trade, not a verdict on it.
+
+
+---
+
+## F28 — "Pinned in commit" was a local claim dressed as external evidence
+
+External review, source-only, and it caught a sentence I had just written to
+describe a control I had just built.
+
+`verifyCanonicalPin` checks that a canonical rater worksheet still hashes to the
+value recorded when it was emitted, in a sums file that is committed and
+unmodified. I wrote that this pinned the file to its **pre-distribution** state
+and had the report publish "pinned in commit `b988c68`", as though a reader
+could rely on it.
+
+**This repository has no remote, no tag, and nothing pushed.** Local `HEAD` is
+whatever the author last wrote. History can be rewritten carrying the worksheet
+and the sums file together, and the check would pass afterwards without a trace
+— and I know that concretely, because **I rewrote this repository's history
+myself earlier in the same session**, to purge a refund launcher. I built a
+control whose only guarantee is that an honest author has not made a mistake,
+and then described it as evidence against a dishonest one.
+
+The shape is the project's oldest defect once more: **a control whose
+description is stronger than what it enforces**. What makes this instance worth
+its own entry is that the gap is not a coding slip. The code does exactly what
+it should; the claim attached to it reached for a property the environment
+cannot supply.
+
+**What it actually is:** a local workflow-integrity control. It catches an
+uncommitted edit, an accidental regeneration, a stale tree. Those are real
+mistakes and catching them is worth doing.
+
+**What the external anchors are, neither of which existed:**
+
+1. a public commit, pushed before distribution, that a third party can fetch and
+   hash independently;
+2. the hash sent to each rater in their distribution message, which the rater
+   holds and the author cannot retroactively change.
+
+`predistribute-armC` now enforces the order. It runs the local check, reports
+remote/upstream/public-commit status without embellishment, and **refuses to
+print the rater messages** until a public commit is recorded in
+`DISTRIBUTION-armC.json`. Forced past that with `-acknowledge-no-anchor`, the
+messages it prints tell the rater outright that the file is published nowhere
+and the hash is the author's own record. `AUDIT-armC.md` prints the same warning
+in place of the anchor table when none exists.
+
+The wording is corrected everywhere: local workflow-integrity control, not
+immutable pre-distribution evidence.

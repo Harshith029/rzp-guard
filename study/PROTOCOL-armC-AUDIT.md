@@ -102,16 +102,36 @@ worked on the implementation, read `grid.py`, or seen the repository. The
 author does **not** label this set: with 72 rows and a near-arithmetic rubric,
 an author-rater adds nothing and risks being read as a third opinion.
 
-**The distributed worksheets are pinned.** Before any returned file is read,
-each canonical `audit-armC-e*.csv` is checked against the SHA-256 recorded at
-emission time in `SHA256SUMS-audit-armC.txt`, and that sums file must itself be
-committed and unmodified — verified by git blob id, so the recorded hash is
-fixed by history rather than by a working tree. `AUDIT-armC.md` publishes each
-verified hash and the commit carrying it.
+**A local workflow-integrity control, and two external anchors.**
 
-Without this, field-by-field verification would compare a return against
-whatever the local canonical copy now says: the author could edit it after
-distribution and a returned file would verify cleanly against the altered copy.
+Before any returned file is read, each canonical `audit-armC-e*.csv` is checked
+against the SHA-256 recorded at emission time in `SHA256SUMS-audit-armC.txt`,
+and that sums file must itself be committed and unmodified, verified by git blob
+id.
+
+**That is a local workflow-integrity control and nothing more.** It catches an
+uncommitted edit, an accidental regeneration, or a stale working tree — real
+mistakes, worth catching. It does **not** stop, and would not reveal, a
+deliberate local history rewrite carrying the worksheet and the sums file
+together. This repository has had its history rewritten before, to purge a
+refund launcher, so that is not hypothetical. Local `HEAD` attests to nothing
+outside this machine, and calling it "immutable pre-distribution evidence" would
+be a self-authored claim.
+
+The **external anchors** are:
+
+1. **A public commit**, pushed before distribution, containing the canonical
+   worksheets and the sums file — something a third party can fetch and hash
+   independently. Its URL and full SHA are recorded in
+   `adjudication/DISTRIBUTION-armC.json` and republished in `AUDIT-armC.md`.
+2. **The hash sent to each rater** in their distribution message. The rater
+   holds that message; the author cannot retroactively change it.
+
+`rzp-study predistribute-armC` enforces the order: it runs the local check,
+reports the anchor status honestly, and **refuses to print the rater messages**
+until a public commit is recorded. If run with `-acknowledge-no-anchor`, the
+messages it prints tell the rater in as many words that the file is not
+published anywhere and the hash is the author's own record.
 
 **Rater free text is neutralised before rendering.** A `reason` is written
 outside the project and lands in a published document. Formula prefixes and

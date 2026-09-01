@@ -1,0 +1,12 @@
+{
+  "note": "The EXTERNAL anchor for the arm C blocked-call audit. Fill this in AFTER pushing the commit that contains the canonical worksheets and SHA256SUMS-audit-armC.txt to the public repository, and BEFORE sending anything to a rater. Until public_commit_sha and public_repo_url are set, `rzp-study predistribute-armC` refuses to print the rater messages and AUDIT-armC.md states that no public anchor exists.",
+  "why": "The local hash check is a workflow-integrity control. It catches an uncommitted edit or a stale tree. It cannot stop or reveal a deliberate local history rewrite carrying the worksheet and the sums file together, so local HEAD is not evidence to anyone outside this machine.",
+  "public_repo_url": "",
+  "public_commit_sha": "",
+  "public_commit_url": "",
+  "distributed_file_sha256": {
+    "audit-armC-e1.csv": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5",
+    "audit-armC-e2.csv": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5"
+  },
+  "recorded_at_utc": ""
+}

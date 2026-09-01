@@ -219,6 +219,7 @@ func cmdArmCAuditReport(args []string) error {
 	if err != nil {
 		return err
 	}
+	dist, _ := loadDistributionRecord()
 	agr := computeAgreement("e1 vs e2 (both external)", e1, e2)
 
 	// Classify. Disagreements are carried, not dropped.
@@ -292,11 +293,26 @@ func cmdArmCAuditReport(args []string) error {
 	p("Each returned file was verified field by field against the canonical CSV\n")
 	p("delivered to that rater. Only `label` and `reason` may differ; the row set\n")
 	p("must be exactly the delivered ids, once each.\n\n")
-	p("The canonical files themselves are pinned to their **pre-distribution**\n")
-	p("hashes, recorded at emission time in a sums file that is committed and\n")
-	p("unmodified. Without this a canonical worksheet could be edited after\n")
-	p("distribution and a returned file would verify cleanly against the altered\n")
-	p("copy.\n\n")
+	p("The canonical files are checked against the SHA-256 recorded when they were\n")
+	p("emitted, in a sums file that is committed and unmodified. **This is a local\n")
+	p("workflow-integrity control, not immutable evidence.** It catches an\n")
+	p("uncommitted edit or a stale working tree. It does not stop, and would not\n")
+	p("reveal, a deliberate local history rewrite carrying the worksheet and the\n")
+	p("sums file together -- this repository has had its history rewritten before.\n\n")
+	p("The external anchors are the public commit below, which a third party can\n")
+	p("fetch and hash independently, and the hash sent to each rater in their\n")
+	p("distribution message, which the rater holds and the author cannot\n")
+	p("retroactively change.\n\n")
+	if dist != nil {
+		p("| | |\n|---|---|\n")
+		p("| Public repository | %s |\n", dist.RepoURL)
+		p("| Public commit | `%s` |\n", dist.CommitSHA)
+		p("| Commit URL | %s |\n\n", dist.CommitURL)
+	} else {
+		p("> **No public anchor was recorded for this distribution.** The hashes\n")
+		p("> below rest on local history only, which the author could have\n")
+		p("> rewritten. Treat them as a workflow record, not as evidence.\n\n")
+	}
 	p("| delivered file | SHA-256 recorded before distribution | pinned in commit |\n")
 	p("|---|---|---|\n")
 	for _, pin := range pins {

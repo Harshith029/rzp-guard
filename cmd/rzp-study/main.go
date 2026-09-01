@@ -49,6 +49,8 @@ func main() {
 		err = cmdArmCReport(os.Args[2:])
 	case "audit-armC":
 		err = cmdArmCAuditReport(os.Args[2:])
+	case "predistribute-armC":
+		err = cmdArmCPreDistribute(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -78,6 +80,9 @@ func usage() {
   worksheet-armC -blocked-only
                    emit the EXHAUSTIVE false-block audit sheets (blocked calls
                    only; raters are not told what the rows share)
+  predistribute-armC
+                   pre-distribution check: local pin, external anchor status,
+                   and the exact message to send each rater
   audit-armC       report in-intent calls among guard-blocked calls
 
 run flags:
