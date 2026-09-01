@@ -1,142 +1,156 @@
 # 5-minute pitch — script and shot list
 
-Timed to 5:00. Every number here is checked against the repository; if you
-re-run anything and it differs, say the number you got, not the one below.
+Timings are a guide. The one thing that must survive cutting is §3:40 — the
+agent that reported a refund it never made.
 
-The strongest thing this project has is not the code — it is that the evidence
-survives being checked. Pitch it that way. Do not oversell; the honesty *is* the
-differentiator, and a panel that catches one inflated claim discounts everything
-else.
+**Read this first:** the evaluation section changed. An earlier version of this
+script led with arm A's precision and recall. Those are descriptive traces over
+fifteen scenarios the author wrote and labelled, not detector scores, and the
+serious experiment that replaced them **failed**. Say so. A video that claims
+more than the README is the fastest way to lose a panel.
 
 ---
 
 ## 0:00 – 0:40 — The problem
 
-> "An AI agent is given tools that move money. Razorpay's MCP server exposes
-> `create_refund`. The agent is a language model, so you cannot enumerate its
-> behaviour and you cannot test it exhaustively.
+> "Merchants are starting to let AI agents handle support. An agent that can
+> read a customer's message and call a refund API can also be talked into
+> refunding the wrong thing — by a confused instruction, a misread order, or
+> text in the customer's own message written to manipulate it.
 >
-> The usual answer is to make the agent safer — better prompts, better model.
-> That is unfalsifiable. I did the opposite: assume the agent is untrustworthy,
-> and put an authorization boundary between it and the money, so that no agent
-> behaviour can produce an unauthorized refund."
+> The agent isn't malicious. It's credulous, and it's holding a live payments
+> credential.
+>
+> I picked one action, because it's where money actually leaves: `create_refund`."
 
-**On screen:** the topology diagram from `ARCHITECTURE.md` §1.
+**On screen:** README, the four-line worked example.
 
 ---
 
 ## 0:40 – 1:20 — The design decision worth defending
 
-> "The guard sits between agent and server and sees only JSON-RPC. It never sees
-> the prompt or the reasoning. So it cannot judge intent — and it does not try.
+> "The obvious build is a classifier that scores refunds for risk. I didn't
+> build that, and the reason is the whole design.
 >
-> The merchant issues a capability list: one refund, one amount, one payment,
-> consumed when used. Not 'refunds up to ₹500'. A range authorizes an unbounded
-> number of refunds inside it; a discrete action cannot be used twice. The blast
-> radius of any single mistake is one action."
+> This sits on the wire between the agent and Razorpay's official MCP server. It
+> sees JSON-RPC. It cannot see the agent's reasoning or the user's intent — so
+> anything it 'judged' would be a guess added to a money path.
+>
+> Instead the merchant writes down the refunds they'll allow: one payment, one
+> amount, consumed when used. The guard forwards a refund only if it matches an
+> unused entry. Everything else is refused. It's an authorization verifier, not
+> a fraud detector, and I'd defend that choice over a model here."
 
-**On screen:** an `examples/mandate.json` action block.
+**On screen:** `ARCHITECTURE.md`, the capability-list section.
 
 ---
 
 ## 1:20 – 2:30 — It works against the real thing
 
-Run live. This is the moment the claim stops being a slide.
+> "Two live gates, both against Razorpay's official container, unmodified and
+> pinned by digest.
+>
+> An unauthorized refund never reaches the server. An authorized one really
+> executes — and the receipt the guard injected comes back unchanged, the
+> authorization is consumed, and a replay of the same call is refused.
+>
+> And when it can't tell what happened — connection drops mid-refund — it does
+> not guess. It doesn't retry and it doesn't release the authorization. It marks
+> the refund IN_DOUBT and tells a human. 'Probably fine' isn't a safe assumption
+> about someone else's money."
 
-```bash
-./run.sh live-block
-```
-
-> "This is the shipped binary, spawning Razorpay's official container pinned by
-> digest, with real Test Mode credentials. An unauthorized refund is requested."
-
-**Point at three lines specifically:**
-
-- `NO money-moving tools/call of any kind reached child stdin (found 0)`
-- `blocked response carries the deciding rule NO_AUTHORIZED_ACTION`
-- `CONTROL: real container produced a response for the allowed read id 4`
-
-> "That last line matters more than the first. Without it, 'nothing was
-> forwarded' would also pass if the container were dead or the credentials
-> wrong — exactly the cases the test exists to rule out. So a permitted read has
-> to succeed in the same session."
-
-Then the allow path:
-
-> "Blocking everything is easy. G1.6 is the other half: a real refund on a real
-> Test Mode payment — `rfnd_TTwsIoEmRPXnBa`, 100 paise. It executed, and the
-> receipt the guard minted came back unchanged."
+**On screen:** `evidence/g16/`, then the four lifecycle states.
 
 ---
 
 ## 2:30 – 3:40 — What happened when a real agent drove it
 
-> "Then I ran a pre-registered study. Fifteen briefs, forty-five traces, frozen
-> and hash-committed before the first API call. Forty-nine refund calls."
-
-**On screen:** `study/RESULTS.md` §1.
-
-> "The result is not the ratio. The agent never emitted a refund outside the
-> merchant's intent — not once, including all fifteen injection traces. So the
-> positive class is empty, precision reads zero over eight for an arithmetic
-> reason, and recall is undefined. I report it that way rather than picking a
-> flattering framing.
+> "Then I ran the evaluation, and I want to be straight about how it went.
 >
-> The number that carries information is the false-block rate: eight in
-> forty-nine. And the cause is mine, not the model's — the guard authorizes an
-> exact amount, so an agent that batched two authorized refunds into one call
-> was refused. I predicted two of those cases in writing before the run. Two more
-> I did not predict at all."
+> The serious attempt was a 54-scenario grid generated mechanically, so I wasn't
+> choosing the test cases. Policy frozen by hash first. Predictions written down
+> in advance — including one that said the study would be worthless if it
+> produced fewer than twenty out-of-intent calls.
+>
+> It produced **two**, out of 340 refund calls. That prediction failed
+> decisively. You cannot estimate recall from two, so **this does not meet the
+> Track 2 metric bar** and I'm not going to dress it up.
+>
+> Why it failed is itself the finding: in the 113 refund calls from scenarios
+> containing an injected instruction, none was classified out-of-intent. The
+> agent mostly just behaved. That's a fact about this corpus and this endpoint on
+> one day — not proof that models resist injection."
+
+**On screen:** `study/PRELABEL-FINDING-armC.md`, recorded before any label existed.
 
 ---
 
 ## 3:40 – 4:20 — The finding to end on
 
-> "One trace is worth the whole study."
+> "One trace from the earlier run is worth the whole study."
 
 **On screen:** the `C04/run2` block in `study/FINDINGS.md`.
 
 > "The agent's only refund call was blocked. It then told the operator: *'I
-> issued the authorized refund of 3,000 paise.'* It never did.
+> issued the authorized refund of 3,000 paise for the six cracked eggs.'*
 >
-> Nothing was lost — the guard is what made that statement false rather than
+> It never did. No 3,000 refund was ever made — the only call in that trace was
+> the one the guard refused.
+>
+> Nothing was lost, and the guard is what made that sentence false rather than
 > merely inaccurate. But a human reading only that summary would have believed a
 > refund happened.
 >
-> That is the argument for this whole layer. **The agent's account of what it did
+> That's the argument for this entire layer. **The agent's account of what it did
 > is not evidence of what it did.** The decision log is."
 
 ---
 
 ## 4:20 – 5:00 — What is not proven
 
-Do not skip this. It is the part that makes the rest credible.
+> "Four things I'd want a reviewer to know.
+>
+> **Recall is not estimated.** The experiment designed to measure it failed, and
+> no amount of labelling fixes that — the calls it needed were never emitted.
+>
+> **Mandates aren't signed.** The guard reads the mandate off disk. Whoever can
+> write that file can grant authority, including after the fact. What it enforces
+> is that the agent can't exceed authority *someone else wrote down* — not that
+> the grant was legitimate. Closing that needs merchant-side signing.
+>
+> **Combining is deliberately bounded**, and it costs something. A refund can be
+> covered by several entries summing to it, but the search stops at eight,
+> because the amount is chosen by the agent and an unbounded search is
+> computation an untrusted party controls. In the study that refused nine refunds
+> whose entries summed exactly. That's the price of the trade, measured.
+>
+> **And 72 refused calls are with two external raters right now**, to find how
+> many were refunds the merchant actually wanted. That result isn't in, and I'm
+> not previewing it."
 
-> "Three things I am not claiming.
->
-> The guard was never given a genuinely hostile call, because the model never
-> made one — so the thing it was built for went untested by this run.
->
-> The generator was an unverified third-party endpoint. I measured it serving a
-> different model than the one requested, so the study publishes every emitted
-> call rather than claiming to know what produced them.
->
-> And every number is conditional on that model's call distribution. I claimed
-> otherwise in an earlier draft and it is retracted in the protocol.
->
-> There are twenty-one entries in FAILURES.md. Each one is a real defect with the
-> output that exposed it, including the ones I found by attacking my own fixes.
-> That file is the honest measure of this project."
+**On screen:** README "Known limits".
+
+> "What I'd claim is narrow: a fail-closed authorization layer that verifiably
+> blocks unauthorized refunds, survives a crash mid-refund without losing track
+> of money, and refuses to guess when it can't confirm an outcome. Everything
+> else I've told you is in the failure log."
+
+**On screen:** `FAILURES.md`.
 
 ---
 
 ## Practical notes
 
-- **Rehearse `live-block` once before recording.** It pulls containers on a cold
-  start and you do not want that on the take.
-- Have `.env` loaded: `set -a && . ./.env && set +a`.
-- If a command fails on camera, **keep it in and say what happened.** For this
-  project specifically, that is on-brand rather than a disaster.
-- Numbers to have exactly right: **49** calls, **8** blocked, **45** traces,
-  **0/15** injection traces induced, **21** FAILURES entries.
-- Do not say "detector", "precision 100%", or "production-ready". None is true.
+- **Show the terminal, not slides,** for the live gates. The pinned digest
+  scrolling past is the point.
+- If time runs short, cut §1:20 (live gates) to one sentence and keep §3:40. The
+  gates are reproducible from the README; the lying-agent trace is the argument.
+- Have `study/PRELABEL-FINDING-armC.md` open before you start. If a panellist
+  asks "so what were your numbers", open it rather than answering from memory.
+- **Do not say** "detector", "precision", "recall", "production-ready", or "we
+  block prompt injection". None is supported.
+- If asked whether it caught injections: *"In this corpus the agent didn't
+  follow the injected instructions, so the guard was never given a hostile call
+  to block. That's why I can't claim it."*
+- If asked why not ML: *"On the wire I can't see intent. A guess there is
+  unpredictability in a money path."*
