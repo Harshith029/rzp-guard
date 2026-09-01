@@ -1680,3 +1680,72 @@ stress figures are in `study/ASSESSMENT-armD.md` §5. Summary: **1 failure in 12
 runs before, 0 in 60 after**, under `--cpus=0.5` with `-race` in the pinned
 container, with the contention test rewritten to assert all four required
 properties instead of counting successes.
+
+---
+
+## F33 — The pre-distribution command handed blind raters a link to the study, and misreported what it could know
+
+**Severity: P0 (two).** Found by review. `cmd/rzp-study/armc_distribute.go` had
+been left untouched through the arm D work while both defects were already
+known, which is its own lesson: a finding that is not fixed in the commit that
+records it is a finding that gets shipped.
+
+### F33.1 — The blinding and the thing that defeated it, in the same paragraph
+
+**P0.** The rater message ended with:
+
+```
+This exact file is published at:
+  <public commit URL>
+You can verify the attachment's hash against that commit.
+```
+
+The intent was honest — let a rater confirm nobody swapped their worksheet. The
+effect was to hand someone who was supposed to be blind a link to the
+repository, and through it the study design, the labelling rule, the protocol,
+and the guard's own decision on every row they were about to label.
+
+Three lines above it, the same message asked them not to discuss the cases with
+the other rater. The message was protecting the blinding at one end and breaking
+it at the other.
+
+**Fix.** Two artifacts that never mix. `raterMessage` carries the file name, its
+SHA-256, how to edit and return it, and an instruction not to look the rows up —
+no URL, no repository, no commit, no protocol, no description of what the rows
+are or why they were selected. `reviewerRecord` carries the anchor and the
+hashes, for a reviewer or the release record, and is never sent to a rater. The
+console output brackets each with explicit BEGIN/END markers so the two cannot
+be copied together by accident.
+
+**The trade, stated rather than hidden:** a rater can no longer verify their
+attachment against a published commit. They hold the hash and nothing else. That
+is the right way round — the anchor exists so a *third party* can check the
+author did not swap the worksheets, and a third party reads the reviewer record.
+
+Five tests assert this on the real output, including one that scans for the
+literal repository URL, commit SHA and commit URL from
+`DISTRIBUTION-armC.json`, and one that checks the message is still sufficient to
+label and return the file. A comment claiming "no context here" would not have
+survived the next edit.
+
+### F33.2 — "NONE (nothing has been pushed)"
+
+**P0.** When no tracking branch was configured, the command printed
+`upstream branch: NONE (nothing has been pushed)`. That is a claim it cannot
+make. An absent upstream says only that *this checkout* has no tracking branch
+set. The commit may have been pushed from another clone, pushed by explicit
+refspec, or pushed and the configuration removed afterwards.
+
+This is the same error as the earlier "no remote configured, therefore never
+pushed" — restated in a different field, in a tool whose entire purpose is to
+distinguish what is locally asserted from what is externally checkable.
+
+The direction matters too. Reading "not configured here" as "never published"
+reports an anchored audit as unanchored, and an author who knows better learns
+to click past the warning.
+
+**Fix.** `upstreamLine` states the narrow meaning and disclaims the inference.
+The command now also states plainly that it makes **no network calls**: it does
+not fetch the recorded commit, does not confirm it exists on the public host,
+and does not confirm the published files hash to the recorded values. Everything
+in that section is read from local configuration and a local JSON file.
