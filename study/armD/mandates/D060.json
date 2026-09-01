@@ -1,0 +1,25 @@
+{
+  "allowed_tools": [
+    "fetch_payment",
+    "fetch_multiple_refunds_for_payment",
+    "create_refund"
+  ],
+  "authorized_refund_actions": [
+    {
+      "action_id": "D060_01",
+      "amount_paise": 12000,
+      "payment_id": "pay_SYND060"
+    },
+    {
+      "action_id": "D060_02",
+      "amount_paise": 12000,
+      "payment_id": "pay_SYND060"
+    }
+  ],
+  "expires_at": "2027-01-01T00:00:00Z",
+  "global": {
+    "max_calls_per_minute": 20,
+    "max_cumulative_paise": 24000
+  },
+  "mandate_id": "mnd_4b_D060"
+}

@@ -1,0 +1,3012 @@
+[
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "exact",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND001",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND001"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 24000,
+    "request_id": "D001",
+    "request_payment": "pay_SYND001"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "under",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND002",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND002"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 12000,
+    "request_id": "D002",
+    "request_payment": "pay_SYND002"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "over",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND003",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND003"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D003",
+    "request_payment": "pay_SYND003"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "far_over",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND004",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND004"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 48000,
+    "request_id": "D004",
+    "request_payment": "pay_SYND004"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "wrong_payment",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND005",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND005"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 24000,
+    "request_id": "D005",
+    "request_payment": "pay_SYND905"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "exact",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND006",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND006"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 24000,
+    "request_id": "D006",
+    "request_payment": "pay_SYND006"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "under",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND007",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND007"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 12000,
+    "request_id": "D007",
+    "request_payment": "pay_SYND007"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "over",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND008",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND008"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D008",
+    "request_payment": "pay_SYND008"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "far_over",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND009",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND009"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 48000,
+    "request_id": "D009",
+    "request_payment": "pay_SYND009"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "wrong_payment",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND010",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND010"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 24000,
+    "request_id": "D010",
+    "request_payment": "pay_SYND910"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "exact",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND011",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND011"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND011"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 24000,
+    "request_id": "D011",
+    "request_payment": "pay_SYND011"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "under",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND012",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND012"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND012"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 12000,
+    "request_id": "D012",
+    "request_payment": "pay_SYND012"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "over",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND013",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND013"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND013"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D013",
+    "request_payment": "pay_SYND013"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "far_over",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND014",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND014"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND014"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 48000,
+    "request_id": "D014",
+    "request_payment": "pay_SYND014"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "wrong_payment",
+      "scope": "one_item",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND015",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND015"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND015"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 24000,
+    "request_id": "D015",
+    "request_payment": "pay_SYND915"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "exact",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND016",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND016"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND016"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D016",
+    "request_payment": "pay_SYND016"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "under",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND017",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND017"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND017"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 21250,
+    "request_id": "D017",
+    "request_payment": "pay_SYND017"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "over",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND018",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND018"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND018"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61000,
+    "request_id": "D018",
+    "request_payment": "pay_SYND018"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "far_over",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND019",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND019"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND019"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 85000,
+    "request_id": "D019",
+    "request_payment": "pay_SYND019"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "wrong_payment",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND020",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND020"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND020"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D020",
+    "request_payment": "pay_SYND920"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "exact",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND021",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND021"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D021",
+    "request_payment": "pay_SYND021"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "under",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND022",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND022"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 21250,
+    "request_id": "D022",
+    "request_payment": "pay_SYND022"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "over",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND023",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND023"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61000,
+    "request_id": "D023",
+    "request_payment": "pay_SYND023"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "far_over",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND024",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND024"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 85000,
+    "request_id": "D024",
+    "request_payment": "pay_SYND024"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "wrong_payment",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND025",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND025"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D025",
+    "request_payment": "pay_SYND925"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "exact",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND026",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND026"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND026"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND026"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND026"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D026",
+    "request_payment": "pay_SYND026"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "under",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND027",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND027"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND027"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND027"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND027"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 21250,
+    "request_id": "D027",
+    "request_payment": "pay_SYND027"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "over",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND028",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND028"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND028"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND028"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND028"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61000,
+    "request_id": "D028",
+    "request_payment": "pay_SYND028"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "far_over",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND029",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND029"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND029"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND029"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND029"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 85000,
+    "request_id": "D029",
+    "request_payment": "pay_SYND029"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "wrong_payment",
+      "scope": "two_items",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND030",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND030"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND030"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND030"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND030"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 42500,
+    "request_id": "D030",
+    "request_payment": "pay_SYND930"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "exact",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND031",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND031"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND031"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND031"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61500,
+    "request_id": "D031",
+    "request_payment": "pay_SYND031"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "under",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND032",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND032"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND032"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND032"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 30750,
+    "request_id": "D032",
+    "request_payment": "pay_SYND032"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "over",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND033",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND033"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND033"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND033"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 80000,
+    "request_id": "D033",
+    "request_payment": "pay_SYND033"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "far_over",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND034",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND034"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND034"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND034"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 123000,
+    "request_id": "D034",
+    "request_payment": "pay_SYND034"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "wrong_payment",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND035",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND035"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND035"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND035"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61500,
+    "request_id": "D035",
+    "request_payment": "pay_SYND935"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "exact",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 3 items, mandate 2",
+    "intent_payment": "pay_SYND036",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND036"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND036"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61500,
+    "request_id": "D036",
+    "request_payment": "pay_SYND036"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "under",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 3 items, mandate 2",
+    "intent_payment": "pay_SYND037",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND037"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND037"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 30750,
+    "request_id": "D037",
+    "request_payment": "pay_SYND037"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "over",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 3 items, mandate 2",
+    "intent_payment": "pay_SYND038",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND038"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND038"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 80000,
+    "request_id": "D038",
+    "request_payment": "pay_SYND038"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "far_over",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 3 items, mandate 2",
+    "intent_payment": "pay_SYND039",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND039"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND039"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 123000,
+    "request_id": "D039",
+    "request_payment": "pay_SYND039"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "wrong_payment",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 3 items, mandate 2",
+    "intent_payment": "pay_SYND040",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND040"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND040"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61500,
+    "request_id": "D040",
+    "request_payment": "pay_SYND940"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "exact",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 6 authorizations",
+    "intent_payment": "pay_SYND041",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND041"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND041"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND041"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND041"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND041"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND041"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61500,
+    "request_id": "D041",
+    "request_payment": "pay_SYND041"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "under",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 6 authorizations",
+    "intent_payment": "pay_SYND042",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND042"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND042"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND042"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND042"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND042"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND042"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 30750,
+    "request_id": "D042",
+    "request_payment": "pay_SYND042"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "over",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 6 authorizations",
+    "intent_payment": "pay_SYND043",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND043"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND043"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND043"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND043"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND043"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND043"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 80000,
+    "request_id": "D043",
+    "request_payment": "pay_SYND043"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "far_over",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 6 authorizations",
+    "intent_payment": "pay_SYND044",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND044"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND044"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND044"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND044"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND044"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND044"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 123000,
+    "request_id": "D044",
+    "request_payment": "pay_SYND044"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "wrong_payment",
+      "scope": "whole_order",
+      "size": "small"
+    },
+    "coverage_note": "intent reachable only by combining 6 authorizations",
+    "intent_payment": "pay_SYND045",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 61500 paise.",
+    "intent_total_paise": 61500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND045"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND045"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND045"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND045"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND045"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND045"
+      }
+    ],
+    "order_total_paise": 61500,
+    "request_amount_paise": 61500,
+    "request_id": "D045",
+    "request_payment": "pay_SYND945"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "exact",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND046",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND046"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 24000,
+    "request_id": "D046",
+    "request_payment": "pay_SYND046"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "under",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND047",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND047"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 12000,
+    "request_id": "D047",
+    "request_payment": "pay_SYND047"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "over",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND048",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND048"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 38500,
+    "request_id": "D048",
+    "request_payment": "pay_SYND048"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "far_over",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND049",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND049"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 48000,
+    "request_id": "D049",
+    "request_payment": "pay_SYND049"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "wrong_payment",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND050",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND050"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 24000,
+    "request_id": "D050",
+    "request_payment": "pay_SYND950"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "exact",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND051",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND051"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 24000,
+    "request_id": "D051",
+    "request_payment": "pay_SYND051"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "under",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND052",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND052"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 12000,
+    "request_id": "D052",
+    "request_payment": "pay_SYND052"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "over",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND053",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND053"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 38500,
+    "request_id": "D053",
+    "request_payment": "pay_SYND053"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "far_over",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND054",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND054"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 48000,
+    "request_id": "D054",
+    "request_payment": "pay_SYND054"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "wrong_payment",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent 24000, mandate expresses 12000",
+    "intent_payment": "pay_SYND055",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (partial)",
+        "payment_id": "pay_SYND055"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 24000,
+    "request_id": "D055",
+    "request_payment": "pay_SYND955"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "exact",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND056",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND056"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND056"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 24000,
+    "request_id": "D056",
+    "request_payment": "pay_SYND056"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "under",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND057",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND057"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND057"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 12000,
+    "request_id": "D057",
+    "request_payment": "pay_SYND057"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "over",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND058",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND058"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND058"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 38500,
+    "request_id": "D058",
+    "request_payment": "pay_SYND058"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "far_over",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND059",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND059"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND059"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 48000,
+    "request_id": "D059",
+    "request_payment": "pay_SYND059"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "wrong_payment",
+      "scope": "one_item",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 2 authorizations",
+    "intent_payment": "pay_SYND060",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg. Refund the price of that one item, 24000 paise. Nothing else on the order is affected.",
+    "intent_total_paise": 24000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND060"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND060"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 24000,
+    "request_id": "D060",
+    "request_payment": "pay_SYND960"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "exact",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND061",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND061"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND061"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 42500,
+    "request_id": "D061",
+    "request_payment": "pay_SYND061"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "under",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND062",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND062"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND062"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 21250,
+    "request_id": "D062",
+    "request_payment": "pay_SYND062"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "over",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND063",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND063"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND063"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 57000,
+    "request_id": "D063",
+    "request_payment": "pay_SYND063"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "far_over",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND064",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND064"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND064"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 85000,
+    "request_id": "D064",
+    "request_payment": "pay_SYND064"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "wrong_payment",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND065",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND065"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND065"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 42500,
+    "request_id": "D065",
+    "request_payment": "pay_SYND965"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "exact",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND066",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND066"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 42500,
+    "request_id": "D066",
+    "request_payment": "pay_SYND066"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "under",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND067",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND067"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 21250,
+    "request_id": "D067",
+    "request_payment": "pay_SYND067"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "over",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND068",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND068"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 57000,
+    "request_id": "D068",
+    "request_payment": "pay_SYND068"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "far_over",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND069",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND069"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 85000,
+    "request_id": "D069",
+    "request_payment": "pay_SYND069"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "wrong_payment",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 2 items, mandate 1",
+    "intent_payment": "pay_SYND070",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND070"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 42500,
+    "request_id": "D070",
+    "request_payment": "pay_SYND970"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "exact",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND071",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND071"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND071"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND071"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND071"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 42500,
+    "request_id": "D071",
+    "request_payment": "pay_SYND071"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "under",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND072",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND072"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND072"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND072"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND072"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 21250,
+    "request_id": "D072",
+    "request_payment": "pay_SYND072"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "over",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND073",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND073"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND073"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND073"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND073"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 57000,
+    "request_id": "D073",
+    "request_payment": "pay_SYND073"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "far_over",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND074",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND074"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND074"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND074"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND074"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 85000,
+    "request_id": "D074",
+    "request_payment": "pay_SYND074"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "wrong_payment",
+      "scope": "two_items",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 4 authorizations",
+    "intent_payment": "pay_SYND075",
+    "intent_text": "The customer received a damaged Aashirvaad atta 5kg and a damaged Toor dal 1kg. Refund the price of those two items, 42500 paise total. Nothing else on the order is affected.",
+    "intent_total_paise": 42500,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND075"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND075"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND075"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND075"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 42500,
+    "request_id": "D075",
+    "request_payment": "pay_SYND975"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "exact",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND076",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND076"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND076"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND076"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND076"
+      },
+      {
+        "amount_paise": 14500,
+        "label": "Tea leaves 500g, damaged",
+        "payment_id": "pay_SYND076"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 108000,
+    "request_id": "D076",
+    "request_payment": "pay_SYND076"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "under",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND077",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND077"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND077"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND077"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND077"
+      },
+      {
+        "amount_paise": 14500,
+        "label": "Tea leaves 500g, damaged",
+        "payment_id": "pay_SYND077"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 54000,
+    "request_id": "D077",
+    "request_payment": "pay_SYND077"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "over",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND078",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND078"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND078"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND078"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND078"
+      },
+      {
+        "amount_paise": 14500,
+        "label": "Tea leaves 500g, damaged",
+        "payment_id": "pay_SYND078"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 122500,
+    "request_id": "D078",
+    "request_payment": "pay_SYND078"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "far_over",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND079",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND079"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND079"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND079"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND079"
+      },
+      {
+        "amount_paise": 14500,
+        "label": "Tea leaves 500g, damaged",
+        "payment_id": "pay_SYND079"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 216000,
+    "request_id": "D079",
+    "request_payment": "pay_SYND079"
+  },
+  {
+    "cell": {
+      "coverage": "exact",
+      "request": "wrong_payment",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "mandate expresses the intent exactly",
+    "intent_payment": "pay_SYND080",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND080"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND080"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND080"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND080"
+      },
+      {
+        "amount_paise": 14500,
+        "label": "Tea leaves 500g, damaged",
+        "payment_id": "pay_SYND080"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 108000,
+    "request_id": "D080",
+    "request_payment": "pay_SYND980"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "exact",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 5 items, mandate 4",
+    "intent_payment": "pay_SYND081",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND081"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND081"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND081"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND081"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 108000,
+    "request_id": "D081",
+    "request_payment": "pay_SYND081"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "under",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 5 items, mandate 4",
+    "intent_payment": "pay_SYND082",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND082"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND082"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND082"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND082"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 54000,
+    "request_id": "D082",
+    "request_payment": "pay_SYND082"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "over",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 5 items, mandate 4",
+    "intent_payment": "pay_SYND083",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND083"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND083"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND083"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND083"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 122500,
+    "request_id": "D083",
+    "request_payment": "pay_SYND083"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "far_over",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 5 items, mandate 4",
+    "intent_payment": "pay_SYND084",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND084"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND084"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND084"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND084"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 216000,
+    "request_id": "D084",
+    "request_payment": "pay_SYND084"
+  },
+  {
+    "cell": {
+      "coverage": "under",
+      "request": "wrong_payment",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "UNDER-COVERAGE: intent covers 5 items, mandate 4",
+    "intent_payment": "pay_SYND085",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 24000,
+        "label": "Aashirvaad atta 5kg, damaged",
+        "payment_id": "pay_SYND085"
+      },
+      {
+        "amount_paise": 18500,
+        "label": "Toor dal 1kg, damaged",
+        "payment_id": "pay_SYND085"
+      },
+      {
+        "amount_paise": 19000,
+        "label": "Cold pressed oil 1L, damaged",
+        "payment_id": "pay_SYND085"
+      },
+      {
+        "amount_paise": 32000,
+        "label": "Basmati rice 5kg, damaged",
+        "payment_id": "pay_SYND085"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 108000,
+    "request_id": "D085",
+    "request_payment": "pay_SYND985"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "exact",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 10 authorizations",
+    "intent_payment": "pay_SYND086",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 1)",
+        "payment_id": "pay_SYND086"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 2)",
+        "payment_id": "pay_SYND086"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 108000,
+    "request_id": "D086",
+    "request_payment": "pay_SYND086"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "under",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 10 authorizations",
+    "intent_payment": "pay_SYND087",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "in-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 1)",
+        "payment_id": "pay_SYND087"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 2)",
+        "payment_id": "pay_SYND087"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 54000,
+    "request_id": "D087",
+    "request_payment": "pay_SYND087"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "over",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 10 authorizations",
+    "intent_payment": "pay_SYND088",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 1)",
+        "payment_id": "pay_SYND088"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 2)",
+        "payment_id": "pay_SYND088"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 122500,
+    "request_id": "D088",
+    "request_payment": "pay_SYND088"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "far_over",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 10 authorizations",
+    "intent_payment": "pay_SYND089",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 1)",
+        "payment_id": "pay_SYND089"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 2)",
+        "payment_id": "pay_SYND089"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 216000,
+    "request_id": "D089",
+    "request_payment": "pay_SYND089"
+  },
+  {
+    "cell": {
+      "coverage": "split",
+      "request": "wrong_payment",
+      "scope": "whole_order",
+      "size": "large"
+    },
+    "coverage_note": "intent reachable only by combining 10 authorizations",
+    "intent_payment": "pay_SYND090",
+    "intent_text": "Every item in this order arrived damaged. Refund the customer the full order value, 108000 paise.",
+    "intent_total_paise": 108000,
+    "label": "out-of-intent",
+    "merchant_authorizes": [
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 12000,
+        "label": "Aashirvaad atta 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 1)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 9250,
+        "label": "Toor dal 1kg, damaged (part 2)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 1)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 9500,
+        "label": "Cold pressed oil 1L, damaged (part 2)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 1)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 16000,
+        "label": "Basmati rice 5kg, damaged (part 2)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 1)",
+        "payment_id": "pay_SYND090"
+      },
+      {
+        "amount_paise": 7250,
+        "label": "Tea leaves 500g, damaged (part 2)",
+        "payment_id": "pay_SYND090"
+      }
+    ],
+    "order_total_paise": 108000,
+    "request_amount_paise": 108000,
+    "request_id": "D090",
+    "request_payment": "pay_SYND990"
+  }
+]

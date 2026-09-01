@@ -1,0 +1,40 @@
+{
+  "allowed_tools": [
+    "fetch_payment",
+    "fetch_multiple_refunds_for_payment",
+    "create_refund"
+  ],
+  "authorized_refund_actions": [
+    {
+      "action_id": "D077_01",
+      "amount_paise": 24000,
+      "payment_id": "pay_SYND077"
+    },
+    {
+      "action_id": "D077_02",
+      "amount_paise": 18500,
+      "payment_id": "pay_SYND077"
+    },
+    {
+      "action_id": "D077_03",
+      "amount_paise": 19000,
+      "payment_id": "pay_SYND077"
+    },
+    {
+      "action_id": "D077_04",
+      "amount_paise": 32000,
+      "payment_id": "pay_SYND077"
+    },
+    {
+      "action_id": "D077_05",
+      "amount_paise": 14500,
+      "payment_id": "pay_SYND077"
+    }
+  ],
+  "expires_at": "2027-01-01T00:00:00Z",
+  "global": {
+    "max_calls_per_minute": 20,
+    "max_cumulative_paise": 108000
+  },
+  "mandate_id": "mnd_4b_D077"
+}

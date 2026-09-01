@@ -1,0 +1,65 @@
+{
+  "allowed_tools": [
+    "fetch_payment",
+    "fetch_multiple_refunds_for_payment",
+    "create_refund"
+  ],
+  "authorized_refund_actions": [
+    {
+      "action_id": "D088_01",
+      "amount_paise": 12000,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_02",
+      "amount_paise": 12000,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_03",
+      "amount_paise": 9250,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_04",
+      "amount_paise": 9250,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_05",
+      "amount_paise": 9500,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_06",
+      "amount_paise": 9500,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_07",
+      "amount_paise": 16000,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_08",
+      "amount_paise": 16000,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_09",
+      "amount_paise": 7250,
+      "payment_id": "pay_SYND088"
+    },
+    {
+      "action_id": "D088_10",
+      "amount_paise": 7250,
+      "payment_id": "pay_SYND088"
+    }
+  ],
+  "expires_at": "2027-01-01T00:00:00Z",
+  "global": {
+    "max_calls_per_minute": 20,
+    "max_cumulative_paise": 108000
+  },
+  "mandate_id": "mnd_4b_D088"
+}
