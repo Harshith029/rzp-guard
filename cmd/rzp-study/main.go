@@ -47,6 +47,8 @@ func main() {
 		err = cmdArmCAgreement(os.Args[2:])
 	case "report-armC":
 		err = cmdArmCReport(os.Args[2:])
+	case "audit-armC":
+		err = cmdArmCAuditReport(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -73,6 +75,10 @@ func usage() {
   agreement-armC   inter-rater agreement + every disagreement; reads no trace
   report-armC      join frozen labels to guard decisions; refuses until
                    agreement has been published
+  worksheet-armC -blocked-only
+                   emit the EXHAUSTIVE false-block audit sheets (blocked calls
+                   only; raters are not told what the rows share)
+  audit-armC       report in-intent calls among guard-blocked calls
 
 run flags:
   -guard PATH      rzp-guard binary (test-hook build, for the stub child)

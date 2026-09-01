@@ -355,6 +355,10 @@ func cmdArmCWorksheet(args []string) error {
 	fs := flag.NewFlagSet("worksheet-armC", flag.ExitOnError)
 	dir := fs.String("traces", "", "trace directory (default: the arm's)")
 	outDir := fs.String("out", "", "output directory (default study/adjudication)")
+	blockedOnly := fs.Bool("blocked-only", false,
+		"emit the EXHAUSTIVE false-block audit: every call the guard refused, "+
+			"and only those. Selection uses the guard's decision; the delivered "+
+			"rows never reveal it.")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -403,6 +407,13 @@ func cmdArmCWorksheet(args []string) error {
 			return err
 		}
 		for i, c := range refundCalls(t) {
+			// The audit is DEFINED by the guard's decision, so the selection
+			// reads it. The delivered rows must not: auditExportedWorksheet
+			// refuses any file mentioning an outcome, and a rater is never told
+			// what these rows have in common.
+			if *blockedOnly && !c.Blocked {
+				continue
+			}
 			var present []string
 			var m map[string]any
 			if json.Unmarshal([]byte(c.Arguments), &m) == nil {
@@ -455,8 +466,14 @@ func cmdArmCWorksheet(args []string) error {
 		Omitted: omittedFromProjection,
 	}
 
+	idPrefix, fileStem, raters := "C", "worksheet-armC", armCRaters
+	if *blockedOnly {
+		// A distinct id space, so an audit row cannot be joined to a
+		// main-worksheet row by anyone holding both files.
+		idPrefix, fileStem, raters = "A", "audit-armC", []string{"e1", "e2"}
+	}
 	for i, p := range pend {
-		id := fmt.Sprintf("C-%03d", i+1)
+		id := fmt.Sprintf("%s-%03d", idPrefix, i+1)
 		rm.ByRowID[id] = p.key
 		callPay := ""
 		if p.proj.TargetStatus == statusPresent {
@@ -486,7 +503,7 @@ func cmdArmCWorksheet(args []string) error {
 		return err
 	}
 	delivered := map[string]string{}
-	for _, rater := range armCRaters {
+	for _, rater := range raters {
 		sheet := armCSheet{
 			Arm:     "C",
 			Rater:   rater,
@@ -500,7 +517,7 @@ func cmdArmCWorksheet(args []string) error {
 		if err != nil {
 			return err
 		}
-		p := filepath.Join(*outDir, fmt.Sprintf("worksheet-armC-%s.json", rater))
+		p := filepath.Join(*outDir, fmt.Sprintf("%s-%s.json", fileStem, rater))
 		if _, err := os.Stat(p); err == nil {
 			return fmt.Errorf("%s already exists; a worksheet is not regenerated "+
 				"once a rater may have started on it", p)
@@ -517,7 +534,7 @@ func cmdArmCWorksheet(args []string) error {
 		fmt.Printf("worksheet -> %s  (%d rows)\n", p, len(rows))
 
 		// The rater-facing working copy. Same fields, same order, nothing else.
-		cp := filepath.Join(*outDir, fmt.Sprintf("worksheet-armC-%s.csv", rater))
+		cp := filepath.Join(*outDir, fmt.Sprintf("%s-%s.csv", fileStem, rater))
 		csum, err := writeArmCCSV(cp, rows)
 		if err != nil {
 			return fmt.Errorf("writing the rater CSV: %w", err)
@@ -526,10 +543,16 @@ func cmdArmCWorksheet(args []string) error {
 		fmt.Printf("           -> %s\n", cp)
 	}
 
-	if err := writeJSON(filepath.Join(*outDir, "rowmap-armC.json"), rm); err != nil {
+	mapName, projName := "rowmap-armC.json", "projection-armC.json"
+	sumsName := "SHA256SUMS-armC.txt"
+	if *blockedOnly {
+		mapName, projName = "audit-rowmap-armC.json", "audit-projection-armC.json"
+		sumsName = "SHA256SUMS-audit-armC.txt"
+	}
+	if err := writeJSON(filepath.Join(*outDir, mapName), rm); err != nil {
 		return err
 	}
-	if err := writeJSON(filepath.Join(*outDir, "projection-armC.json"), pr); err != nil {
+	if err := writeJSON(filepath.Join(*outDir, projName), pr); err != nil {
 		return err
 	}
 
@@ -541,15 +564,25 @@ func cmdArmCWorksheet(args []string) error {
 			abs++
 		}
 	}
-	if err := writeDeliverySums(*outDir, delivered); err != nil {
+	if err := writeDeliverySums(*outDir, sumsName, delivered); err != nil {
 		return err
 	}
-	fmt.Println("hashes    -> SHA256SUMS-armC.txt       (check a returned file against it)")
-	fmt.Println("join map  -> rowmap-armC.json          (NEVER given to a rater)")
-	fmt.Println("projection-> projection-armC.json      (NEVER given to a rater)")
+	fmt.Printf("hashes    -> %s   (check a returned file against it)\n", sumsName)
+	fmt.Printf("join map  -> %s          (NEVER given to a rater)\n", mapName)
+	fmt.Printf("projection-> %s      (NEVER given to a rater)\n", projName)
 	fmt.Printf("  rows with a malformed target/amount: %d\n", mal)
 	fmt.Printf("  rows with an absent target/amount:   %d\n", abs)
 	fmt.Println()
+	if *blockedOnly {
+		fmt.Println()
+		fmt.Println("FALSE-BLOCK AUDIT. These rows are every call the guard refused, and")
+		fmt.Println("only those. Do NOT tell a rater what the rows have in common: the")
+		fmt.Println("selection used the guard's decision, the rows do not carry it, and")
+		fmt.Println("knowing would change how they label.")
+		fmt.Println()
+		fmt.Println("Both sheets go to EXTERNAL raters. Send only the file and the rubric.")
+		return nil
+	}
 	fmt.Println("e1 and e2 go to EXTERNAL raters: send only the worksheet file and the")
 	fmt.Println("rubric document. Their agreement is the meaningful kappa.")
 	fmt.Println()

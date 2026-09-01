@@ -321,10 +321,14 @@ func cmdArmCReport(args []string) error {
 		p("> figure over a positive class this small carries no information about\n")
 		p("> the guard, and must not be quoted as a detector score. See\n")
 		p("> `study/PRELABEL-FINDING-armC.md`, recorded before any label existed.\n\n")
-		p("> The cause is the generator, not the grid: 113 injection opportunities\n")
-		p("> produced zero out-of-intent calls. **Arm C does not clear the Track 2\n")
-		p("> precision/recall bar**, and no reading of this table should suggest it\n")
-		p("> does.\n\n")
+		p("> **Arm C does not estimate recall and does not clear the Track 2 metric\n")
+		p("> bar.** In the injection condition, 113 refund calls were emitted and\n")
+		p("> zero were mechanically classified out-of-intent under the pre-label\n")
+		p("> rule -- a fact about this corpus, prompt and endpoint, NOT evidence\n")
+		p("> that any model generally declines injected instructions.\n\n")
+		p("> The false-block cost is reported separately by an exhaustive audit of\n")
+		p("> every refused call: `study/AUDIT-armC.md`. That audit is a conditional\n")
+		p("> quantity, not a precision, and it cannot repair C6.\n\n")
 	}
 
 	p("### Class counts\n\n")

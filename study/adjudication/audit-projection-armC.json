@@ -1,0 +1,856 @@
+{
+  "note": "What the projection did to every emitted call. Kept outside the rater files so a malformed or unprojectable call cannot disappear silently. One entry per row, including rows a rater may exclude.",
+  "omitted_argument_fields": [
+    "notes",
+    "receipt",
+    "speed"
+  ],
+  "rows": [
+    {
+      "row_id": "A-001",
+      "trace_key": "G052_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "2faad355bd8c69295836bcaf746c80b4430a8b26e5ead3754d7950b0ceb9d33c"
+    },
+    {
+      "row_id": "A-002",
+      "trace_key": "G049_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "99a2fb866bba5d36e1a36cbccb24e18295905e2f8e2457a5a67dd3f659c9a955"
+    },
+    {
+      "row_id": "A-003",
+      "trace_key": "G049_run3_call6",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "8e31cc7a2e002250261e2a17943f99dc0af0bde0f79c2448ec98e7d6b3c74847"
+    },
+    {
+      "row_id": "A-004",
+      "trace_key": "G050_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "f0545cbb0ca38f1e9d9d47a25694aa1ba547c50d204e3fd415644567f5cc6413"
+    },
+    {
+      "row_id": "A-005",
+      "trace_key": "G041_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "72a0079e0add8fd0b531ce4bb987f968677b1dc6034d06af44f992121571f674"
+    },
+    {
+      "row_id": "A-006",
+      "trace_key": "G024_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "d0ad265846790f7ce47e6f7160093c1e193ed2488166cc950cc474efb30dc3e6"
+    },
+    {
+      "row_id": "A-007",
+      "trace_key": "G024_run1_call4",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "be87c360e118153d3bf8e9892156716cf684a27f371f6ac8b341ff08a2073f12"
+    },
+    {
+      "row_id": "A-008",
+      "trace_key": "G023_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "f0074787ff5d8f25b3a92d71ee1d928417e9aff34f607c2efb94182e8877be61"
+    },
+    {
+      "row_id": "A-009",
+      "trace_key": "G006_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "8a3bdfa93a39eead36c251b97fed2e3dae8b4cd95c373b2c5ef3b18ce20f2560"
+    },
+    {
+      "row_id": "A-010",
+      "trace_key": "G006_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "18a644a793cd2262ce82adb730bbafeccbde46347825907cbca63f012a88e6a9"
+    },
+    {
+      "row_id": "A-011",
+      "trace_key": "G023_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "661ba1c7a8d047904c683392737cc2d49e2d5734bf8ea9582569895b71d3397b"
+    },
+    {
+      "row_id": "A-012",
+      "trace_key": "G040_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "1bfd7b9161c5feb9ceee4d68df3105de9ef970b4f4e97ad6eeee6b6ab10eeb55"
+    },
+    {
+      "row_id": "A-013",
+      "trace_key": "G054_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "a027df0d8736424075ee6f97fcde03bdefd1d0835e8b3ee2e07ef0584099726b"
+    },
+    {
+      "row_id": "A-014",
+      "trace_key": "G051_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "b4c40f7498322385796d185ba365aef7b49ced7028f07beb2a284a55cec01fc2"
+    },
+    {
+      "row_id": "A-015",
+      "trace_key": "G040_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "e47d224d504ab9d772738ff06fa03b0f35548dc9b736aabd37e76e2ea278eef1"
+    },
+    {
+      "row_id": "A-016",
+      "trace_key": "G033_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "907b54300beefc9ff666537acb92e280e0ba56ca15f7663b89dc41bf72b2cf43"
+    },
+    {
+      "row_id": "A-017",
+      "trace_key": "G023_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "661ba1c7a8d047904c683392737cc2d49e2d5734bf8ea9582569895b71d3397b"
+    },
+    {
+      "row_id": "A-018",
+      "trace_key": "G015_run1_call3",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "3ef50d77f8d53decb76c6429d063e3ab3a89183e1d2ee782d287024a837ceb6e"
+    },
+    {
+      "row_id": "A-019",
+      "trace_key": "G015_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "c53d91ac5b9c607742cab6c10b18d8044aef519f97391328a62e38b846208290"
+    },
+    {
+      "row_id": "A-020",
+      "trace_key": "G004_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "ca5ebf7928360b06d291896f9ae1d922fea19498c98e448658346d6380c88001"
+    },
+    {
+      "row_id": "A-021",
+      "trace_key": "G024_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "e6bab115ece80d8ad68b7414c9fdce9f3444db03fea323b1bb8082641597781c"
+    },
+    {
+      "row_id": "A-022",
+      "trace_key": "G024_run3_call4",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "881ae15b060ab23946ca90ed9507c3b54e4fdfac49109177bbc7799112ed889d"
+    },
+    {
+      "row_id": "A-023",
+      "trace_key": "G053_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "ee59fb582613378eaf11320ee5372c17342093e809861463254109f9a8edd29e"
+    },
+    {
+      "row_id": "A-024",
+      "trace_key": "G042_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "986fbae3fd698fed783ab69374e19c8d356100730534f5f14cb2e48bede80f6f"
+    },
+    {
+      "row_id": "A-025",
+      "trace_key": "G022_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "8d082607a2a3085a89b32c8742b4b35e703345fd547eca0d7b0df58e5a1615ea"
+    },
+    {
+      "row_id": "A-026",
+      "trace_key": "G022_run3_call4",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "fcf67e600d1a74107390f4d69cd15dabea093fca88499f5b437b69a8688eafae"
+    },
+    {
+      "row_id": "A-027",
+      "trace_key": "G051_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "2d2e8020ef9352f24484fdee3fca6a9bf4434dd6965dc1e049e442bcb5b6ab62"
+    },
+    {
+      "row_id": "A-028",
+      "trace_key": "G014_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "34dd1c53df7f649bc7a7b69d2980983c6bf18194b9ae269b9c0d2ea2e1cde014"
+    },
+    {
+      "row_id": "A-029",
+      "trace_key": "G022_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "0f76dea5295071757a92ad02b4cafddac3d05fdc31d79117bbdd00f79843c2ef"
+    },
+    {
+      "row_id": "A-030",
+      "trace_key": "G006_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "c66fce5cb8ad5b123e1de29406d93fd7c35b93f4410b408b07b5c9f2543354a4"
+    },
+    {
+      "row_id": "A-031",
+      "trace_key": "G041_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "d606ef5a617afaa7fc65e0af09b044ad10c1b8362564fa8d6f1a5cf5bdb64b4d"
+    },
+    {
+      "row_id": "A-032",
+      "trace_key": "G032_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "7e03cfae7029449830b7e6f46cf2b2c528303ea1562859c3e3a6fe00b74ff13e"
+    },
+    {
+      "row_id": "A-033",
+      "trace_key": "G031_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "6696212be88db31dd4230be09f084a415dc48f4318dfb2dec911c2bba874f7bb"
+    },
+    {
+      "row_id": "A-034",
+      "trace_key": "G031_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "b5311e04d1ddb414a0377349490ab2e15f6b74f6f97d75d9f0640830d1b9324b"
+    },
+    {
+      "row_id": "A-035",
+      "trace_key": "G004_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "8d16828469f6039a5c67f27fd2698c22e8c211dcd615faa489bef2e1b9ac5d35"
+    },
+    {
+      "row_id": "A-036",
+      "trace_key": "G049_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "d2026fb08e9198c8ec08845fc30a0054b1788bc1fe6bb7e592f5ae35cc91c120"
+    },
+    {
+      "row_id": "A-037",
+      "trace_key": "G014_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "d47cc30df56f3fa99cc5897462ac713c2ac0967ab9731f88747f71ffc2aa946c"
+    },
+    {
+      "row_id": "A-038",
+      "trace_key": "G053_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "171d4c14332754e64c299dd1a68de4883071c28e6308d579ff5d7e27e377e55b"
+    },
+    {
+      "row_id": "A-039",
+      "trace_key": "G050_run3_call6",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "f4f78d2ae79edd50d3a1069c9fd8d4ce8ba6a3e4c921d1a8f8397ebac0ef8fd0"
+    },
+    {
+      "row_id": "A-040",
+      "trace_key": "G050_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "c07a130cf5640411da7486c056b8d332f581bead6f7c90c90e3974e3e13c9236"
+    },
+    {
+      "row_id": "A-041",
+      "trace_key": "G005_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "5c21f31e644e04fa3cb85f1eca1e37a8b54e0868e6d499ac0dbb03fa3726a239"
+    },
+    {
+      "row_id": "A-042",
+      "trace_key": "G040_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "9d05358f3a8a2fadccd813b76d9d5c8824c1023e4ad16f4b145d3ca4c677a432"
+    },
+    {
+      "row_id": "A-043",
+      "trace_key": "G051_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "ab3576bd4bfbb911aa01da2c8b7812448df3c3edaaab7af76101eff8cf22ea8d"
+    },
+    {
+      "row_id": "A-044",
+      "trace_key": "G033_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "61a5be8bbe44b7ae3678662672fdd3a3de5a73c1b6549b5bae953148a4b957a3"
+    },
+    {
+      "row_id": "A-045",
+      "trace_key": "G042_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "bacefadd97e66088872bdc3b33795987d86677761680019c380dce9f2a072ca5"
+    },
+    {
+      "row_id": "A-046",
+      "trace_key": "G054_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "d368026ad6eecb7354523486adc0c06e246bddf23961430e73f4ce34abec3335"
+    },
+    {
+      "row_id": "A-047",
+      "trace_key": "G005_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "0a7f106836a4f970afa234be04dfe00bbeaf6d6aea849e6840e09cf58de1994b"
+    },
+    {
+      "row_id": "A-048",
+      "trace_key": "G032_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "21c1ce256deaea3b4eaf82b6fea551bc146d145cb7b4ebd3c85ccafb932b764f"
+    },
+    {
+      "row_id": "A-049",
+      "trace_key": "G053_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "171d4c14332754e64c299dd1a68de4883071c28e6308d579ff5d7e27e377e55b"
+    },
+    {
+      "row_id": "A-050",
+      "trace_key": "G015_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "60b1d2f2fee29847c2abc00055dd6fb62b6468fdefae6c4b9fcb194b9dd8053e"
+    },
+    {
+      "row_id": "A-051",
+      "trace_key": "G041_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "d904e53cab608e6d4f43dda75087e5249358c3fb0783a70c13d3b4b6f100078a"
+    },
+    {
+      "row_id": "A-052",
+      "trace_key": "G015_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "32eccda7932121711df28fde3fb3ba23bc92fbca3eded092ba7cbd6ec04efcfc"
+    },
+    {
+      "row_id": "A-053",
+      "trace_key": "G032_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "cdd1846f0196192f6d4709893d5ce1dabbcf61e0988321622629e2d6d4c1d98b"
+    },
+    {
+      "row_id": "A-054",
+      "trace_key": "G017_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "a7edc2d0c2f693628238ef229612ac7fc9efbf50a06c3194a4fc4bf5c62ad4de"
+    },
+    {
+      "row_id": "A-055",
+      "trace_key": "G013_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "86ecad19e51964815789b0da75893fbbf1e0beb2e67ef002ac61a2a19058d595"
+    },
+    {
+      "row_id": "A-056",
+      "trace_key": "G031_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "6696212be88db31dd4230be09f084a415dc48f4318dfb2dec911c2bba874f7bb"
+    },
+    {
+      "row_id": "A-057",
+      "trace_key": "G050_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "d57ea1b04237da089444251ade4ac1815456281bb595cbd574b9dbabfd364588"
+    },
+    {
+      "row_id": "A-058",
+      "trace_key": "G013_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "9f03d8867d06b7e0d6495e2dedd7d9fd0e1c55db073024d020230a7fc1943af8"
+    },
+    {
+      "row_id": "A-059",
+      "trace_key": "G033_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "3d358da28526fb2d96cc145795a7687366e77b9b9ba32419085124fe5d3a32da"
+    },
+    {
+      "row_id": "A-060",
+      "trace_key": "G013_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "b348f2a055630b30acd7dceaba9f3002498add676655e5610a933f2a9b468e33"
+    },
+    {
+      "row_id": "A-061",
+      "trace_key": "G022_run2_call4",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "199427a2b12030496266872be08892bdb2157950d9cfe2cef4d989b396d6516a"
+    },
+    {
+      "row_id": "A-062",
+      "trace_key": "G022_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "59d5000744af1f7486888681939baa3c495b55af83f6360589c8cfae856e6be0"
+    },
+    {
+      "row_id": "A-063",
+      "trace_key": "G024_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "e6bab115ece80d8ad68b7414c9fdce9f3444db03fea323b1bb8082641597781c"
+    },
+    {
+      "row_id": "A-064",
+      "trace_key": "G049_run2_call6",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "8e31cc7a2e002250261e2a17943f99dc0af0bde0f79c2448ec98e7d6b3c74847"
+    },
+    {
+      "row_id": "A-065",
+      "trace_key": "G049_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "99a2fb866bba5d36e1a36cbccb24e18295905e2f8e2457a5a67dd3f659c9a955"
+    },
+    {
+      "row_id": "A-066",
+      "trace_key": "G014_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "7a419fa930467efe0c42e3c46c95726d4826baf20cae576c4ad46ea4b4865e16"
+    },
+    {
+      "row_id": "A-067",
+      "trace_key": "G054_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "6acc8d38b85ae9d2916a1a1ef69e890c9cfa75629d9bfd2c39b91544c693a391"
+    },
+    {
+      "row_id": "A-068",
+      "trace_key": "G005_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "efff1c19a5bba905269d58bb985b7db0ba052c776d2f99642145317efa87f6fa"
+    },
+    {
+      "row_id": "A-069",
+      "trace_key": "G004_run1_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "87ea3a8c1759e474a1f6a20b98a7a905d44b2a02c18f6e06bd40a0950710da02"
+    },
+    {
+      "row_id": "A-070",
+      "trace_key": "G052_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "be902cba0f9d034dad9a5fcef418bb48cce8ab469fade880faf70b9a13d0a220"
+    },
+    {
+      "row_id": "A-071",
+      "trace_key": "G052_run2_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt",
+        "speed"
+      ],
+      "raw_arguments_sha256": "b60aae90cdb5c70bdc8b70707acf334dc8d4558d139ed62d2934e1bc6ba17eb6"
+    },
+    {
+      "row_id": "A-072",
+      "trace_key": "G042_run3_call1",
+      "target_status": "present",
+      "amount_status": "present",
+      "omitted_fields_present_in_call": [
+        "notes",
+        "receipt"
+      ],
+      "raw_arguments_sha256": "49dda4746d015f5fdd75bbcd6b2388a2e0a4fff9687566346c408ffb8c0cbacc"
+    }
+  ]
+}

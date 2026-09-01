@@ -1,0 +1,11 @@
+# SHA-256 of every arm C file delivered to a rater.
+# The CSV is the working copy; the JSON is canonical.
+# The three CSVs are byte-identical BY DESIGN -- every rater
+# must see exactly the same rows. Attribution is by filename,
+# not by hash. A returned file that still matches its hash
+# here has not been labelled at all.
+
+09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5  audit-armC-e1.csv
+ae121dd0b7a2ac9f296f30d596f7663f111956ab7393ed641062410d4d393d01  audit-armC-e1.json
+09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5  audit-armC-e2.csv
+c11a64b7fc32903eb225efda5f3ad223bb3d3e6a830276a9f51260e81f5569e0  audit-armC-e2.json

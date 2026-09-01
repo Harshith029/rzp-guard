@@ -80,7 +80,7 @@ func writeArmCCSV(path string, rows []armCRow) (string, error) {
 
 // writeDeliverySums records a hash for every file a rater receives, so a
 // returned file can be checked against what was sent.
-func writeDeliverySums(dir string, sums map[string]string) error {
+func writeDeliverySums(dir, name string, sums map[string]string) error {
 	var names []string
 	for n := range sums {
 		names = append(names, n)
@@ -96,7 +96,7 @@ func writeDeliverySums(dir string, sums map[string]string) error {
 	for _, n := range names {
 		fmt.Fprintf(&b, "%s  %s\n", sums[n], n)
 	}
-	return os.WriteFile(filepath.Join(dir, "SHA256SUMS-armC.txt"), []byte(b.String()), 0o644)
+	return os.WriteFile(filepath.Join(dir, name), []byte(b.String()), 0o644)
 }
 
 // readLabelsCSV parses a rater's returned CSV.
