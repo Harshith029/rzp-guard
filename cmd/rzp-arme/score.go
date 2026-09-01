@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/csv"
 	"encoding/json"
@@ -53,13 +54,27 @@ type raterFile struct {
 
 func worksheetPath() string { return filepath.Join(armEDir, "worksheet-armE.csv") }
 
+// readCSV parses a worksheet or a returned file.
+//
+// A leading UTF-8 byte-order mark is stripped. Excel on Windows writes one
+// whenever it saves a CSV, and without this every file a rater opened in Excel
+// would be refused for a difference in the FIRST HEADER CELL -- which is an
+// encoding artifact, not a change to anything they judged. Measured before
+// fixing: a BOM alone rejected the file, and Excel's default output (BOM +
+// CRLF) rejected it too, while CRLF alone, quote-all and a trailing blank line
+// all parsed correctly.
+//
+// This is the only normalisation applied, and the distinction matters: stripping
+// a BOM discards no information a rater expressed. Repairing a reformatted
+// amount or a dropped column would discard exactly that, which is why those are
+// still refused with a resend request.
 func readCSV(path string) ([][]string, error) {
-	f, err := os.Open(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	r := csv.NewReader(f)
+	raw = bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
+	r := csv.NewReader(bytes.NewReader(raw))
 	r.FieldsPerRecord = numCols
 	recs, err := r.ReadAll()
 	if err != nil {

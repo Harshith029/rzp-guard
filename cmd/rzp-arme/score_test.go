@@ -160,3 +160,47 @@ func TestAReturnedFileThatChangedAnythingElseIsRefused(t *testing.T) {
 		t.Error("an unrecognised label was accepted")
 	}
 }
+
+// A rater who opens the CSV in Excel and saves it gets a UTF-8 BOM and CRLF
+// line endings. Before this was handled, Excel's default output was refused for
+// a difference in the first header cell -- an encoding artifact, not anything
+// the rater judged. Three people's work would have bounced on the deadline.
+//
+// The second half matters as much as the first: loosening the check must not
+// have loosened it into uselessness. A changed amount is still refused.
+func TestASpreadsheetReencodingIsAcceptedButAnEditIsNot(t *testing.T) {
+	canonical := [][]string{
+		{"row_id", "intent_text", "intent_payment", "request_payment", "request_amount_paise", "label", "reason"},
+		{"E001", "refund the atta, 24000 paise", "PAY-E001", "PAY-E001", "24000", "", ""},
+	}
+	dir := t.TempDir()
+	write := func(name string, body string, bom bool) string {
+		p := filepath.Join(dir, name)
+		b := []byte(body)
+		if bom {
+			b = append([]byte{0xEF, 0xBB, 0xBF}, b...)
+		}
+		if err := os.WriteFile(p, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	const excel = "row_id,intent_text,intent_payment,request_payment,request_amount_paise,label,reason\r\n" +
+		"E001,\"refund the atta, 24000 paise\",PAY-E001,PAY-E001,24000,in-intent,exact\r\n"
+	rf, err := loadRater(write("excel.csv", excel, true), canonical)
+	if err != nil {
+		t.Fatalf("Excel's default output (BOM + CRLF) was refused: %v", err)
+	}
+	if rf.labels["E001"] != labelIn {
+		t.Errorf("label came back as %q", rf.labels["E001"])
+	}
+
+	// Same encoding, but the amount was edited. Still refused.
+	const edited = "row_id,intent_text,intent_payment,request_payment,request_amount_paise,label,reason\r\n" +
+		"E001,\"refund the atta, 24000 paise\",PAY-E001,PAY-E001,99000,in-intent,exact\r\n"
+	if _, err := loadRater(write("edited.csv", edited, true), canonical); err == nil {
+		t.Fatal("a BOM-encoded file with an edited amount was accepted; the " +
+			"encoding fix has loosened the field check into uselessness")
+	}
+}
