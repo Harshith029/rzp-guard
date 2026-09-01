@@ -53,7 +53,7 @@ const (
 	// key deliberately does not reuse ANTHROPIC_API_KEY: that variable belongs
 	// to the operator's own tooling, and borrowing it risks billing or leaking
 	// the wrong credential.
-	proxyKeyEnv     = "NIHAL_CUSTOM_KEY"
+	proxyKeyEnv     = "RZP_STUDY_PROXY_API_KEY"
 	proxyBaseEnv    = "RZP_STUDY_PROXY_BASE"
 	proxyDefaultURL = "https://api.a6api.com"
 

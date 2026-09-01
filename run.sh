@@ -244,7 +244,7 @@ cmd_redteam() {
       -e GOFLAGS=-buildvcs=false \
       -e GOPROXY=off \
       -e RAZORPAY_KEY_ID= -e RAZORPAY_KEY_SECRET= \
-      -e NIHAL_CUSTOM_KEY= -e OPENAI_API_KEY= -e ANTHROPIC_API_KEY= \
+      -e RZP_STUDY_PROXY_API_KEY= -e OPENAI_API_KEY= -e ANTHROPIC_API_KEY= \
       -e RZP_STUDY_PROVIDER= -e RZP_STUDY_PROXY_BASE= \
       "$GO_IMAGE_PINNED" \
       sh -c '
@@ -286,7 +286,7 @@ cmd_redteam_selfcheck() {
     check() { if [ "$2" = ok ]; then echo "  PASS  $1"; else echo "  FAIL  $1"; fail=1; fi; }
 
     [ ! -e .env ] && check "no .env in the export" ok || check "no .env in the export" no
-    [ -z "${RAZORPAY_KEY_ID:-}${RAZORPAY_KEY_SECRET:-}${NIHAL_CUSTOM_KEY:-}${OPENAI_API_KEY:-}" ] \
+    [ -z "${RAZORPAY_KEY_ID:-}${RAZORPAY_KEY_SECRET:-}${RZP_STUDY_PROXY_API_KEY:-}${OPENAI_API_KEY:-}" ] \
       && check "credential variables empty" ok || check "credential variables empty" no
     [ ! -e /var/run/docker.sock ] && check "no docker socket" ok || check "no docker socket" no
     if getent hosts proxy.golang.org >/dev/null 2>&1; then check "no DNS" no; else check "no DNS" ok; fi
@@ -861,8 +861,8 @@ RZP_STUDY_PROVIDER="${RZP_STUDY_PROVIDER:-proxy}"
 need_study_creds() {
   case "$RZP_STUDY_PROVIDER" in
     proxy)
-      if [ -z "${NIHAL_CUSTOM_KEY:-}" ]; then
-        echo "NIHAL_CUSTOM_KEY is not set (RZP_STUDY_PROVIDER=proxy)." >&2
+      if [ -z "${RZP_STUDY_PROXY_API_KEY:-}" ]; then
+        echo "RZP_STUDY_PROXY_API_KEY is not set (RZP_STUDY_PROVIDER=proxy)." >&2
         echo "Put it in .env (gitignored) and re-run:" >&2
         echo "  set -a && . ./.env && set +a && ./run.sh study-model -model gpt-5.6-sol" >&2
         exit 2
@@ -891,7 +891,7 @@ study_docker() {
   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
       -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
       -e RZP_STUDY_PROVIDER -e RZP_STUDY_PROXY_BASE \
-      -e NIHAL_CUSTOM_KEY -e OPENAI_API_KEY \
+      -e RZP_STUDY_PROXY_API_KEY -e OPENAI_API_KEY \
       "$GOIMAGE" "$@"
 }
 
@@ -1150,7 +1150,7 @@ rzp-guard
                              (no API key, no spend, never a study result)
   ./run.sh study-model       Phase 4b: resolve + record provider, endpoint and
                              model. COMMIT the result BEFORE running traces.
-                             Proxy by default; needs NIHAL_CUSTOM_KEY. It has
+                             Proxy by default; needs RZP_STUDY_PROXY_API_KEY. It has
                              no trustworthy model list, so -model <id> is
                              required, e.g. -model gpt-5.6-sol.
   ./run.sh study-smoke       Phase 4b: ONE real trace to prove the integration.

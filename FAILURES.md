@@ -157,7 +157,7 @@ A present CLI is not a running daemon. Cost: every Phase 1 live gate is still un
 ## F9 — Windows Application Control intermittently blocks freshly built test binaries
 
 ```
-fork/exec C:\Users\harsh\AppData\Local\Temp\go-build3699973873\b175\relay.test.exe:
+fork/exec C:\Users\<user>\AppData\Local\Temp\go-build3699973873\b175\relay.test.exe:
 An Application Control policy has blocked this file.
 ```
 
@@ -306,7 +306,7 @@ evidence/live/block_operator_token
 evidence/live/recover_operator_token
 ```
 
-Both are genuine recovery credentials. `.gitignore` covers `evidence/live/`, which is exactly why it felt safe — but this working tree is `C:/Users/harsh/OneDrive/Desktop/Razorpay`, so an ignored file still syncs to the cloud. **Gitignore is not a confidentiality control.**
+Both are genuine recovery credentials. `.gitignore` covers `evidence/live/`, which is exactly why it felt safe — but this working tree is `C:/Users/<user>/OneDrive/Desktop/Razorpay`, so an ignored file still syncs to the cloud. **Gitignore is not a confidentiality control.**
 
 **Fix:** the gates delete the token immediately after provisioning, and `gate-verify` now asserts its absence — a leak fails the gate rather than passing quietly.
 
@@ -1201,7 +1201,7 @@ A `git push` straight to a URL leaves almost no trace beyond the reflog, and
 construction. The claim is *plausible and locally consistent*, not proven.
 
 **And one copy demonstrably does exist outside this object store.** The working
-tree lives at `C:/Users/harsh/OneDrive/Desktop/Razorpay` — a OneDrive-synced
+tree lives at `C:/Users/<user>/OneDrive/Desktop/Razorpay` — a OneDrive-synced
 path, with `.git` inside it — and `OneDrive.exe` and `OneDrive.Sync.Service.exe`
 are both running. The pre-rewrite pack files were therefore uploaded to
 Microsoft's cloud, which retains version history and a recycle bin. That copy is
