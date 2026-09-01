@@ -165,6 +165,21 @@ func cmdArmCAuditReport(args []string) error {
 		return fmt.Errorf("refusing to overwrite published output: %s", out)
 	}
 
+	// Announced BEFORE the primary sets are loaded, so a supplementary file is
+	// visible even on the error path where e1/e2 are missing. Silence here is
+	// how one would end up quietly treated as ground truth.
+	supp, err := findSupplementaryAuditSets()
+	if err != nil {
+		return err
+	}
+	for _, sset := range supp {
+		fmt.Fprintf(os.Stderr,
+			"NOTE: %s is a SUPPLEMENTARY label set (rater %q).\n"+
+				"      It is excluded from ground truth, from agreement and from\n"+
+				"      the bounds. Only e1 and e2 are primary.\n",
+			filepath.Base(sset.Path), sset.Rater)
+	}
+
 	e1, err := loadAuditLabels("e1")
 	if err != nil {
 		return err
@@ -174,8 +189,16 @@ func cmdArmCAuditReport(args []string) error {
 		return err
 	}
 	if e1 == nil || e2 == nil {
-		return fmt.Errorf("both external raters must return audit labels; expected "+
+		msg := fmt.Sprintf("both external raters must return audit labels; expected "+
 			"%s.csv and %s.csv", auditLabelPath("e1"), auditLabelPath("e2"))
+		if len(supp) > 0 {
+			msg += fmt.Sprintf(
+				"\n\n%d supplementary label set(s) are present and CANNOT "+
+					"substitute: they are not external raters blind to the "+
+					"implementation, so using one as ground truth would be a false "+
+					"claim of independence.", len(supp))
+		}
+		return fmt.Errorf("%s", msg)
 	}
 	blocked, err := loadBlockedCalls()
 	if err != nil {
@@ -332,6 +355,15 @@ func cmdArmCAuditReport(args []string) error {
 	p("  mandate can only authorize what someone wrote down.\n")
 	p("- Synthetic, model-generated calls. The generator's served model is\n")
 	p("  self-reported by an endpoint measured substituting models.\n")
+
+	inSet, outSet := map[string]bool{}, map[string]bool{}
+	for _, k := range agreedIn {
+		inSet[k] = true
+	}
+	for _, k := range agreedOut {
+		outSet[k] = true
+	}
+	reportSupplementary(p, supp, inSet, outSet)
 
 	if err := os.WriteFile(out, []byte(w.String()), 0o644); err != nil {
 		return err
