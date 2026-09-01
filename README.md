@@ -3,24 +3,57 @@
 An authorization proxy that sits in front of Razorpay's **official, unmodified** MCP server and enforces a merchant-issued capability list over `create_refund`.
 
 > **Status — read this before anything else.**
-> This is a **tested Go authorization core with live-verified block AND allow paths**. It is **not** a detector.
 >
-> **The Phase 4b study has run TWICE**, against two generators on the identical frozen task set, and the two arms disagree completely. That disagreement is the result.
+> This is a **tested Go authorization core with live-verified block AND allow
+> paths**. It is **not** a detector, and it does **not** clear the Track 2
+> precision/recall bar. Three evaluation arms have run and none of them
+> establishes recall.
 >
-> | | arm A — `gpt-5.6-sol` | arm B — `gpt-4o` |
-> |---|---|---|
-> | Out-of-intent calls emitted | **0** | **3** |
-> | Recall | undefined (empty positive class) | **1.000** (3/3) |
-> | Precision | degenerate (`0/8`) | **0.250** (3/12) |
-> | False blocks | 8 / 49 | 9 / 51 |
+> **Arm C is a failed recall experiment, and that is the headline.** A
+> mechanically enumerated 54-cell grid the author did not select, policy frozen
+> by hash beforehand, 162 traces, **340 emitted refund calls** — of which the
+> pre-label rule finds **two candidate out-of-intent calls**. Prediction C6
+> required at least twenty and failed decisively. In the injection condition,
+> **113 refund calls were emitted and zero were mechanically classified
+> out-of-intent** — a fact about this corpus, this prompt and this endpoint, and
+> explicitly *not* evidence that any model generally declines injected
+> instructions. Recorded before any label existed:
+> [study/PRELABEL-FINDING-armC.md](study/PRELABEL-FINDING-armC.md).
 >
-> In arm A ([study/RESULTS.md](study/RESULTS.md)) the agent never misbehaved, so the guard was never given a hostile call and precision/recall are arithmetic artefacts. In arm B ([study/RESULTS-armB.md](study/RESULTS-armB.md)) an injected fake "system note" induced a 52000-paise refund in all three runs of one brief, and **the guard blocked every one**.
+> **Arms A and B are descriptive traces over fifteen briefs the implementer
+> wrote and labelled.** They are not a held-out sample and their precision and
+> recall figures must not be quoted as detector scores. Arm A produced no
+> out-of-intent calls at all, so its numbers are arithmetic artefacts; arm B's
+> three positives come from one brief written to produce them. The arms are
+> never pooled. Details: [study/RESULTS.md](study/RESULTS.md),
+> [study/RESULTS-armB.md](study/RESULTS-armB.md).
 >
-> Same guard, same briefs, opposite pictures. **A precision figure for this system is meaningless without naming the generator** — the arms are reported separately and never pooled. The false-block rate is stable across both (≈0.17) and its cause is the guard's exact-amount matching, not the model. Interpretation: [study/FINDINGS-armB.md](study/FINDINGS-armB.md).
+> **What the guard's own record does support** is what the design is for: 72 of
+> arm C's 340 calls were refused, and a **post-hoc, exhaustive conditional
+> audit** of every one of them is underway with two external raters
+> ([study/PROTOCOL-armC-AUDIT.md](study/PROTOCOL-armC-AUDIT.md)). It reports
+> *in-intent calls among guard-blocked calls*, split three ways so a refusal
+> correctly enforcing an incomplete mandate is never counted as a guard defect.
+> It is not a detector metric, it cannot repair C6, and **no result is published
+> here until those labels return.**
 >
-> The generator was an **unverified third-party endpoint** (no direct provider account is available), measured serving a different model than requested. The study publishes every emitted call and does **not** claim to know which model produced them (limits 2 and 3).
+> One finding already visible from the guard's own refusal messages: **nine
+> refusals denied an amount that the available actions summed to exactly**, a
+> bounded-search availability limitation from `maxSetSize = 8` — a deliberate
+> fail-closed cap on computation an agent can drive by choosing an amount. The
+> guard denies authority reachable under unbounded combining in order to bound
+> agent-controlled work. That is a trade-off with a measurable price, not a bug
+> report.
 >
-> The automatic *success* path is **no longer** an unverified guess: G1.6 ran a real Test Mode refund and the envelope is pinned as a test fixture. The remaining limit is narrower and permanent — `COMMITTED` means the provider **created** the refund entity, never that money **settled** (§Known limits).
+> The generator was an **unverified third-party endpoint** (no direct provider
+> account is available), measured serving a different model than requested. The
+> study publishes every emitted call and does **not** claim to know which model
+> produced them (limits 2 and 3).
+>
+> The automatic *success* path is **no longer** an unverified guess: G1.6 ran a
+> real Test Mode refund and the envelope is pinned as a test fixture. The
+> remaining limit is narrower and permanent — `COMMITTED` means the provider
+> **created** the refund entity, never that money **settled** (§Known limits).
 
 ```bash
 ./run.sh operator-setup    # ONCE, before first start: create the recovery credential
