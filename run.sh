@@ -385,11 +385,41 @@ cmd_preflight() {
   echo "  (a text-pattern scan; see the SCOPE note in this function)"
 }
 
+# rn_exit_guard turns a silent early exit into a loud failure.
+#
+# cmd_redteam_negative once exited 0 with no summary at all, because N9's
+# command substitution tripped `set -e` before any case could report. Silence
+# read as success, and a stale summary from an earlier run was quoted as
+# current. This makes that impossible: if the suite leaves without emitting its
+# terminal summary, the process fails whatever its exit code would have been.
+rn_exit_guard() {
+  if [ "${RN_SUMMARY_EMITTED:-0}" != 1 ]; then
+    echo "" >&2
+    echo "FAILED: the negative suite exited WITHOUT its terminal summary." >&2
+    echo "  cases that reported:${RN_SEEN:- none}" >&2
+    echo "  An exit without a summary is not a pass. Do not quote an earlier" >&2
+    echo "  run's summary in its place." >&2
+    exit 1
+  fi
+}
+
 cmd_redteam_negative() {
+  # Deliberately NOT `local`: the EXIT trap below runs after this function's
+  # scope is gone and must still be able to see whether the summary was
+  # emitted. N9 aborted this function mid-run and the suite exited 0 with no
+  # summary at all -- silence that read as success. That must never be possible
+  # again, so the guard lives outside the function's own control flow.
+  RN_PASS=0; RN_FAIL=0; RN_SKIP=0
+  RN_SEEN=""
+  RN_SUMMARY_EMITTED=0
+  RN_EXPECTED_CASES="N1 N2 N3 N4 N5 N6 N7 N8 N9"
+  trap rn_exit_guard EXIT
+
+  rn_mark() { RN_SEEN="$RN_SEEN ${1%% *}"; }
+  ok()   { echo "  BLOCKED   $1"; RN_PASS=$((RN_PASS+1)); rn_mark "$1"; }
+  bad()  { echo "  BYPASSED  $1" >&2; RN_FAIL=$((RN_FAIL+1)); rn_mark "$1"; }
+  skipped() { echo "  SKIP      $1"; RN_SKIP=$((RN_SKIP+1)); rn_mark "$1"; }
   local pass=0 fail=0 skip=0
-  ok()   { echo "  BLOCKED   $1"; pass=$((pass+1)); }
-  bad()  { echo "  BYPASSED  $1" >&2; fail=$((fail+1)); }
-  skipped() { echo "  SKIP      $1"; skip=$((skip+1)); }
 
   echo "=== negative tests: each of these once worked ==="
 
@@ -589,8 +619,15 @@ cmd_redteam_negative() {
     git commit -qm "synthetic launcher-shape fixture (N9)"
   ) >/dev/null 2>&1
   cp run.sh "$n9dir/run.sh"
-  n9out="$( cd "$n9dir" && sh ./run.sh preflight 2>&1 )"
-  n9rc=$?
+  # Captured with && / || like N3, not as a bare assignment.
+  #
+  # Under `set -e`, `x="$(cmd)"` terminates the shell when cmd exits non-zero
+  # -- and a non-zero exit is exactly what this test requires. The bare form
+  # aborted cmd_redteam_negative right here: N9 never reported, the
+  # blocked/bypassed/skipped summary never printed, and I quoted an older
+  # run's summary as though it were current. A test that kills the harness
+  # proving it is worse than no test at all.
+  n9out="$( cd "$n9dir" && sh ./run.sh preflight 2>&1 )" && n9rc=0 || n9rc=1
   rm -rf "$n9dir"
   if [ "$n9rc" = 0 ]; then
     bad "N9 the history scan PASSED a self-authorizing refund shape"
@@ -602,12 +639,46 @@ cmd_redteam_negative() {
   fi
 
   echo
-  echo "  blocked: $pass   bypassed: $fail   skipped: $skip"
-  if [ "$skip" != 0 ]; then
-    echo "  NOT a clean result: $skip case(s) did not run here. Cite the Linux CI"
+  # TERMINAL SUMMARY, machine-checkable.
+  #
+  # Every expected case must have produced exactly one terminal state, and the
+  # three counters must account for all of them. Anything else -- a case that
+  # never ran, a case that reported twice, an early exit -- fails here rather
+  # than being read as success.
+  local total missing dupes c n
+  total=$((RN_PASS+RN_FAIL+RN_SKIP))
+  echo "  blocked: $RN_PASS   bypassed: $RN_FAIL   skipped: $RN_SKIP   total: $total"
+  echo "  cases reporting:$RN_SEEN"
+
+  missing=""; dupes=""
+  for n in $RN_EXPECTED_CASES; do
+    c=0
+    for seen in $RN_SEEN; do [ "$seen" = "$n" ] && c=$((c+1)); done
+    [ "$c" = 0 ] && missing="$missing $n"
+    [ "$c" -gt 1 ] && dupes="$dupes $n(x$c)"
+  done
+
+  RN_SUMMARY_EMITTED=1
+
+  if [ -n "$missing" ]; then
+    echo "  FAILED: these cases produced NO terminal state:$missing" >&2
+    echo "  A case that does not report is not a case that passed." >&2
+    exit 1
+  fi
+  if [ -n "$dupes" ]; then
+    echo "  FAILED: these cases reported more than once:$dupes" >&2
+    exit 1
+  fi
+  if [ "$total" != 9 ]; then
+    echo "  FAILED: $total terminal states, expected 9" >&2
+    exit 1
+  fi
+
+  if [ "$RN_SKIP" != 0 ]; then
+    echo "  NOT a clean result: $RN_SKIP case(s) did not run here. Cite the Linux CI"
     echo "  output for those, never this local summary alone."
   fi
-  [ "$fail" = 0 ] || { echo "A PREVIOUSLY-FIXED BYPASS IS OPEN AGAIN" >&2; exit 1; }
+  [ "$RN_FAIL" = 0 ] || { echo "A PREVIOUSLY-FIXED BYPASS IS OPEN AGAIN" >&2; exit 1; }
 }
 
 # Fuzzing INSIDE the isolated lane.
