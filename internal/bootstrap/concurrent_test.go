@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -193,45 +194,97 @@ func TestConcurrentSessionsDoNotShareDurableState(t *testing.T) {
 
 // The lock is per FILE. Two guards on the SAME file must still be refused --
 // that is the guarantee sharding relies on, so it must survive contention.
+//
+// THIS TEST CAUGHT A REAL DEFECT. On ca1e4c1 it failed in CI with "0 of 16
+// concurrent opens succeeded": not one winner and fifteen refusals, but NOBODY.
+// Under locking_mode = EXCLUSIVE every opener held SHARED and none could
+// upgrade. Reproduced 1 run in 12 under --cpus=0.5 with -race, then fixed by
+// the bounded retry in storage.Open.
+//
+// The old version of this test discarded the error and counted successes, so it
+// could see "0 of 16" but could not say whether the fifteen losers were refused
+// as owners, refused for some unrelated reason, or still running. It now checks
+// all four things the fix has to deliver.
 func TestTheExclusiveLockHoldsUnderConcurrentOpens(t *testing.T) {
 	const attempts = 16
+	// storage.Open waits out contention for its own internal deadline (2s at the
+	// time of writing) and then refuses. This bound is deliberately far looser,
+	// because it has to hold under -race on a constrained CPU. It still fails if
+	// any loser ever waits without a bound, which is the property under test.
+	const bound = 90 * time.Second
+
 	path := filepath.Join(t.TempDir(), "contended.db")
 	m := buildMandate(t, "mnd_contend", 2, 1000)
 	now := time.Now().UTC()
 
 	var wg sync.WaitGroup
-	opened := make([]bool, attempts)
-	var mu sync.Mutex
-	var live []*Result
+	errs := make([]error, attempts)
+	live := make([]*Result, attempts)
 
+	start := time.Now()
 	for i := 0; i < attempts; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			boot, err := Open(path, m, now)
-			if err != nil {
-				return
-			}
-			mu.Lock()
-			opened[i] = true
-			live = append(live, boot)
-			mu.Unlock()
+			errs[i] = err
+			live[i] = boot
 		}(i)
 	}
 	wg.Wait()
+	elapsed := time.Since(start)
 
-	n := 0
-	for _, ok := range opened {
-		if ok {
+	// 1. Exactly one owner.
+	winner, n := -1, 0
+	for i, err := range errs {
+		if err == nil {
 			n++
+			winner = i
 		}
 	}
-	for _, b := range live {
-		_ = b.Close()
-	}
 	if n != 1 {
+		for _, b := range live {
+			if b != nil {
+				_ = b.Close()
+			}
+		}
 		t.Fatalf("%d of %d concurrent opens succeeded on ONE state file, want "+
 			"exactly 1; each would enforce the cumulative cap against its own "+
-			"in-memory ledger, so between them they could spend past it", n, attempts)
+			"in-memory ledger, so between them they could spend past it. Zero is "+
+			"the deadlock this test caught on ca1e4c1", n, attempts)
+	}
+	defer live[winner].Close()
+
+	// 2. Every loser refused as a NAMED ownership conflict, within a bound. An
+	//    anonymous failure would be indistinguishable from a corrupt state file,
+	//    and an unbounded wait would hang the guard at startup instead.
+	for i, err := range errs {
+		if i == winner {
+			continue
+		}
+		if !errors.Is(err, storage.ErrNotOwner) {
+			t.Fatalf("open %d was refused with %v, want storage.ErrNotOwner", i, err)
+		}
+	}
+	if elapsed > bound {
+		t.Fatalf("%d contending opens took %v, over the %v bound: a loser is "+
+			"waiting without a deadline", attempts, elapsed, bound)
+	}
+
+	// 3. The winner still OWNS it -- both halves. It can still write through its
+	//    own handle, and the file is still closed to everyone else. A "fix" that
+	//    let the losers in once the winner settled would satisfy (1) and (2) and
+	//    still be the two-ledger bug.
+	args := map[string]any{"payment_id": "pay_SYNmnd_contend00", "amount": int64(1000)}
+	if d := live[winner].Guard.Decide(policy.RefundTool, args, now); !d.Allowed {
+		t.Fatalf("the owner was refused its own action after winning the race: %s", d.Reason)
+	}
+	late, err := storage.Open(path, "mnd_contend")
+	if err == nil {
+		late.Close()
+		t.Fatal("a later open took the state file while the owner was still live")
+	}
+	if !errors.Is(err, storage.ErrNotOwner) {
+		t.Fatalf("a later open was refused with %v, want storage.ErrNotOwner", err)
 	}
 }

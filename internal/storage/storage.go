@@ -56,7 +56,31 @@ var (
 	// ErrMandateMismatch means this state file already belongs to a different
 	// mandate that still has unresolved actions.
 	ErrMandateMismatch = errors.New("state file belongs to another mandate with unresolved actions")
+
+	// errLockContended is INTERNAL and never escapes Open. It marks the one
+	// failure worth retrying -- another connection held the exclusive lock at this
+	// instant -- as opposed to a decision this build has already reached about the
+	// file (wrong schema version, another mandate's unresolved actions), which
+	// retrying could only delay.
+	errLockContended = errors.New("storage: exclusive lock contended")
 )
+
+// lockAcquireDeadline bounds how long Open waits for the exclusive lock. A var
+// so tests can shorten it; nothing outside this package can set it.
+var lockAcquireDeadline = 2 * time.Second
+
+// lockContended reports whether err is SQLite refusing because someone else
+// holds the lock right now. Matched on the driver's text because
+// modernc.org/sqlite returns a plain error here, not a typed one. A false
+// negative costs a retry that would have succeeded; it never yields a wrong
+// owner, because the lock itself is what decides that.
+func lockContended(err error) bool {
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "database is locked") ||
+		strings.Contains(s, "sqlite_busy") ||
+		strings.Contains(s, "database table is locked") ||
+		strings.Contains(s, "sqlite_protocol")
+}
 
 func nowUnixNano() int64 { return time.Now().UTC().UnixNano() }
 
@@ -201,8 +225,71 @@ type Store struct {
 	mandateID string
 }
 
-// Open prepares the database and applies the schema.
+// Open prepares the database and applies the schema, waiting out lock
+// contention for a bounded time.
+//
+// WHY A RETRY IS NEEDED AT ALL. The exclusive lock is taken by the schema
+// statement in openOnce, not by the PRAGMA above it. Under
+// `locking_mode = EXCLUSIVE` a connection that has read the database KEEPS its
+// SHARED lock for the connection's whole life. So N processes starting together
+// can each hold SHARED, none can upgrade to EXCLUSIVE, and every one of them
+// fails -- not one owner and N-1 refusals, but ZERO owners. CI observed exactly
+// that on ca1e4c1 ("0 of 16 concurrent opens succeeded"), and it reproduced 1
+// run in 12 under --cpus=0.5 with -race. A single attempt cannot recover from
+// it, because the losers are holding the very lock they are waiting for.
+//
+// Closing the handle releases it, so each attempt here uses a FRESH connection
+// and the losers get out of each other's way. Jittered backoff stops them
+// colliding again in lockstep.
+//
+// WHY NOT A BUSY TIMEOUT. sqlite3_busy_timeout sleeps and retries on the SAME
+// connection, so in this deadlock every waiter would sleep while holding the
+// SHARED lock that blocks everyone: it cannot break it. It would also apply to
+// every later statement, turning a fast refusal into an unbounded stall
+// mid-refund. This retry is confined to startup and has a deadline.
+//
+// THE DIRECTION IS STILL FAIL CLOSED. Nothing has been forwarded when Open
+// runs. Exhausting the deadline returns ErrNotOwner and the guard does not
+// start: unavailable, never two owners over one ledger.
 func Open(path, mandateID string) (*Store, error) {
+	return openWithDeadline(path, mandateID, lockAcquireDeadline)
+}
+
+func openWithDeadline(path, mandateID string, deadline time.Duration) (*Store, error) {
+	giveUp := time.Now().Add(deadline)
+	backoff := 2 * time.Millisecond
+	for attempt := 1; ; attempt++ {
+		st, err := openOnce(path, mandateID)
+		if err == nil {
+			return st, nil
+		}
+		if !errors.Is(err, errLockContended) {
+			return nil, err
+		}
+		if !time.Now().Before(giveUp) {
+			return nil, fmt.Errorf(
+				"storage: %w: could not acquire the exclusive lock on %s within %s "+
+					"(%d attempts). Another guard process holds it, so this one "+
+					"refuses to start rather than run a second ledger over the "+
+					"same file", ErrNotOwner, path, deadline, attempt)
+		}
+		// Jitter from the clock rather than math/rand: this package should not
+		// carry a seeded global, and the only requirement is that two contenders
+		// do not wake together.
+		wait := backoff + time.Duration(time.Now().UnixNano()%int64(backoff))
+		if rem := time.Until(giveUp); wait > rem {
+			wait = rem
+		}
+		time.Sleep(wait)
+		if backoff < 40*time.Millisecond {
+			backoff *= 2
+		}
+	}
+}
+
+// openOnce is one attempt. Every failure path closes the handle, which is what
+// releases the SHARED lock and lets a competing attempt make progress.
+func openOnce(path, mandateID string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("storage: open: %w", err)
@@ -224,6 +311,9 @@ func Open(path, mandateID string) (*Store, error) {
 	}
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
+		if lockContended(err) {
+			return nil, fmt.Errorf("%w (%v)", errLockContended, err)
+		}
 		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
 	}
 	// Before ANY read of the tables below. A file this build cannot correctly
@@ -287,6 +377,9 @@ func Open(path, mandateID string) (*Store, error) {
 		                               acquired_at = excluded.acquired_at`,
 		mandateID, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
 		db.Close()
+		if lockContended(err) {
+			return nil, fmt.Errorf("%w (%v)", errLockContended, err)
+		}
 		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
 	}
 	return &Store{db: db, mandateID: mandateID}, nil

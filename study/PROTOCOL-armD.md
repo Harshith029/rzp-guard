@@ -1,51 +1,28 @@
-# Arm D pre-registration — a synthetic conformance corpus
+> ## RETRACTED - see [ASSESSMENT-armD.md](ASSESSMENT-armD.md)
+>
+> **This notice was added on 2026-09-01, after the numbers existed. It is the
+> only edit ever made to this file.**
+>
+> The metric claims in this document are **withdrawn**. Arm D is a
+> pre-registered, same-author synthetic conformance corpus scored against
+> author-declared labels. Its 90-row confusion matrix is exact for that finite
+> grid, but it is not independently labelled or policy-blind and does not
+> establish transferable recall, precision, or false-positive cost.
+>
+> This file is the pre-registration, committed before the corpus existed. It is preserved
+> **unedited** below, because a retraction that quietly rewrites the document
+> it retracts leaves no record of what was claimed. Everything after the marker
+> line is byte-for-byte the artifact committed in `ca1e4c1` (git blob `db57fd5902f085d95c9ea1f7681b766b9c885af6`), which
+> `git show ca1e4c1:study/PROTOCOL-armD.md` will print.
+>
+> `rzp-armd verify` recomputes the hash of that preserved text and fails if a
+> byte of it changes.
+>
+> What is withdrawn, why, and what these numbers do still support:
+> [**ASSESSMENT-armD.md**](ASSESSMENT-armD.md).
 
-> ## What arm D is
->
-> **Arm D is a pre-registered, same-author synthetic conformance corpus scored
-> against author-declared labels.**
->
-> **Its 90-row confusion matrix is exact for that finite grid, but it is not
-> independently labelled or policy-blind and does not establish transferable
-> recall, precision, or false-positive cost.**
->
-> It is an engineering regression and conformance suite. It is **not** the metric
-> rescue, it does not meet the Track 2 metric bar, and it does not repair arm C.
-> Arm C's failed agent-trace result stands unchanged in
-> `PRELABEL-FINDING-armC.md`.
->
-> ### Why the original framing was wrong
->
-> **The scorer never reads the intent.** `cmd/rzp-armd/main.go` branches on
-> `r.Label`, a field authored into `requests.json`. `intent_text` is loaded and
-> never used in a decision, and `intent_payment` is not even in the struct. A
-> one-field edit to `label` changes the reported precision and recall. The claim
-> "ground truth comes from intent, never the mandate" was false **as an
-> implementation claim**, whatever the generator intended.
->
-> **Freezing the policy first does not blind the author.** The same person who
-> knew the decision rule constructed the corpus afterwards. A date proves the
-> code was not fitted to the data; it does not make the data independent of the
-> author's knowledge of the code.
->
-> **D1 is tautological.** Every positive was constructed as an unmatched amount
-> or an unmatched payment. A default-deny capability verifier must refuse all of
-> them. Recall 1.000 restates the construction; it does not measure detection.
->
-> **The false-positive labels are not settled ground truth.** An intent reading
-> "refund the item price, 24,000 paise" does not self-evidently mean a
-> 12,000-paise partial refund is in-intent. The six `coverage=exact /
-> request=under` rows counted as false positives may be a correct exact-
-> authorization refusal rather than a merchant-harming block. Deciding that needs
-> independent human labels or a separately justified rule, and has neither.
->
-> ### The minimum path to a literal Track-qualifying claim
->
-> Independent blinded labels for these 90 rows: each rater shown the intended
-> payment, the intent, and the requested refund — and **not** the mandate or the
-> guard's decision. Until that exists, nothing here is a metric result.
-
-
+<!-- PRESERVED-ORIGINAL-BELOW -->
+# Arm D pre-registration — a held-out verifier evaluation
 
 **Status: written and committed before the corpus exists.** Nothing below was
 written after seeing a number.
@@ -84,7 +61,7 @@ wrong:
 - **Not a fraud-detection result.** The guard is deterministic. This measures
   whether it classifies correctly, not whether it predicts anything.
 
-## 3. What the policy freeze does and does not buy
+## 3. Why "held out" is defensible here
 
 The usual worry is that the implementation was tuned to the test data. That is
 answerable in this arm with a date rather than an argument:
@@ -94,13 +71,12 @@ policy last changed   fb87b12   2026-08-30
 arm D corpus created            2026-09-01 or later
 ```
 
-The detector was written and frozen before this corpus existed, so it cannot
-have been fitted to data that did not exist. **That is all the date buys.** It
-does not blind the author, who knew the decision rule while constructing the
-corpus, and it does not make the labels independent. See the banner above.
+**The detector was written and frozen before this corpus existed.** It cannot
+have been fitted to data that did not exist, and any reader can check the two
+commits. That is a stronger guarantee than a random train/test split over a
+corpus the author already held.
 
-Additionally — and only the last of these is enforced by the harness, a
-distinction the original wording got wrong:
+Additionally, and enforced by the harness:
 
 - the corpus is a **mechanical cross product**, not a chosen set of cases;
 - **the policy is not modified after scoring.** If `internal/policy` changes
@@ -168,10 +144,10 @@ both and give precision at more than one class balance.
 
 ## 7. What the result will and will not support
 
-**Will support:** "on a pre-registered, same-author synthetic conformance
-corpus of 90 constructed refund requests scored against author-declared
-labels, the guard's decisions matched those labels as follows ..." — a
-conformance statement about a finite grid, not a metric.
+**Will support:** "on a pre-registered, mechanically enumerated, held-out corpus
+of 90 constructed refund requests, scored against a policy frozen before the
+corpus existed, the verifier achieved precision X and recall Y, with the
+false-positive cost attributable to mandate under-coverage."
 
 **Will not support:** any claim about how often an agent misbehaves, any fraud
 rate, any generalisation to merchant traffic, or that arm C succeeded.

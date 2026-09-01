@@ -1,0 +1,64 @@
+{
+  "note": "Everything the published arm D numbers depend on. `rzp-armd verify` checks all of it and writes nothing. None of this makes the labels independent; see study/ASSESSMENT-armD.md.",
+  "recorded_at_utc": "2026-09-01T14:06:31Z",
+  "decision_path": {
+    "note": "Non-test sources of the scorer's import closure (`go list -deps ./cmd/rzp-armd`), plus cmd/rzp-armd/main.go. internal/storage is absent because it is not in that closure: the scorer's persister is nil.",
+    "packages": [
+      "internal/lifecycle",
+      "internal/mandate",
+      "internal/opauth",
+      "internal/policy",
+      "cmd/rzp-armd"
+    ],
+    "tree_sha256": "b62ea2facbe78c84faae482d0bc7e7dde9c46887e27a7bbfba57bfa6d2ac7b18",
+    "files": {
+      "cmd/rzp-armd/main.go": "31901382821ac6fe506681c9f5db2761c3df4684fe2a4e9192911023ddf2640f",
+      "internal/lifecycle/lifecycle.go": "f5b59d977a35c05c300393b09a7a09adfead6a99cc2fa698684e7a16666c4f70",
+      "internal/mandate/mandate.go": "e63eeb856350cb0dcb5feaf0a1410253e192c0656b952b92ade5750f389bc0e5",
+      "internal/opauth/deliver.go": "2c09319729a9b76e2f0a9b071ec3e0b8a9fc6a607074f0fa268f3621b66dfbc1",
+      "internal/opauth/opauth.go": "8857267918089da6703914b043ca4b4a4c5689cdabe1ae6368af4db003efc2c3",
+      "internal/opauth/syncdir.go": "c055f5b59d667bf4aaf9a80fcd3927817c9cab0482f6e85bbf0a17589078d2ae",
+      "internal/policy/policy.go": "225e4ba9ba7b54ddc81f6f3c14553f1e26e26fd3beefcfc43ef71c4aceaed48d"
+    }
+  },
+  "corpus": {
+    "requests_sha256": "25e1cc3cb79dfbb115b6eb195edb0ac53572e81b626d9e678cf35aec8577e6de",
+    "mandate_count": 90,
+    "mandates_tree_sha256": "84e8a37b9caef6820bc5b630d56187977fce3d8f8acce032af1125de8ce28ed8",
+    "generators": {
+      "study/compile_mandate.py": "35b6c7dbc749ee98340d842b7ea27a2e89f0ebb4ad06dd04439a1c04bce013e2",
+      "study/grid.py": "90e7492ca3fdf37cb524799cc7eeddfb24406f8834c51dfffe3d80c81dbafe11",
+      "study/grid_d.py": "6d97d03b8f3b2d4b30e2ef233a66439511ad3fe4e98b8a0e1a59b55f6a3aa9ad"
+    }
+  },
+  "generated_report": {
+    "path": "study/armD/CONFORMANCE-armD.md",
+    "sha256": "ef38c6332ffac00864bd198b0c5bf36ab820bb6538489a4634b437ef7481113d"
+  },
+  "preserved_documents": [
+    {
+      "path": "study/RESULTS-armD.md",
+      "preserved_from_commit": "f87c86b",
+      "preserved_git_blob": "5fa0bc39be271ddc9fb2dee1ec90fdcac478cb75",
+      "preserved_body_sha256": "bd817e1ab8526649a54f9413d2440b115c1a79cfdd6dc04af05583c26934512d"
+    },
+    {
+      "path": "study/PROTOCOL-armD.md",
+      "preserved_from_commit": "ca1e4c1",
+      "preserved_git_blob": "db57fd5902f085d95c9ea1f7681b766b9c885af6",
+      "preserved_body_sha256": "f6812f0ac9d9b7d2cf93652684c8bac3e620f47c988ca6d9f41f6f2e51e872af"
+    },
+    {
+      "path": "study/FINDINGS-armD.md",
+      "preserved_from_commit": "f87c86b",
+      "preserved_git_blob": "49ec6ae34ac78f84ac445b6fafc3a7be9780af4e",
+      "preserved_body_sha256": "5be948497ba95fa99a41135f16767f4aeec9c24df2a521a32136cef53838dcc9"
+    }
+  ],
+  "published_matrix": {
+    "tp": 54,
+    "fp": 17,
+    "tn": 19,
+    "fn": 0
+  }
+}

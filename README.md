@@ -146,6 +146,18 @@ Earlier arms A and B are descriptive traces over fifteen scenarios the author
 wrote and labelled. **Their precision and recall figures are not detector scores
 and must not be quoted as such.**
 
+**Arm D** is a pre-registered, same-author synthetic conformance corpus of 90
+constructed refund requests, scored against author-declared labels. Its
+confusion matrix is exact for that finite grid, but it is **not independently
+labelled or policy-blind, and it does not establish transferable recall,
+precision, or false-positive cost.** It was published on 2026-09-01 as a metric
+result and that claim was withdrawn the same day; the original documents are
+preserved unedited and the retraction is
+[`study/ASSESSMENT-armD.md`](study/ASSESSMENT-armD.md). **It does not change the
+line above, and it does not repair arm C.** What it is worth is engineering: a
+reproducible conformance suite, pinned by a manifest that `go test` enforces,
+and one bounded-search limitation reduced to a single deterministic case.
+
 **What is prepared, not yet run:** the guard refused **72 of those 340 calls**.
 Two blinded external-rater worksheets covering every one of them are prepared
 but **have not been distributed, and no external result exists.** Raters would
