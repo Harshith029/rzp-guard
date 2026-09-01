@@ -150,8 +150,15 @@ Run the gate:
 ./run.sh preflight
 ```
 
-It scans **all reachable history** and refuses if any commit grants a refund
-action to a caller-supplied target — the shape of a self-authorizing launcher.
+It scans **all reachable history** and refuses if any commit contains the
+prohibited launcher signature — a refund action granted to a caller-supplied
+target.
+
+**It is a text-pattern scan, and its claim is exactly that narrow.** A pass
+means no reachable source matched the signature. It is not, and cannot be,
+proof that no reachable commit can launch a caller-selected refund: it cannot
+see the same capability built by concatenation, read from data, written in a
+language it does not read, or shaped in a way nobody added to the list.
 `FAILURES.md` F26 is why this exists: such a command survived in history for
 four commits after it was deleted from the tip, and every check in place at the
 time looked only at `HEAD`. A clone carries its history.

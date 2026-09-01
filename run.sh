@@ -332,10 +332,22 @@ cmd_preflight() {
   # would miss the same code under any other name. The shape is the invariant;
   # the name is not.
   #
-  # WHAT IT DOES NOT PROVE: the absence of every conceivable offense-capable
-  # construction. It rejects the one shape that actually occurred here, and any
-  # renaming or re-spelling of it, across all reachable history. It is a
-  # tripwire against regression, not a proof of universal safety.
+  # SCOPE, stated as narrowly as the mechanism allows.
+  #
+  # This is a TEXT-PATTERN SCAN. What it can support is: "no reachable source
+  # in this repository matched the prohibited launcher signature." What it
+  # cannot support -- and what an earlier version of this message claimed -- is
+  # "no reachable commit can launch a caller-selected refund." That is a claim
+  # about program behaviour, and no grep establishes it.
+  #
+  # Specifically it cannot see: the same capability spelled differently, built
+  # by string concatenation, read from a data file, expressed in a language
+  # this scan does not read, or reached through a dependency. It also cannot
+  # see a shape nobody thought to add to the pattern list.
+  #
+  # It rejects the shape that actually occurred here (FAILURES.md F18, F26) and
+  # renamings of it. It is a regression tripwire, not a proof of safety, and
+  # F29 records the time it was reported green without being run.
   #
   # Validated against the pre-rewrite history: these patterns flag exactly the
   # four carrier commits and nothing else, and flag nothing in the current
@@ -369,7 +381,8 @@ cmd_preflight() {
     echo "  RESULT: FAILED -- do not publish this history" >&2
     exit 1
   fi
-  echo "  RESULT: no reachable commit can launch a caller-selected refund"
+  echo "  RESULT: no reachable source matched the prohibited launcher signature"
+  echo "  (a text-pattern scan; see the SCOPE note in this function)"
 }
 
 cmd_redteam_negative() {

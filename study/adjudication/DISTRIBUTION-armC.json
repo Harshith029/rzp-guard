@@ -8,10 +8,39 @@
     "audit-armC-e1.csv": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5",
     "audit-armC-e2.csv": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5"
   },
-  "recorded_at_utc": "2026-09-01T04:36:33Z",
-  "verification": "Verified before recording, not taken on trust: `git ls-remote` returned dc204416dab91c4f69440ce2761bbea971ac79db for both HEAD and refs/heads/master, matching local HEAD. A commit SHA hashes the whole tree, so the published worksheets are byte-identical to the local ones. Each worksheet was additionally hashed straight out of that commit's blob and matches the pre-distribution record.",
+  "recorded_at_utc": "2026-09-01T04:42:49Z",
+  "verification": {
+    "verified_at_utc": "2026-09-01T04:42:49Z",
+    "note": "Each step below was executed and its output recorded. An earlier version of this field described verifying dc204416... while this record already declared 65f97b0... as the anchor, so it did not verify the commit it asked anyone to trust.",
+    "step_1_external_branch_resolution": {
+      "method": "git ls-remote https://github.com/Harshith029/rzp-guard refs/heads/master",
+      "observed_refs_heads_master": "d67a4ec803e8f63c9d4e3fac4fe874444883fb54",
+      "observed_at_utc": "2026-09-01T04:42:49Z",
+      "meaning": "The branch tip published at that moment. The tip ADVANCES with every normal commit, including the one carrying this record. It is evidence that the anchor was published, not a value expected to stay constant."
+    },
+    "step_2_anchor_is_ancestor_of_published_tip": {
+      "method": "git merge-base --is-ancestor 65f97b0352e79611c48f99577a57a338d98a7ba9 d67a4ec803e8f63c9d4e3fac4fe874444883fb54",
+      "result": "true",
+      "meaning": "The anchor is contained in the published branch. This stays true for every later tip on master, so it does not decay as the branch grows."
+    },
+    "step_3_worksheet_blobs_at_the_anchor": {
+      "method": "git cat-file blob <anchor>:study/adjudication/audit-armC-e*.csv | sha256",
+      "audit-armC-e1.csv": {
+        "blob": "0193dc096c10c12fa7dd7fce52bbf0ef0a7dd461",
+        "sha256": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5"
+      },
+      "audit-armC-e2.csv": {
+        "blob": "0193dc096c10c12fa7dd7fce52bbf0ef0a7dd461",
+        "sha256": "09b3142b5e20c7cf96148b97d2c0c73e99fe08690f5f9caea6752edd5c0587c5"
+      },
+      "meaning": "Hashed straight out of the anchor commit's tree, not from the working directory. Both files share one blob because they are byte-identical by design -- every rater must see the same rows."
+    },
+    "what_this_does_not_establish": "That the repository will not be rewritten again. A force-push can move a public branch, and this project has done so. The durable evidence a rater holds is the SHA-256 in their own distribution message, which the author cannot reach."
+  },
   "superseded_anchor": {
     "sha": "dc204416dab91c4f69440ce2761bbea971ac79db",
-    "why": "History was rewritten and force-pushed AFTER this SHA was first recorded and BEFORE anything was sent to a rater. cmd_preflight was refusing the repository's own history because N9's test fixture was written literally into run.sh and matched the rule preflight enforces. The fixture is now assembled at runtime. Nothing had been distributed, so no rater holds a hash tied to the old SHA. The worksheet hashes are UNCHANGED by the rewrite -- 09b3142b... before and after -- so only the commit id moved."
+    "status": "SUPERSEDED - not the anchor. Retained for provenance only.",
+    "why": "Recorded as the anchor, then invalidated by a history rewrite before anything was distributed. cmd_preflight was refusing the repository's own history: N9's test fixture was written literally into run.sh and matched the rule preflight enforces. The fixture is now assembled at runtime. No rater ever held a hash tied to this SHA.",
+    "worksheet_hashes_unchanged_by_the_rewrite": true
   }
 }
