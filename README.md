@@ -8,6 +8,25 @@ amount, which is the default and the form every shipped mandate uses.
 
 ---
 
+## Two minutes
+
+If you only have a few minutes, this is the whole project:
+
+| | |
+|---|---|
+| **1. What it does** | the four-line trace under [What this is](#what-this-is) |
+| **2. That it works** | `./run.sh test` — unit, lifecycle and race lanes in a digest-pinned container |
+| **3. That it cannot be bypassed** | `./run.sh redteam-negative` — ten bypasses that once worked, each must still fail |
+| **4. What it costs** | [`study/FP-COST.md`](study/FP-COST.md) — both error directions priced, with the break-even |
+| **5. What it has not shown** | [Honest evaluation status](#honest-evaluation-status) — the recall experiment failed, and it is published as a failure |
+
+The one number worth arguing about: **this control breaks even at roughly a 5.6%
+out-of-intent base rate, and the only agent traffic we observed ran at 0.6%.**
+That is in `study/FP-COST.md`, with the assumptions that produce it and the ones
+that would overturn it.
+
+---
+
 ## The problem
 
 Merchants are starting to let AI agents handle support. An agent that can read a
@@ -172,13 +191,23 @@ Details: `study/PRELABEL-FINDING-armC.md`, `study/PROTOCOL-armC-AUDIT.md`.
 
 ## Known limits
 
-**Mandates are not signed.** The guard reads the mandate from disk and does not
-verify who wrote it. Anyone who can write that file can grant authority —
-including after the fact. So the honest claim is narrow: the guard enforces that
-an agent cannot exceed authority *someone else wrote down*, and makes every
-grant single-use, durable and auditable. It does not establish that the grant
-was legitimate. Closing this needs merchant-side signing with a key the guard
-host does not hold.
+**Mandate signing is available but off by default.** Without
+`-mandate-pubkey`, the guard reads the mandate from disk and does not verify who
+wrote it: anyone who can write that file can grant authority, including after
+the fact. With a key configured, the mandate must carry a valid ed25519
+signature over its exact bytes at `<mandate>.sig`, and an unsigned or altered
+mandate refuses to start — verified before parsing, so no re-serialisation sits
+between what was signed and what is enforced.
+
+It is opt-in because every fixture in this repository is unsigned, and defaulting
+it on would break them all. **Nothing here is enforced by default, and the
+unconfigured path prints a warning saying exactly what is not being checked.**
+Signing also authenticates the file, not the human: a compromised key issues
+mandates the guard will honour, and key custody is outside this program.
+
+So the claim stays narrow. The guard enforces that an agent cannot exceed the
+authority *presented to it*, and makes every grant single-use, durable and
+auditable.
 
 **Combining is deliberately bounded.** A refund can be covered by several
 authorized entries summing to it, but the search stops at eight. Exact
@@ -201,6 +230,7 @@ merchant traffic, and no claim is made about which model produced the calls.
 |---|---|
 | `cmd/`, `internal/` | the guard, the operator tool, the study runner |
 | `study/` | the evaluation: protocol, corpus, traces, results |
+| `study/FP-COST.md` | what each error direction costs, and the break-even base rate |
 | `evidence/` | live-gate projections and CI references |
 | `FAILURES.md` | what broke, why, and what was changed — including defects found in the fixes for earlier defects |
 | `ARCHITECTURE.md` | design and the reasoning behind the capability model |

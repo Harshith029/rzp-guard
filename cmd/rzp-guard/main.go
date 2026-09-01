@@ -28,6 +28,7 @@ import (
 	"github.com/harshith/rzp-guard/internal/bootstrap"
 	"github.com/harshith/rzp-guard/internal/buildinfo"
 	"github.com/harshith/rzp-guard/internal/mandate"
+	"github.com/harshith/rzp-guard/internal/mandateauth"
 	"github.com/harshith/rzp-guard/internal/policy"
 	"github.com/harshith/rzp-guard/internal/relay"
 )
@@ -79,6 +80,10 @@ func run() error {
 		statusFile  = flag.String("status-file", "", "publish a lock-free status document here (see status.go)")
 		statusEvery = flag.Duration("status-interval", 5*time.Second, "how often to refresh -status-file")
 		showVersion = flag.Bool("version", false, "print build identity and exit")
+		mandateKey  = flag.String("mandate-pubkey", "", "hex ed25519 public key of the "+
+			"merchant that issues mandates. When set, the mandate MUST carry a valid "+
+			"detached signature at <mandate>.sig or the guard refuses to start. When "+
+			"unset, the mandate is trusted as-is and a warning says so.")
 	)
 	flag.Parse()
 
@@ -110,6 +115,25 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("read mandate: %w", err)
 	}
+
+	// Establish that the merchant issued this authority BEFORE parsing it. The
+	// guard's other checks all assume the mandate is genuine; nothing until now
+	// established that. Verification covers the exact bytes on disk, so no
+	// re-serialisation sits between what was signed and what is enforced.
+	pub, err := mandateauth.LoadPublicKey(*mandateKey)
+	if err != nil {
+		return err
+	}
+	auth, err := mandateauth.Verify(*mandatePath, raw, pub)
+	if err != nil {
+		return fmt.Errorf("mandate authenticity: %w", err)
+	}
+	if auth.Verified {
+		fmt.Fprintf(os.Stderr, "rzp-guard: mandate signature verified (key %s)\n", auth.KeyID)
+	} else {
+		fmt.Fprintln(os.Stderr, "rzp-guard: WARNING: "+auth.Warning)
+	}
+
 	m, err := mandate.Load(raw)
 	if err != nil {
 		return err

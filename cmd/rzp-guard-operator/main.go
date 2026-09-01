@@ -121,6 +121,19 @@ func run() error {
 		flag.Usage()
 		return errors.New("no command given")
 	}
+
+	// Merchant-side key handling runs BEFORE the state file is opened and before
+	// the operator credential is checked. Signing a mandate is not an operation on
+	// the guard's durable state, and requiring the guard's exclusive lock to do it
+	// would force the signing key onto the guard host -- the one place it must not
+	// be. See mandatesign.go.
+	switch args[0] {
+	case "mandate-keygen":
+		return cmdMandateKeygen(args[1:])
+	case "mandate-sign":
+		return cmdMandateSign(args[1:])
+	}
+
 	if *mandatePath == "" {
 		return errors.New("-mandate is required")
 	}

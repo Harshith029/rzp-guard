@@ -1811,3 +1811,96 @@ F33 fixed the rater *message* and shipped the rater *packet* unchanged. The
 review found the message defect; I did not then ask what else was in the
 envelope. Fixing the instance in front of me and not the class is how the same
 defect arrives twice from two directions.
+
+---
+
+## F35 — Two gaps a hostile review named, and what closing them cost
+
+Not defects found in operation: gaps found by reading the project the way a
+judge would. Recorded here because the fixes changed a money path and an
+economic claim, and both deserve the same scrutiny as a bug.
+
+### F35.1 — The guard secured one boundary and trusted the other
+
+Every check in this project assumed the mandate was genuine. Nothing
+established it. `cmd/rzp-guard` read a JSON file off disk and enforced whatever
+it said, faithfully. Anyone who could write that file could grant authority,
+including after the fact.
+
+    merchant --[ authority -> guard ]--> guard --[ agent -> authority ]--> agent
+               ^ nothing checked this               ^ internal/policy
+
+**Fix.** `internal/mandateauth` verifies an ed25519 detached signature over the
+mandate's **exact file bytes**, before parsing. Signing a re-serialisation would
+mean the bytes that were signed are not the bytes that are enforced, and any
+difference in key order or number formatting becomes either a false rejection or
+a gap; verifying the raw bytes removes canonicalisation from the trust path
+entirely. It also runs before any parser touches the input.
+
+`rzp-guard-operator mandate-keygen` and `mandate-sign` are the merchant side.
+They run before the operator opens a state file or checks a credential, on
+purpose: requiring the guard's exclusive lock to sign a mandate would force the
+signing key onto the guard host, which is the one place it must not be.
+
+**Opt-in, and that is a real limitation, not a soft launch.** Every fixture in
+this repository is unsigned; defaulting verification on would break all of them
+at once, on a money path, days from a deadline. Without `-mandate-pubkey` the
+behaviour is exactly what it was, and the guard prints a warning naming what is
+not being checked. With a key configured, an unsigned or altered mandate refuses
+to start.
+
+**What it still does not do.** It authenticates the file, not the human. A
+compromised signing key issues mandates the guard will honour. Key custody is
+outside this program and is not solved here.
+
+Eight tests in `internal/mandateauth`, four in the operator. They cover a raised
+amount, a one-byte flip, a signature from a different key, a **deleted**
+signature file (verification that can be switched off by deleting a file is not
+verification), a malformed key, and a mandate whose incidental whitespace proves
+the signature covers the file rather than a re-encoding.
+
+`internal/mandateauth` is deliberately outside the arm D decision path -- the
+scorer does not import it -- so `rzp-armd verify` still reproduces the published
+matrix against an unchanged decision-path hash. That was checked, not assumed.
+
+### F35.2 — The false-positive rate was published and never priced
+
+Track 2 asks for "honest metrics including false-positive cost". This project
+reported a rate, and a "value refused: 689,000 paise" figure that reads like a
+loss and is not one.
+
+**A blocked refund is not a lost refund.** The customer waits, a human unblocks
+it, the money still moves. A false positive costs a support contact, not the
+basket -- reading it as the basket overstates the cost of a block by roughly
+fifty times. A false negative genuinely costs the amount plus investigation. The
+two errors are asymmetric in kind, which is why a single F1 number is the wrong
+objective here.
+
+`study/FP-COST.md` prices both directions with stated, challengeable
+assumptions, and reaches a break-even: this control pays for itself above
+roughly a **5.6%** out-of-intent base rate, or **2.4%** with bounded actions --
+a feature that already exists -- enabled.
+
+**Arm C observed 0.6%.** Below break-even. On the only agent traffic this
+project has ever seen, the handling cost would have exceeded the loss prevented.
+That is recorded rather than buried, and it changes the honest positioning from
+"saves money" to "insurance against a tail that is catastrophic and
+uninsurable". It also says precisely where the remaining engineering value is:
+recall is 1.000 by construction and has nothing left to give, so every available
+improvement is on the false-positive side.
+
+The document states the four inputs that would overturn it, including that
+`c_fp` is a guess no corpus can measure -- it needs a merchant.
+
+### F35.3 — What was NOT fixed
+
+- **No independent labels.** The blocked-call audit still has none, so no
+  precision, recall or conditional rate is published. The README headline is
+  unchanged: this project does not meet the Track 2 metric bar.
+- **`cmd/rzp-armd` will not build on this Windows host**, reporting `cannot find
+  package` at its two import lines while `go list -deps` resolves all 106 and
+  `cmd/rzp-study` with the same imports builds fine. It builds and tests clean
+  in the pinned container and in CI, and `git status` shows the package
+  unmodified. Recorded as an unexplained host-toolchain artifact on this
+  OneDrive-synced tree, not diagnosed and not a code defect. Arm D is verified
+  in the container from here.

@@ -61,3 +61,10 @@ venv/
 # Raw provider responses. Committed evidence is a redacted projection
 # built by evidence/redact.py; raw records stay local.
 evidence/*/raw/
+
+# Local-only research archive. Development notes, AI-assisted analysis,
+# red-team prose, presenter scripts, abandoned experiments. Kept on disk,
+# never committed: the public tree carries the product, the tests, the
+# security documentation and the evaluation, not the process that produced
+# them.
+_local/
