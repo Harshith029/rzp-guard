@@ -27,8 +27,18 @@ A-001,in-intent,looks fine
 		t.Fatalf("supplementary loader rejected a valid minimal set: %v", err)
 	}
 
-	// The primary loader must not, whatever the file is called.
-	_, err := readLabelsCSV(p)
+	// The primary loader must not, whatever the file is called. It now also
+	// needs a canonical delivered file to verify against, which a supplementary
+	// set has no counterpart for -- a second, independent reason it cannot
+	// become ground truth.
+	canonical := filepath.Join(dir, "canonical.csv")
+	canonicalBody := `row_id,intent_text,intent_payment,tool,call_payment,amount_paise,target_status,amount_status,label,reason
+A-001,some intent,PAY-aaaa,create_refund,PAY-aaaa,1,present,present,,
+`
+	if err := os.WriteFile(canonical, []byte(canonicalBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := readLabelsCSVVerified(p, canonical)
 	if err == nil {
 		t.Fatal("the PRIMARY loader accepted a three-column supplementary file; renaming one to labels-armC-e1.csv would make it ground truth")
 	}

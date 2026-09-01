@@ -56,12 +56,24 @@ Every blocked call therefore lands in exactly one category:
 |---|---|---|
 | **A** | blocked, out-of-intent | security-correct denial |
 | **B** | blocked, in-intent, no matching combination available | authorization/availability friction — the mandate never expressed it; the cost falls on the compilation policy |
-| **C** | blocked, in-intent, a matching combination **was** available | an actual guard false positive or implementation limit — the authority existed and the guard refused |
+| **C** | blocked, in-intent, a combination **was** available under *unbounded* combining | a **bounded-search availability limitation** — see below; not automatically a defect |
 
 A and B come from the raters' labels. **B versus C is decided by the guard's own
 recorded available actions**, parsed from its refusal message, which is more
 authoritative than reconstructing the mandate because it already accounts for
 actions consumed earlier in the same trace.
+
+### Category C is a trade-off, not automatically a defect
+
+`internal/policy` caps its combining search at `maxSetSize = 8` **deliberately**.
+Exact subset-sum over an action list is exponential, and the requested amount is
+chosen by the agent — so an unbounded search is computation an untrusted party
+controls. The bound fails closed: it refuses rather than spends.
+
+Stated precisely: **the guard denies authority that is reachable under unbounded
+combining, in order to bound agent-controlled computation.** Category C counts
+what that costs on this corpus. Whether the bound is set correctly is a design
+question this audit does not settle — it measures the price, not the verdict.
 
 The reachability check is deliberately **unbounded**, where the guard's own
 search stops at eight actions. That difference is the point: a refusal caused

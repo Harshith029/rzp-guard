@@ -309,8 +309,17 @@ func cmdArmCAuditReport(args []string) error {
 
 	if defAgreed > 0 {
 		p("### Category C in detail\n\n")
-		p("These are the ones that matter: the authority existed and the guard\n")
-		p("refused anyway.\n\n")
+		p("The authority existed and the guard refused. That is **not** an\n")
+		p("implementation defect by itself: `internal/policy` caps its combining\n")
+		p("search at `maxSetSize = 8` deliberately. Exact subset-sum over an action\n")
+		p("list is exponential and the requested amount is chosen by the agent, so\n")
+		p("an unbounded search is computation an untrusted party controls. The\n")
+		p("bound fails closed: it refuses rather than spends.\n\n")
+		p("The trade-off, stated precisely: **the guard denies authority that is\n")
+		p("reachable under unbounded combining, in order to bound agent-controlled\n")
+		p("computation.** The rows below are what that costs on this corpus.\n")
+		p("Whether the bound is set correctly is a design question this audit does\n")
+		p("not settle -- it measures the price, not the verdict.\n\n")
 		for _, k := range defectKeys {
 			bc := blocked[k]
 			p("- `%s` — %d paise requested; available actions summed exactly to it "+
@@ -381,13 +390,20 @@ func auditLabelPath(rater string) string {
 	return filepath.Join(studyDir(), "adjudication", "audit-labels-armC-"+rater)
 }
 
+// loadAuditLabels reads a primary rater's returned audit file and verifies it
+// against the CSV that was actually delivered to that rater. Only label and
+// reason may differ; anything else fails closed.
 func loadAuditLabels(rater string) (map[string]labelledRow, error) {
 	base := auditLabelPath(rater)
+	canonical := filepath.Join(studyDir(), "adjudication",
+		fmt.Sprintf("audit-armC-%s.csv", rater))
 	if _, err := os.Stat(base + ".csv"); err == nil {
-		return readLabelsCSV(base + ".csv")
+		return readLabelsCSVVerified(base+".csv", canonical)
 	}
 	if _, err := os.Stat(base + ".json"); err == nil {
-		return loadArmCLabels(base + ".json")
+		return nil, fmt.Errorf("%s.json: return the CSV that was delivered, not "+
+			"JSON. The returned file is verified field by field against the "+
+			"delivered CSV, which a hand-built JSON file cannot satisfy", base)
 	}
 	return nil, nil
 }

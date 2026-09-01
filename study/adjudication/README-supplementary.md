@@ -36,11 +36,19 @@ Not by filename luck. Three barriers:
    even on the error path where `e1`/`e2` are missing.
 2. `audit-armC` refuses to run without both primary sets, and its error states
    that a supplementary set **cannot substitute**.
-3. The primary loader requires the **full emitted header**, which is evidence a
-   file came from the worksheet that was actually delivered. The minimal
-   three-column form used here is rejected by it. `TestSupplementarySetCannotPassAsPrimary`
-   pins that: renaming this file to `audit-labels-armC-e1.csv` would not make it
-   ground truth.
+3. The primary loader verifies a returned file **field by field against the
+   canonical CSV that was delivered to that rater**. Only `label` and `reason`
+   may differ; the row set must be exactly the delivered row ids, once each.
+   The minimal three-column form used here cannot satisfy that, and there is no
+   delivered counterpart for it to be checked against.
+   `TestSupplementarySetCannotPassAsPrimary` pins it: renaming this file to
+   `audit-labels-armC-e1.csv` would not make it ground truth.
+
+   *(An earlier version of this note claimed the full ten-column header was
+   itself evidence a file came from the delivered worksheet. That was wrong —
+   the loader validated the header and then read only three columns, so an
+   altered `intent_text` or `amount_paise` would have been joined silently to
+   the original row id. See `FAILURES.md` F27.)*
 
 When the audit runs, supplementary sets appear in `AUDIT-armC.md` under their
 own heading, marked *NOT ground truth, NOT a kappa input*, with a concordance

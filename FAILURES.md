@@ -1233,3 +1233,60 @@ I also told the user only arm B's id would move, having checked descent from
 `bb7fc14` alone. Both moved: arm A's freeze descends from one of the three
 earlier carriers. A check narrower than the claim it supported — the same defect
 as the finding itself, committed while fixing the finding.
+
+
+---
+
+## F27 — "The header proves it came from the delivered file" proved nothing
+
+External review, and the finding is that a sentence I wrote to describe a
+safeguard was describing something the code did not do.
+
+`readLabelsCSV` validated the returned CSV's header column by column, and I
+wrote that this was *"evidence the file came from the worksheet that was
+actually delivered."* It then read exactly three fields:
+
+```go
+id := strings.TrimSpace(r[idx["row_id"]])
+lb := strings.TrimSpace(r[idx["label"]])
+Reason: strings.TrimSpace(r[idx["reason"]])
+```
+
+**Everything else was parsed and discarded.** A returned file could carry a
+rewritten `intent_text`, a different `amount_paise`, a swapped payment
+pseudonym, or altered statuses, and the label would still be joined to the
+original `row_id` as though the row were untouched. A spreadsheet that
+autocorrected a number would have done it silently. Duplicated, missing or
+unknown row ids were collapsed or ignored after parsing rather than refused.
+
+The shape is this project's oldest defect and I have now made it in the code
+written to *prevent* a labelling problem: **a control whose description is
+stronger than what it enforces.** The header check was real; the claim attached
+to it was not.
+
+**Fixed by comparing the returned file against the canonical delivered CSV,
+field by field.** Only `label` and `reason` may differ. The row set must be
+exactly the delivered ids, once each — duplicates, unknowns, missing rows and
+added rows all fail closed, before agreement and before anything is rendered.
+Returned labels and reasons are also refused if they carry a spreadsheet formula
+prefix or a control character, since they are rendered into a Markdown report.
+
+Nine tamper cases hold it: altered intent text, altered amount, altered payment
+pseudonym, altered status, duplicated id, unknown id, removed row, blank label,
+formula prefix — plus control characters. Each must fail, and the accepted case
+must still pass, so the check is known to be able to reject and to accept.
+
+Also corrected in the same round, both mine:
+
+- I described the author's, the assistant's and my own mechanical passes as
+  **"three independent passes"**. They are not independent and not blinded —
+  each of us has seen the study design, the rubric and the audit surface. At
+  most it is deterministic concordance on a nearly arithmetic rule, and it is
+  not comparable evidence to two external raters. The phrase is withdrawn.
+- Category C in the false-block audit was labelled **"an actual guard false
+  positive or implementation limit"**. `maxSetSize = 8` is an intentional
+  fail-closed bound on computation an agent can drive by choosing an amount, so
+  the honest description is a **bounded-search availability limitation**: the
+  guard denies authority reachable under unbounded combining in order to bound
+  agent-controlled work. The nine cases still matter; what they measure is the
+  price of that trade, not a verdict on it.

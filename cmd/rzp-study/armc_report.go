@@ -146,11 +146,15 @@ func attachContext(res *agreementResult) {
 // wins, and that is stated rather than left to be discovered.
 func loadIfPresent(rater string) (map[string]labelledRow, error) {
 	base := filepath.Join(studyDir(), "adjudication", "labels-armC-"+rater)
+	canonical := filepath.Join(studyDir(), "adjudication",
+		"worksheet-armC-"+rater+".csv")
 	if _, err := os.Stat(base + ".csv"); err == nil {
-		return readLabelsCSV(base + ".csv")
+		return readLabelsCSVVerified(base+".csv", canonical)
 	}
 	if _, err := os.Stat(base + ".json"); err == nil {
-		return loadArmCLabels(base + ".json")
+		return nil, fmt.Errorf("%s.json: return the CSV that was delivered, not "+
+			"JSON. The returned file is verified field by field against the "+
+			"delivered CSV", base)
 	}
 	return nil, nil
 }
