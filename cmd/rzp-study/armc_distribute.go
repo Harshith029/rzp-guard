@@ -195,7 +195,7 @@ func cmdArmCPreDistribute(args []string) error {
 	// The rater-only instrument, and the scan that decides whether it may be
 	// sent. LABELLING-armC.md is the internal rubric and is never delivered:
 	// see study/PROTOCOL-armC-AUDIT-AMENDMENT-3.md.
-	instrPath, instrBody, err := loadRaterInstructions()
+	instrPath, instrBody, err := loadRaterInstructions("C")
 	if err != nil {
 		return err
 	}

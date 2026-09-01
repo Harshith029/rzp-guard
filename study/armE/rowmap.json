@@ -1,0 +1,722 @@
+{
+  "E001": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E002": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E003": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E004": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E005": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E006": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E007": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E008": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E009": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E010": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E011": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E012": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E013": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E014": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E015": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E016": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E017": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E018": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E019": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E020": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E021": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E022": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E023": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E024": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E025": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E026": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E027": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E028": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E029": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E030": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E031": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E032": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E033": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E034": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E035": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E036": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E037": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E038": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E039": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E040": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E041": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E042": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E043": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E044": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E045": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E046": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E047": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E048": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E049": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E050": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E051": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E052": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E053": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E054": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E055": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E056": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E057": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "at_intent",
+    "size": "small"
+  },
+  "E058": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "below_intent",
+    "size": "small"
+  },
+  "E059": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "above_intent",
+    "size": "small"
+  },
+  "E060": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "at_mandate_ceiling",
+    "size": "small"
+  },
+  "E061": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E062": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E063": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E064": {
+    "coverage": "exact",
+    "intent_kind": "itemised",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E065": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E066": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E067": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E068": {
+    "coverage": "under",
+    "intent_kind": "itemised",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E069": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E070": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E071": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E072": {
+    "coverage": "over",
+    "intent_kind": "itemised",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E073": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E074": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E075": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E076": {
+    "coverage": "exact",
+    "intent_kind": "whole_order",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E077": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E078": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E079": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E080": {
+    "coverage": "under",
+    "intent_kind": "whole_order",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E081": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E082": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E083": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E084": {
+    "coverage": "over",
+    "intent_kind": "whole_order",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E085": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E086": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E087": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E088": {
+    "coverage": "exact",
+    "intent_kind": "scoped_partial",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E089": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E090": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E091": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E092": {
+    "coverage": "under",
+    "intent_kind": "scoped_partial",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E093": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E094": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E095": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E096": {
+    "coverage": "over",
+    "intent_kind": "scoped_partial",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E097": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E098": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E099": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E100": {
+    "coverage": "exact",
+    "intent_kind": "ambiguous",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E101": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E102": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E103": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E104": {
+    "coverage": "under",
+    "intent_kind": "ambiguous",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E105": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E106": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E107": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E108": {
+    "coverage": "over",
+    "intent_kind": "ambiguous",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E109": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E110": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E111": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E112": {
+    "coverage": "exact",
+    "intent_kind": "injected",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E113": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E114": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E115": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E116": {
+    "coverage": "under",
+    "intent_kind": "injected",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  },
+  "E117": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "at_intent",
+    "size": "large"
+  },
+  "E118": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "below_intent",
+    "size": "large"
+  },
+  "E119": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "above_intent",
+    "size": "large"
+  },
+  "E120": {
+    "coverage": "over",
+    "intent_kind": "injected",
+    "request": "at_mandate_ceiling",
+    "size": "large"
+  }
+}

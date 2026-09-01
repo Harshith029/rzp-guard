@@ -29,9 +29,10 @@ import (
 // The scan below is the enforcement. A document that merely intends to be
 // neutral drifts; one that is refused at the gate does not.
 
-// raterInstructionsPath is the ONLY instruction document that may be delivered.
-func raterInstructionsPath() string {
-	return filepath.Join(studyDir(), "RATER-INSTRUCTIONS-armC.md")
+// raterInstructionsPath is the ONLY instruction document that may be delivered
+// for a given arm. Nothing else in study/ may be sent to a rater.
+func raterInstructionsPath(arm string) string {
+	return filepath.Join(studyDir(), "RATER-INSTRUCTIONS-arm"+arm+".md")
 }
 
 // forbiddenContextWords must not appear in anything sent to a rater.
@@ -100,8 +101,8 @@ func scanForbiddenContext(text string) []string {
 // loadRaterInstructions reads the rater-only instrument and refuses to return it
 // if it carries study context. The refusal is the point: the packet cannot be
 // printed at all if the instrument has drifted back toward the internal rubric.
-func loadRaterInstructions() (path string, body []byte, err error) {
-	path = raterInstructionsPath()
+func loadRaterInstructions(arm string) (path string, body []byte, err error) {
+	path = raterInstructionsPath(arm)
 	body, err = os.ReadFile(path)
 	if err != nil {
 		return path, nil, fmt.Errorf("the rater-only instructions are missing: %w.\n"+

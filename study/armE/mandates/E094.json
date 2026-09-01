@@ -1,0 +1,30 @@
+{
+  "allowed_tools": [
+    "fetch_payment",
+    "fetch_multiple_refunds_for_payment",
+    "create_refund"
+  ],
+  "authorized_refund_actions": [
+    {
+      "action_id": "E094_01",
+      "amount_paise": 4000,
+      "payment_id": "pay_SYNE094"
+    },
+    {
+      "action_id": "E094_02",
+      "amount_paise": 24000,
+      "payment_id": "pay_SYNE094"
+    },
+    {
+      "action_id": "E094_03",
+      "amount_paise": 18500,
+      "payment_id": "pay_SYNE094"
+    }
+  ],
+  "expires_at": "2027-01-01T00:00:00Z",
+  "global": {
+    "max_calls_per_minute": 20,
+    "max_cumulative_paise": 46500
+  },
+  "mandate_id": "mnd_4b_E094"
+}
