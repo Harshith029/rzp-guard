@@ -88,6 +88,13 @@ cmd_vet()   { gorun go vet ./...; }
 # from it. This lane runs them explicitly and is reported separately.
 cmd_lifecycle()  { gorun go test -tags testhook -v ./cmd/rzp-guard/; }
 cmd_lifecycle_race() { gorun go test -tags testhook -race ./cmd/rzp-guard/; }
+# NOT everything, despite the name.
+#
+# cmd_all runs the Go test lanes and nothing else: no redteam-negative, no
+# preflight, no fuzz, no study, no live gates. Reporting "full suite green" from
+# this and letting it imply the negative suite passed is a claim it does not
+# support -- and I made exactly that claim. The name is kept for compatibility;
+# the usage text states the exclusion, and so does this.
 cmd_all() {
   cmd_test; echo
   cmd_lifecycle; echo
@@ -412,7 +419,7 @@ cmd_redteam_negative() {
   RN_PASS=0; RN_FAIL=0; RN_SKIP=0
   RN_SEEN=""
   RN_SUMMARY_EMITTED=0
-  RN_EXPECTED_CASES="N1 N2 N3 N4 N5 N6 N7 N8 N9"
+  RN_EXPECTED_CASES="N1 N2 N3 N4 N5 N6 N7 N8 N9 N10"
   trap rn_exit_guard EXIT
 
   rn_mark() { RN_SEEN="$RN_SEEN ${1%% *}"; }
@@ -627,7 +634,27 @@ cmd_redteam_negative() {
   # blocked/bypassed/skipped summary never printed, and I quoted an older
   # run's summary as though it were current. A test that kills the harness
   # proving it is worse than no test at all.
-  n9out="$( cd "$n9dir" && sh ./run.sh preflight 2>&1 )" && n9rc=0 || n9rc=1
+  # bash, EXPLICITLY, not `sh`.
+  #
+  # This read `sh ./run.sh preflight`. run.sh declares #!/usr/bin/env bash and
+  # uses 22 bash-only constructs, so invoking it through `sh` only worked here
+  # by accident: on Git Bash /usr/bin/sh IS bash 5.2. On Linux /bin/sh is dash,
+  # and the same call produces
+  #
+  #   ./run.sh: 157: Syntax error: redirection unexpected   EXIT=2
+  #
+  # which is not the REFUSING that N9 checks for -- so on every Linux run,
+  # including CI, N9 was reporting the wrong-reason branch rather than testing
+  # preflight at all. The one platform where N1 can run is the platform where
+  # N9 was broken.
+  #
+  # The interpreter is now an intentional, asserted dependency rather than
+  # whatever /bin/sh happens to be.
+  command -v bash >/dev/null 2>&1 || {
+    bad "N9 cannot run: bash is required and was not found"
+    return 1
+  }
+  n9out="$( cd "$n9dir" && bash ./run.sh preflight 2>&1 )" && n9rc=0 || n9rc=1
   rm -rf "$n9dir"
   if [ "$n9rc" = 0 ]; then
     bad "N9 the history scan PASSED a self-authorizing refund shape"
@@ -636,6 +663,30 @@ cmd_redteam_negative() {
       *REFUSING*) ok "N9 the history scan refuses an interpolated refund grant" ;;
       *)          bad "N9 the scan failed for the wrong reason: $n9out" ;;
     esac
+  fi
+
+  # N10 -- the suite must invoke run.sh with its DECLARED interpreter.
+  #
+  # N9 called `sh ./run.sh preflight`. On this dev host /usr/bin/sh is bash, so
+  # it passed. On Linux /bin/sh is dash, run.sh uses 22 bash-only constructs,
+  # and the call died with "Syntax error: redirection unexpected" -- which is
+  # not the REFUSING string N9 looks for, so N9 silently reported the
+  # wrong-reason branch on every Linux run, CI included. A test that only works
+  # on the platform where the thing it tests cannot run is not a test.
+  # Comment lines are stripped first: the two paragraphs above legitimately
+  # quote the bad form while explaining it, and a detector that flags its own
+  # documentation is the preflight-vs-N9-fixture mistake again.
+  local wrongshell
+  wrongshell="$(sed -n '/^cmd_redteam_negative()/,/^}/p' run.sh \
+    | grep -nE '(^|[^a-z])sh \\./run\\.sh' \
+    | grep -vE ':[[:space:]]*#' || true)"
+  if [ -n "$wrongshell" ]; then
+    echo "  BYPASSED  N10 the suite invokes run.sh through sh, not bash:" >&2
+    printf '%s
+' "$wrongshell" >&2
+    RN_FAIL=$((RN_FAIL+1)); rn_mark "N10 x"
+  else
+    ok "N10 the suite invokes run.sh with its declared interpreter"
   fi
 
   echo
@@ -669,8 +720,8 @@ cmd_redteam_negative() {
     echo "  FAILED: these cases reported more than once:$dupes" >&2
     exit 1
   fi
-  if [ "$total" != 9 ]; then
-    echo "  FAILED: $total terminal states, expected 9" >&2
+  if [ "$total" != 10 ]; then
+    echo "  FAILED: $total terminal states, expected 10" >&2
     exit 1
   fi
 
