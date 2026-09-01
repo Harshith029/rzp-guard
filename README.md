@@ -22,8 +22,14 @@ credential.
 ## What this is
 
 A **fail-closed authorization verifier**. The merchant issues a *mandate* — a
-list of specific refunds they will allow, each naming one payment and one exact
+list of specific refunds they will allow, each naming one payment and one
 amount. The guard forwards a refund only if it matches an unused entry.
+
+The amount is normally **exact** — that is the form every shipped mandate uses,
+and the form the design argues for. The schema also has an **opt-in bounded**
+form (`max_amount_paise`) where the merchant delegates the figure up to a
+ceiling. It is deliberately weaker: a bounded entry cannot participate in
+combining, and a range authorizes more than a single figure does.
 
 ```
 merchant writes:  "refund pay_A9F2, exactly 24000 paise, once"
@@ -46,7 +52,7 @@ explicitly allowed is refused.
   AI agent  ──►  rzp-guard  ──►  Razorpay MCP server (official, unmodified)
                     │
                     ├─ is this tool allowed at all?        default-deny
-                    ├─ does the mandate authorize it?      exact payment + amount
+                    ├─ does the mandate authorize it?      payment + amount, entry unused
                     ├─ reserve the entry BEFORE forwarding durable, survives a crash
                     └─ commit only on a matching receipt   or mark IN_DOUBT
 ```

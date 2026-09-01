@@ -81,11 +81,21 @@ Authorization is per **discrete action**, not a policy range:
 
 One refund, one amount, one payment, **consumed when used**.
 
-### Why not "refunds up to ₹500 on orders under 30 days"
+### Why exact amounts are the default, and what the bounded form costs
+
+The schema supports both: `amount_paise` (exact) and an opt-in
+`max_amount_paise` (bounded). **Every mandate shipped in this repository uses
+the exact form**, and the reasoning below is why.
 
 A range authorizes an unbounded number of refunds inside it. A compromised or
 confused agent can drain a range without ever violating it. A discrete action
 cannot be used twice, so the blast radius of any single mistake is one action.
+
+A bounded action keeps single-use consumption but gives up the exact figure, so
+its blast radius is the ceiling rather than one amount. It is also excluded from
+combining (`combineExact` skips bounded actions), because summing ranges would
+compound the delegation. Choose it only where the merchant genuinely cannot know
+the figure in advance.
 
 The cost is real and this project measured it: an agent that batches two
 authorized refunds into one call, or splits one into a smaller piece, matches no

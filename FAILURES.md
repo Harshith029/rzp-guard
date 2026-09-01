@@ -1396,3 +1396,89 @@ are unchanged by the rewrite, so only the commit id moved.
 The habit this should have produced, and did not: **run the gate after the
 commit, not before it.** A pre-commit result describes a tree that no longer
 exists.
+
+
+---
+
+## F30 — Final release audit: the docs described a narrower system than the code
+
+A first-principles audit of the public tip, treating every prior claim as
+untrusted. Most of what was checked held. Two documentation defects did not, and
+both were introduced by the README rewrite one commit earlier.
+
+### F30.1 — The README described the mandate model as exact-amount-only
+
+**Severity: P1** — a false statement about the security model, in the primary
+public document.
+
+**Evidence.** `internal/mandate/mandate.go` defines two action forms:
+
+```go
+AmountPaise    *int64 `json:"amount_paise,omitempty"`
+MaxAmountPaise *int64 `json:"max_amount_paise,omitempty"`
+func (a Action) IsBounded() bool { return a.MaxAmountPaise != nil }
+```
+
+`Admits` accepts any amount in `[MinRefundPaise, MaxAmountPaise]` for a bounded
+action. The form is exercised in `corpus/`. The README said each entry names
+"one payment and one exact amount", which describes a stricter system than the
+one shipped.
+
+**Root cause.** The rewrite described the design's *intent* — every shipped
+mandate does use the exact form — and presented it as the schema's only option.
+
+**Fix.** The README now names both forms, says the exact one is what every
+shipped mandate uses, and states why the bounded form is weaker: it cannot
+participate in combining, and a ceiling authorizes more than a figure does.
+
+**Regression test.** None added; this is a documentation-to-code agreement
+question, not a behaviour. The behaviour it describes is already covered by the
+mandate validation tests.
+
+**Remaining limitation.** Nothing enforces that documentation keeps describing
+the schema. A future action form could be added without any doc changing.
+
+### F30.2 — ARCHITECTURE.md implied ranges were impossible
+
+**Severity: P1** — same class, opposite direction.
+
+**Evidence.** The section was headed *"Why not 'refunds up to ₹500 on orders
+under 30 days'"* and argued that a range authorizes an unbounded number of
+refunds. A reader would conclude the schema has no range. It does.
+
+**Fix.** The section is now *"Why exact amounts are the default, and what the
+bounded form costs"*, states that both exist, that every shipped mandate uses
+the exact form, and that a bounded action's blast radius is its ceiling rather
+than one amount.
+
+**Remaining limitation.** The argument against ranges is still the design's
+position. The bounded form remains available and a merchant can choose it.
+
+### Verified during this audit, and NOT findings
+
+Recorded because "we checked and it held" is worth as much as a defect list.
+
+- **Default-deny decision path.** Every error branch in `policy.Decide` returns
+  `deny`. Only two paths allow: an allowed non-refund tool, and `reserveSet`.
+- **Build-level allowlist.** `supportedTools` is nine names — `create_refund`
+  plus eight read-only fetches. A mandate can narrow it, never widen it.
+  `create_refund` is the only money-moving tool in the set.
+- **Amount parsing.** `parseAmountPaise` rejects `float64` outright, rejects
+  exponent and fractional forms, rejects booleans, and rejects anything not
+  representable as `int64`.
+- **Receipt injection.** `forwarded["receipt"]` is assigned unconditionally, so
+  an agent-supplied receipt is discarded. Response correlation requires payment,
+  amount AND receipt to match.
+- **Receipt-set collision.** `ReceiptForSet` joins sorted ids with `+`, which
+  would collide if an id could contain `+` — `{"a+b"}` and `{"a","b"}` would
+  hash alike. Not reachable: `actionIDPattern` is `^[A-Za-z0-9_-]{3,64}$`, and
+  duplicate ids are rejected at load.
+- **Durable ordering.** The reserve-before-forward invariant has dedicated
+  coverage in `internal/lifecycle/durability_order_test.go`, plus
+  `TestAFailedDurableWriteStrandsNoBudget` and `TestFailedDurableWriteLeavesNoClaim`.
+- **Combining excludes bounded actions.** `combineExact` skips
+  `a.IsBounded()`, so ranges cannot be summed.
+- **Defence-only command surface.** 25 commands; none creates a payment, order,
+  checkout or payout, and none can move money outside the guard.
+- **Audit anchor.** `65f97b03` remains an ancestor of the public tip, and both
+  rater worksheets still hash to the value recorded before distribution.
