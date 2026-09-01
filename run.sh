@@ -78,6 +78,9 @@ need_keys() {
   esac
 }
 
+# The 15-second look at what this actually does. No credentials, no network,
+# no money: the far side is a buffer, not a provider.
+cmd_demo()  { gorun go run ./cmd/rzp-demo; }
 cmd_test()  { gorun go test ./...; }
 cmd_race()  { gorun go test -race ./...; }
 cmd_vet()   { gorun go vet ./...; }
@@ -1127,6 +1130,8 @@ usage() {
   cat <<'EOF'
 rzp-guard
 
+  ./run.sh demo              15s: the boundary allows one refund and refuses
+                             four, then refuses an altered authorization
   ./run.sh test              fast lane: all unit tests (no Docker child, no keys, no network)
   ./run.sh race              fast lane under the race detector
   ./run.sh lifecycle         process-lifecycle tests (-tags testhook; NOT in the
@@ -1171,6 +1176,7 @@ EOF
 }
 
 case "${1:-help}" in
+  demo) cmd_demo ;;
   test) cmd_test ;;
   race) cmd_race ;;
   lifecycle) cmd_lifecycle ;;

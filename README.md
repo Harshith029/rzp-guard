@@ -14,7 +14,7 @@ If you only have a few minutes, this is the whole project:
 
 | | |
 |---|---|
-| **1. What it does** | the four-line trace under [What this is](#what-this-is) |
+| **1. Watch it work** | `./run.sh demo` — 15 seconds, no credentials, no network |
 | **2. That it works** | `./run.sh test` — unit, lifecycle and race lanes in a digest-pinned container |
 | **3. That it cannot be bypassed** | `./run.sh redteam-negative` — ten bypasses that once worked, each must still fail |
 | **4. What it costs** | [`study/FP-COST.md`](study/FP-COST.md) — both error directions priced, with the break-even |
@@ -113,6 +113,7 @@ skipped case is **not** a clean result.
 Nothing below touches real money or needs any credential.
 
 ```bash
+./run.sh demo         # 15s: one refund allowed, four refused, one altered mandate rejected
 ./run.sh test         # unit tests
 ./run.sh all          # the Go test lanes, including both race detectors
 ./run.sh preflight    # scans history for a prohibited launcher signature
