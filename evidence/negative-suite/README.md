@@ -8,8 +8,8 @@ record.
 
 ## Linux — authoritative
 
-<https://github.com/Harshith029/rzp-guard/actions/runs/33492881275> · commit
-`5063e87` · see `../ci/README.md`
+<https://github.com/Harshith029/rzp-guard/actions/runs/33496985165> · commit
+`77dd09c` · see `../ci/README.md`
 
 ```
 blocked: 10   bypassed: 0   skipped: 0   total: 10
