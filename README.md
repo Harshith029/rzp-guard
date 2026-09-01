@@ -3,7 +3,8 @@
 **Stops an AI agent issuing a refund nobody approved.**
 
 It sits between the agent and Razorpay's official MCP server, and lets a refund
-through only if a merchant wrote that exact refund down in advance.
+through only if a merchant authorized it in advance — normally as an exact
+amount, which is the default and the form every shipped mandate uses.
 
 ---
 
@@ -57,15 +58,16 @@ explicitly allowed is refused.
                     └─ commit only on a matching receipt   or mark IN_DOUBT
 ```
 
-Every authorized refund moves through four states, written to disk before
-anything is forwarded:
+Every authorized refund moves through four states. **`RESERVED` is written to
+disk before any byte is forwarded**; the later transitions are persisted once
+the outcome is known, which is the earliest point at which they are decidable:
 
 | state | meaning |
 |---|---|
 | `AVAILABLE` | the merchant approved it; unused |
-| `RESERVED` | in flight — written to disk *before* the request leaves |
-| `COMMITTED` | the provider created a refund matching our receipt |
-| `IN_DOUBT` | we could not confirm the outcome — a human must resolve it |
+| `RESERVED` | in flight — **persisted before the request leaves** |
+| `COMMITTED` | the provider created a refund matching our receipt — persisted on reply |
+| `IN_DOUBT` | the outcome could not be confirmed — persisted when that is established; a human must resolve it |
 
 **`IN_DOUBT` is the important one.** If the connection drops mid-refund, the
 guard does not guess. It does not retry, and it does not release the
@@ -78,12 +80,14 @@ authorization. The entry stays locked and an operator is told, because
 |---|---|
 | Continuous integration | [Actions](https://github.com/Harshith029/rzp-guard/actions) — every push runs the full gate set on Linux |
 | A real refund really executed | `evidence/g16/` — Test Mode, receipt round-tripped, replay refused |
-| A real refund really blocked | `evidence/linux/` — against the official pinned container |
+| A prohibited request really blocked | `evidence/linux/` — a non-mandated `create_refund` stopped before the official pinned container's stdin boundary |
 | Attacks that once worked | `./run.sh redteam-negative` — 10 cases, each a bypass that succeeded once and must now fail |
 
-The red-team suite is exhaustive about its own gaps: it prints
-`blocked / bypassed / skipped`, refuses to summarise a partial run, and states
-that a run with any skipped case is **not** a clean result.
+The red-team suite covers **ten bypasses that were previously observed to work**.
+It cannot be exhaustive over attacks nobody has thought of. What it does
+guarantee is that it reports its own gaps: it prints `blocked / bypassed /
+skipped`, refuses to summarise a partial run, and states that a run with any
+skipped case is **not** a clean result.
 
 ## Running it safely
 
@@ -108,9 +112,11 @@ create symlinks, so it can only run on Linux.
 
 ## Defence-only
 
-This repository contains no tool that can move money outside the guard. There is
-no payment or order creation, no checkout flow, no direct Razorpay client, no
-refund launcher, and no realistic card or token fixtures. Adversarial test cases
+**Across the released command surface** — the 25 commands `run.sh` exposes —
+there is no payment or order creation, no checkout flow, no direct Razorpay
+client, no refund launcher, and no realistic card or token fixtures. That is a
+statement about what this repository ships, verified by reading that surface;
+it is not a proof that no combination of code here could ever be repurposed. Adversarial test cases
 are clearly labelled evaluation fixtures using non-resolvable synthetic ids; none
 is a reusable exploit.
 
@@ -140,9 +146,11 @@ Earlier arms A and B are descriptive traces over fifteen scenarios the author
 wrote and labelled. **Their precision and recall figures are not detector scores
 and must not be quoted as such.**
 
-**What is underway:** the guard refused **72 of those 340 calls**. An exhaustive
-audit of every one of them is with two external raters, who see a sanitised view
-of each call and are not told what the rows have in common. It reports one
+**What is prepared, not yet run:** the guard refused **72 of those 340 calls**.
+Two blinded external-rater worksheets covering every one of them are prepared
+but **have not been distributed, and no external result exists.** Raters would
+see a sanitised view of each call and would not be told what the rows have in
+common. It is designed to report one
 conditional quantity — *in-intent calls among refused calls* — split so that a
 refusal correctly enforcing an incomplete mandate is never counted as a guard
 defect. It is **post-hoc, not pre-registered**, it cannot repair the failed

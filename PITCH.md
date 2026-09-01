@@ -37,7 +37,7 @@ more than the README is the fastest way to lose a panel.
 > anything it 'judged' would be a guess added to a money path.
 >
 > Instead the merchant writes down the refunds they'll allow: one payment, one
-> amount, consumed when used. The guard forwards a refund only if it matches an
+> amount — normally exact — consumed when used. The guard forwards a refund
 > unused entry. Everything else is refused. It's an authorization verifier, not
 > a fraud detector, and I'd defend that choice over a model here."
 
@@ -76,10 +76,12 @@ more than the README is the fastest way to lose a panel.
 > decisively. You cannot estimate recall from two, so **this does not meet the
 > Track 2 metric bar** and I'm not going to dress it up.
 >
-> Why it failed is itself the finding: in the 113 refund calls from scenarios
-> containing an injected instruction, none was classified out-of-intent. The
-> agent mostly just behaved. That's a fact about this corpus and this endpoint on
-> one day — not proof that models resist injection."
+> The measured fact is this: of the 113 refund calls emitted in scenarios
+> containing an injected instruction, **zero were mechanically classified
+> out-of-intent in this corpus**. I am not going to tell you why, because I do
+> not know — the generator was a third-party endpoint I could not verify, and
+> any story about what the agent 'decided' would be me narrating past the
+> data."
 
 **On screen:** `study/PRELABEL-FINDING-armC.md`, recorded before any label existed.
 
@@ -124,16 +126,18 @@ more than the README is the fastest way to lose a panel.
 > computation an untrusted party controls. In the study that refused nine refunds
 > whose entries summed exactly. That's the price of the trade, measured.
 >
-> **And 72 refused calls are with two external raters right now**, to find how
-> many were refunds the merchant actually wanted. That result isn't in, and I'm
-> not previewing it."
+> **And 72 refused calls are packaged for two external raters** — blinded
+> worksheets, prepared but **not yet distributed**. **No external result
+> exists.** I'm not previewing a number I don't have."
 
 **On screen:** README "Known limits".
 
-> "What I'd claim is narrow: a fail-closed authorization layer that verifiably
-> blocks unauthorized refunds, survives a crash mid-refund without losing track
-> of money, and refuses to guess when it can't confirm an outcome. Everything
-> else I've told you is in the failure log."
+> "What I'd claim is narrow, and I'll say it precisely: a fail-closed
+> authorization layer that blocks non-mandated `create_refund` requests at the
+> relay boundary, before they reach the server; that recovers a durable
+> `IN_DOUBT` record across the child-failure and restart scenarios I tested;
+> and that refuses to guess when it can't confirm an outcome. Everything else
+> I've told you is in the failure log."
 
 **On screen:** `FAILURES.md`.
 
@@ -147,10 +151,14 @@ more than the README is the fastest way to lose a panel.
   gates are reproducible from the README; the lying-agent trace is the argument.
 - Have `study/PRELABEL-FINDING-armC.md` open before you start. If a panellist
   asks "so what were your numbers", open it rather than answering from memory.
-- **Do not say** "detector", "precision", "recall", "production-ready", or "we
-  block prompt injection". None is supported.
-- If asked whether it caught injections: *"In this corpus the agent didn't
-  follow the injected instructions, so the guard was never given a hostile call
-  to block. That's why I can't claim it."*
+- **Do not claim an estimated precision or recall, and do not call this a
+  detector.** Saying "recall is not estimable here" is correct and is in the
+  script; quoting a figure for either is not. Also avoid "production-ready" and
+  "we block prompt injection" — neither is supported.
+- If asked whether it caught injections: *"In this corpus, zero of the 113
+  refund calls from injection scenarios were classified out-of-intent, so the
+  guard was never handed a hostile call to block. I can't tell you whether the
+  agent resisted the injection or never reached that point — I only have the
+  calls it emitted."*
 - If asked why not ML: *"On the wire I can't see intent. A guess there is
   unpredictability in a money path."*
