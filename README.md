@@ -177,6 +177,18 @@ line above, and it does not repair arm C.** What it is worth is engineering: a
 reproducible conformance suite, pinned by a manifest that `go test` enforces,
 and one bounded-search limitation reduced to a single deterministic case.
 
+**Arm E is running now.** A 120-row corpus whose ground truth comes from three
+independent raters who see the merchant's intent and the requested refund, and
+never the compiled authorization or the guard's decision. The pre-registration
+([`study/PROTOCOL-armE.md`](study/PROTOCOL-armE.md)) was committed before the
+corpus existed; the corpus file carries **no label field**, so the scorer cannot
+score against an author-declared label — the defect that withdrew arm D. Unlike
+arm D, false negatives are reachable by construction: 10 rows are forwarded above
+their stated intent, so recall is a measurement rather than a restatement.
+**Labels are out and no result exists yet.** If they return, this section reports
+precision, recall and false-positive rate with Wilson intervals and inter-rater
+agreement; if they do not, it says so.
+
 **What is prepared, not yet run:** the guard refused **72 of those 340 calls**.
 Two blinded external-rater worksheets covering every one of them are prepared
 but **have not been distributed, and no external result exists.** Raters would

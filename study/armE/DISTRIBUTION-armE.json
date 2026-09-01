@@ -1,0 +1,26 @@
+{
+  "note": "What was delivered to arm E raters, and when. Written by the author AFTER sending, so it is the author's record of the delivery. What a third party can check independently is the WORKSHEET: it was published at the commit below before any rater saw it, so fetching that commit and hashing the file confirms the rows were fixed before labelling.",
+  "delivered_to": 3,
+  "sent_utc": "2026-09-01",
+  "delivered_files": {
+    "study/armE/worksheet-armE.csv": "1c2435a907caec566fb51ffd70e6ec5403f145bea79408ab315826768f53e30e",
+    "study/RATER-INSTRUCTIONS-armE.md": "f9964fea76c41e925d3f4d7a93b00b29e03039c39d7ed9a0824ddecc9877b06b"
+  },
+  "public_anchor": {
+    "repo": "https://github.com/Harshith029/rzp-guard",
+    "commit": "7d0405b115a1bc577c4ae2c16f5803d31c26c190",
+    "meaning": "the commit that first published the worksheet and the instrument. The pre-registration is earlier still, in 8c5bc2b, which carried no corpus."
+  },
+  "context_scan": {
+    "instrument": "0 hits against the forbidden-context word list; enforced by TestArmEInstrumentIsRaterSafe",
+    "covering_message": "0 hits, checked against the same scanner after sending. The message was composed by hand rather than emitted by the gate, so it was verified retroactively -- recorded here rather than left implied."
+  },
+  "labels_received": 0,
+  "result": "NONE. No labels have been returned, nothing has been scored, and study/RESULTS-armE.md does not exist. rzp-arme score refuses to run without returned files and refuses to overwrite a published result.",
+  "what_raters_did_not_receive": [
+    "the compiled authorization for any row",
+    "the decision the component under test made on any row",
+    "PROTOCOL-armE.md, the rowmap, or any other file in the repository",
+    "the repository URL, or any figure from it"
+  ]
+}
