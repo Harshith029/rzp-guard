@@ -1897,10 +1897,19 @@ The document states the four inputs that would overturn it, including that
 - **No independent labels.** The blocked-call audit still has none, so no
   precision, recall or conditional rate is published. The README headline is
   unchanged: this project does not meet the Track 2 metric bar.
-- **`cmd/rzp-armd` will not build on this Windows host**, reporting `cannot find
-  package` at its two import lines while `go list -deps` resolves all 106 and
-  `cmd/rzp-study` with the same imports builds fine. It builds and tests clean
-  in the pinned container and in CI, and `git status` shows the package
-  unmodified. Recorded as an unexplained host-toolchain artifact on this
-  OneDrive-synced tree, not diagnosed and not a code defect. Arm D is verified
-  in the container from here.
+- **`cmd/rzp-armd` intermittently fails to build on this Windows host**,
+  reporting `cannot find package` at its two import lines while `go list -deps`
+  resolves all 106 and `cmd/rzp-study` with the same imports builds fine. It
+  builds and tests clean in the pinned container and in CI, and `git status`
+  shows the package unmodified.
+
+  **Correction, and the reason it is written here rather than quietly edited:**
+  this entry first said the package "will not build on this Windows host". That
+  was wrong. It failed twice consecutively and I read two failures as
+  determinism without measuring. Measured afterwards: **10 runs in the OneDrive
+  tree, 0 failures; 10 runs in a copy outside OneDrive, 0 failures.** It is an
+  intermittent fault, almost certainly a sync-time file lock on this
+  OneDrive-backed tree (F12 is the same hazard in a different guise), and a
+  transient failure reported as a permanent one is still a false statement about
+  the system. Undiagnosed. Arm D is verified in the container, which is
+  unaffected.
