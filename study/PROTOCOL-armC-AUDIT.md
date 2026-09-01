@@ -102,6 +102,23 @@ worked on the implementation, read `grid.py`, or seen the repository. The
 author does **not** label this set: with 72 rows and a near-arithmetic rubric,
 an author-rater adds nothing and risks being read as a third opinion.
 
+**The distributed worksheets are pinned.** Before any returned file is read,
+each canonical `audit-armC-e*.csv` is checked against the SHA-256 recorded at
+emission time in `SHA256SUMS-audit-armC.txt`, and that sums file must itself be
+committed and unmodified — verified by git blob id, so the recorded hash is
+fixed by history rather than by a working tree. `AUDIT-armC.md` publishes each
+verified hash and the commit carrying it.
+
+Without this, field-by-field verification would compare a return against
+whatever the local canonical copy now says: the author could edit it after
+distribution and a returned file would verify cleanly against the altered copy.
+
+**Rater free text is neutralised before rendering.** A `reason` is written
+outside the project and lands in a published document. Formula prefixes and
+control characters are refused at parse time; the text is then rendered inside a
+backtick fence longer than any run it contains, with pipes escaped, so it cannot
+alter a heading, a table or a conclusion.
+
 **Agreement is published before the classification.** Disagreements are
 **carried, not discarded**: the report publishes the agreement count and kappa,
 the agreed-label conditional rate clearly labelled as such, and **conservative

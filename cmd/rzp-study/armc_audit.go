@@ -180,6 +180,21 @@ func cmdArmCAuditReport(args []string) error {
 			filepath.Base(sset.Path), sset.Rater)
 	}
 
+	// The canonical worksheets must still be the files that were distributed.
+	// Without this, field-by-field verification compares a return to whatever
+	// the local copy now says, which the author could have edited.
+	sumsPath := filepath.Join(studyDir(), "adjudication", "SHA256SUMS-audit-armC.txt")
+	var pins []canonicalPin
+	for _, r := range []string{"e1", "e2"} {
+		canonical := filepath.Join(studyDir(), "adjudication",
+			fmt.Sprintf("audit-armC-%s.csv", r))
+		pin, err := verifyCanonicalPin(canonical, sumsPath)
+		if err != nil {
+			return fmt.Errorf("distributed worksheet pin failed: %w", err)
+		}
+		pins = append(pins, pin)
+	}
+
 	e1, err := loadAuditLabels("e1")
 	if err != nil {
 		return err
@@ -273,7 +288,26 @@ func cmdArmCAuditReport(args []string) error {
 	p("no sampling, no curation — asking how much of that refusal was operational\n")
 	p("friction and how much was warranted.\n\n")
 
-	p("---\n\n## 1. Inter-rater agreement, published before the classification\n\n")
+	p("---\n\n## 1. What the raters were given\n\n")
+	p("Each returned file was verified field by field against the canonical CSV\n")
+	p("delivered to that rater. Only `label` and `reason` may differ; the row set\n")
+	p("must be exactly the delivered ids, once each.\n\n")
+	p("The canonical files themselves are pinned to their **pre-distribution**\n")
+	p("hashes, recorded at emission time in a sums file that is committed and\n")
+	p("unmodified. Without this a canonical worksheet could be edited after\n")
+	p("distribution and a returned file would verify cleanly against the altered\n")
+	p("copy.\n\n")
+	p("| delivered file | SHA-256 recorded before distribution | pinned in commit |\n")
+	p("|---|---|---|\n")
+	for _, pin := range pins {
+		c := pin.Commit
+		if len(c) > 12 {
+			c = c[:12]
+		}
+		p("| `%s` | `%s` | `%s` |\n", pin.File, pin.SHA256, c)
+	}
+	p("\n")
+	p("---\n\n## 2. Inter-rater agreement, published before the classification\n\n")
 	p("| | |\n|---|---|\n")
 	p("| Calls audited (all refused calls) | **%d** |\n", total)
 	p("| Compared | %d |\n", agr.N)
@@ -285,7 +319,7 @@ func cmdArmCAuditReport(args []string) error {
 	p("Read cautiously: on this corpus the rubric is close to arithmetic, so a high\n")
 	p("figure largely shows that two people can compare two numbers.\n\n")
 
-	p("---\n\n## 2. The three-way split\n\n")
+	p("---\n\n## 3. The three-way split\n\n")
 	p("A single \"in-intent among blocked\" number would be misleading, because 18\n")
 	p("of arm C's 54 cells are `coverage=under` — built so the merchant's intent\n")
 	p("deliberately exceeds what the compiled mandate expresses. A refusal there is\n")
@@ -330,7 +364,7 @@ func cmdArmCAuditReport(args []string) error {
 		p("\n")
 	}
 
-	p("---\n\n## 3. The conditional rate, and bounds\n\n")
+	p("---\n\n## 4. The conditional rate, and bounds\n\n")
 	p("**Agreed-label conditional rate** — over calls both raters labelled the\n")
 	p("same, excluding disagreements and unlabelable rows:\n\n")
 	p("> in-intent among guard-blocked calls = **%d / %d = %.3f**\n\n",
@@ -348,13 +382,13 @@ func cmdArmCAuditReport(args []string) error {
 		p("### Every disagreement\n\n")
 		for _, d := range agr.Disagreements {
 			p("- `%s` — e1 **%s** (%s); e2 **%s** (%s)\n",
-				d.Key, d.A, orDash(d.AWhy), d.B, orDash(d.BWhy))
+				d.Key, d.A, mdCode(d.AWhy), d.B, mdCode(d.BWhy))
 		}
 		p("\nThey are included in the bounds above rather than resolved by the\n")
 		p("author, who is not an independent rater.\n\n")
 	}
 
-	p("---\n\n## 4. What this does not establish\n\n")
+	p("---\n\n## 5. What this does not establish\n\n")
 	p("- Not a detector metric of any kind, and not a substitute for the failed\n")
 	p("  recall experiment.\n")
 	p("- Not pre-registered; designed after arm C's outcome was known.\n")

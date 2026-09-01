@@ -254,8 +254,8 @@ func cmdArmCAgreement(args []string) error {
 			p("Adjudication is a separate, later step.\n\n")
 			for _, d := range primary.Disagreements {
 				p("### %s\n\n", d.Key)
-				p("- e1: **%s** — %s\n", d.A, orDash(d.AWhy))
-				p("- e2: **%s** — %s\n", d.B, orDash(d.BWhy))
+				p("- e1: **%s** — %s\n", d.A, mdCode(d.AWhy))
+				p("- e2: **%s** — %s\n", d.B, mdCode(d.BWhy))
 				if d.Intent != "" {
 					p("- intent: %s\n", d.Intent)
 				}
