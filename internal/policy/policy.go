@@ -108,6 +108,33 @@ func (d Decision) ForwardedAmountPaise() (int64, bool) {
 //
 // Rejected: booleans, fractions, exponent forms that are not integral,
 // non-finite values, and anything that overflows int64.
+// jsonInteger reports whether s is an integer exactly as RFC 8259 spells one:
+// an optional minus, then either a single 0 or a non-zero digit followed by
+// digits. No plus, no leading zeros, no spaces.
+func jsonInteger(s string) bool {
+	if s == "" {
+		return false
+	}
+	if s[0] == '-' {
+		s = s[1:]
+	}
+	if s == "" {
+		return false
+	}
+	if s == "0" {
+		return true
+	}
+	if s[0] < '1' || s[0] > '9' {
+		return false
+	}
+	for i := 1; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func parseAmountPaise(v any) (int64, error) {
 	switch n := v.(type) {
 	case json.Number:
@@ -117,6 +144,19 @@ func parseAmountPaise(v any) (int64, error) {
 			// money invites exactly the ambiguity this function exists to remove.
 			return 0, fmt.Errorf("amount %q must be a plain JSON integer in paise, "+
 				"not a fraction or exponent form", s)
+		}
+		// strconv, which Int64 uses, is MORE PERMISSIVE THAN JSON: it accepts a
+		// leading "+" and leading zeros, so "+24000" and "024000" both parsed and
+		// were authorized. Neither is a valid JSON number -- RFC 8259 gives
+		// `-? (0 | [1-9][0-9]*)` -- so a compliant decoder would have rejected the
+		// document before this function saw it, which is why nothing was reachable
+		// through the relay. But the error above promises "a plain JSON integer",
+		// and a check looser than the rule it states is the shape of every defect
+		// in FAILURES.md that turned out to defend nothing.
+		if !jsonInteger(s) {
+			return 0, fmt.Errorf("amount %q is not a plain JSON integer in paise: a "+
+				"leading plus or a leading zero is not valid JSON, and money is not "+
+				"the place to be more forgiving than the wire format", s)
 		}
 		i, err := n.Int64()
 		if err != nil {

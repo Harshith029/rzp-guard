@@ -65,6 +65,17 @@ type preservedDoc struct {
 	BodySHA256 string `json:"preserved_body_sha256"`
 }
 
+// supersededPath is one decision-path hash that a re-record replaced, with the
+// reason and the matrix that was verified at the time. A re-record that cannot
+// reproduce the published matrix is refused outright.
+type supersededPath struct {
+	TreeSHA256   string `json:"tree_sha256"`
+	RecordedAt   string `json:"recorded_at_utc"`
+	SupersededAt string `json:"superseded_at_utc"`
+	Reason       string `json:"reason"`
+	MatrixHeld   bool   `json:"published_matrix_still_reproduced"`
+}
+
 type armDManifest struct {
 	Note         string `json:"note"`
 	RecordedAt   string `json:"recorded_at_utc"`
@@ -84,7 +95,12 @@ type armDManifest struct {
 		Path   string `json:"path"`
 		SHA256 string `json:"sha256"`
 	} `json:"generated_report"`
-	Preserved       []preservedDoc `json:"preserved_documents"`
+	Preserved []preservedDoc `json:"preserved_documents"`
+	// PriorPaths records every decision-path hash this manifest has superseded.
+	// Re-recording after a source change would otherwise erase the fact that
+	// the freeze was ever broken, leaving "unchanged since scoring" true of
+	// the newest stamp and silent about the ones before it.
+	PriorPaths      []supersededPath `json:"superseded_decision_paths,omitempty"`
 	PublishedMatrix struct {
 		TP int `json:"tp"`
 		FP int `json:"fp"`
@@ -291,13 +307,58 @@ func scoreCorpus() (matrix, error) {
 // shows up in the diff. That is the only thing between this and a manifest that
 // can be relaundered silently, and it is worth saying plainly: git history, not
 // this program, is what makes the record trustworthy.
+// recordManifest writes study/armD/manifest.json.
+//
+// Without -supersede it refuses to overwrite an existing manifest. With it, the
+// old decision-path hash is carried forward into superseded_decision_paths with
+// the reason and the date, and the re-record is REFUSED unless the corpus still
+// reproduces the published matrix. That is the difference between "the code
+// changed and the result is unaffected, here is the trail" and "the stamp was
+// quietly reapplied".
 func recordManifest() error {
-	if _, err := os.Stat(manifestPath); err == nil {
-		return fmt.Errorf("refusing to overwrite %s. Delete it explicitly if a "+
-			"re-record is genuinely intended; the deletion belongs in the diff",
-			manifestPath)
+	supersede := ""
+	if len(os.Args) > 2 && os.Args[2] == "-supersede" {
+		if len(os.Args) < 4 || strings.TrimSpace(os.Args[3]) == "" {
+			return fmt.Errorf("-supersede needs a reason: what changed in the " +
+				"decision path, and why the published result survives it")
+		}
+		supersede = os.Args[3]
+	}
+	var prior []supersededPath
+	if b, err := os.ReadFile(manifestPath); err == nil {
+		if supersede == "" {
+			return fmt.Errorf("refusing to overwrite %s. If the decision path changed "+
+				"and the result still holds, re-record with:\n  rzp-armd manifest "+
+				"-supersede \"what changed and why the result survives\"", manifestPath)
+		}
+		var old armDManifest
+		if err := json.Unmarshal(b, &old); err != nil {
+			return err
+		}
+		m, err := scoreCorpus()
+		if err != nil {
+			return err
+		}
+		held := m.TP == old.PublishedMatrix.TP && m.FP == old.PublishedMatrix.FP &&
+			m.TN == old.PublishedMatrix.TN && m.FN == old.PublishedMatrix.FN
+		if !held {
+			return fmt.Errorf("REFUSING to supersede: the corpus no longer reproduces "+
+				"the published matrix (was TP %d FP %d TN %d FN %d, now TP %d FP %d "+
+				"TN %d FN %d). This is not a re-record, it is a different result, and "+
+				"it needs a new corpus rather than a new stamp",
+				old.PublishedMatrix.TP, old.PublishedMatrix.FP, old.PublishedMatrix.TN,
+				old.PublishedMatrix.FN, m.TP, m.FP, m.TN, m.FN)
+		}
+		prior = append(old.PriorPaths, supersededPath{
+			TreeSHA256:   old.DecisionPath.TreeSHA256,
+			RecordedAt:   old.RecordedAt,
+			SupersededAt: time.Now().UTC().Format(time.RFC3339),
+			Reason:       supersede,
+			MatrixHeld:   true,
+		})
 	}
 	var mf armDManifest
+	mf.PriorPaths = prior
 	mf.Note = "Everything the published arm D numbers depend on. `rzp-armd verify` " +
 		"checks all of it and writes nothing. None of this makes the labels " +
 		"independent; see study/ASSESSMENT-armD.md."

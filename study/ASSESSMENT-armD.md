@@ -135,6 +135,25 @@ scorer's persister is `nil`. That is a convenient exclusion, given §5 landed in
 `internal/storage` on the same day, so it is checked by a test rather than
 asserted.
 
+**The decision path has changed once since scoring, on 2026-09-02.**
+`internal/policy/policy.go` was hardened so `parseAmountPaise` rejects amounts
+that `strconv` accepts but JSON does not — a leading `+`, and leading zeros.
+`rzp-armd verify` caught it and declared the published result void, which is
+what it is for.
+
+Arm D's corpus uses plain integers only, so all 90 decisions are unchanged and
+the matrix reproduces exactly. The manifest was re-recorded with
+`rzp-armd manifest -supersede "<reason>"`, which **carries the old tree hash,
+both dates and the reason forward** into `superseded_decision_paths` rather than
+erasing them, and refuses outright if the corpus no longer reproduces the
+published matrix. A test asserts every superseded entry has a reason and records
+that the matrix held.
+
+The point of saying this here rather than only in the JSON: "unchanged since
+scoring" is now true of the *current* stamp and would have been silent about the
+earlier one. The freeze was broken, harmlessly, and the trail is the evidence
+that it was harmless rather than an assertion that it never happened.
+
 **Two limitations, stated rather than buried.** The manifest was recorded after
 scoring, not before; what makes it more than self-attestation is git, which
 shows the policy commit `fb87b12` (2026-08-30) predating the corpus. And

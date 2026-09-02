@@ -2128,3 +2128,84 @@ derivation at all. In every case the fix was to make the uncertainty or the
 provenance visible rather than to change the claim — which suggests the defect is
 not in the analysis but in the habit of writing the conclusion before checking
 what supports it.
+
+---
+
+## F39 — The money-path sweep, and the arm D gate catching my own change
+
+**Severity: P2 (one defect fixed), plus a control working as designed.**
+
+### F39.1 — What the sweep found, which was mostly nothing
+
+I probed the authorization path with hostile amounts against the real guard
+rather than reading the code and concluding it was fine:
+
+```
+negative (bounded)     REFUSED   AMOUNT_NOT_AUTHORIZED
+zero                   REFUSED   AMOUNT_NOT_AUTHORIZED
+1 paise                REFUSED   AMOUNT_NOT_AUTHORIZED
+99 (just under floor)  REFUSED   AMOUNT_NOT_AUTHORIZED
+100 (at floor)         ALLOWED
+int64 max              REFUSED   AMOUNT_NOT_AUTHORIZED
+int64 max + 1          REFUSED   MALFORMED_ARGUMENTS
+float / exponent       REFUSED   MALFORMED_ARGUMENTS
+string / bool / nil    REFUSED   MALFORMED_ARGUMENTS
+```
+
+The cumulative cap holds: with three bounded actions of 30,000 against a 50,000
+cap, the first is allowed and the rest are refused — it does not spend a partial
+amount to fill the gap. `Decide` serializes its match-to-reserve section under a
+mutex, `combineExact` filters bounded actions before `reserveSet` dereferences
+`*a.AmountPaise`, and `IsExpired` is `!now.Before(ExpiresAt)`, so a mandate is
+expired *at* its expiry instant rather than one tick later.
+
+### F39.2 — Two inputs got through that should not have
+
+`+24000` and `024000` were **authorized** against an exact 24,000 action.
+
+`parseAmountPaise` rejected `.eE`, booleans and float64, then handed the string
+to `strconv` via `json.Number.Int64` — and **strconv is more permissive than
+JSON**. It accepts a leading plus and leading zeros. RFC 8259 gives integers as
+`-? (0 | [1-9][0-9]*)`; neither form is valid JSON.
+
+**Nothing was reachable through the relay.** A compliant decoder rejects those
+documents before the guard sees them, so this was never live. But the error
+message beside the check promised "a plain JSON integer in paise", and a
+validator looser than the rule it states is the exact shape of every defect in
+this file that turned out to defend nothing. It becomes reachable the moment
+anything upstream constructs a `json.Number` by hand.
+
+**Fixed.** `jsonInteger` checks the grammar before parsing. Eight rejected forms
+and five accepted ones are pinned by test, including the boundaries.
+
+### F39.3 — The arm D gate caught my own change, and I did not re-stamp it
+
+Editing `internal/policy/policy.go` put it inside arm D's recorded decision path,
+so `rzp-armd verify` immediately failed:
+
+```
+FAIL DECISION PATH CHANGED. The published result describes code that is
+     no longer in the tree, so it is VOID and must be re-scored.
+     differs: internal/policy/policy.go
+```
+
+This is the control built in F31 doing precisely its job, on its author.
+
+The easy response was to delete `manifest.json` and re-record — which
+`recordManifest` permitted, since it only refused to *overwrite*. That would have
+left "decision path unchanged since scoring" true of the new stamp and **silent
+about the fact that the freeze had ever been broken.** A freeze that can be
+quietly reapplied is not a freeze.
+
+**Fixed by making the re-record auditable.** `rzp-armd manifest -supersede
+"<reason>"` carries the old tree hash, the original recording date, the
+supersession date and the stated reason forward into
+`superseded_decision_paths`. It **refuses outright** if the corpus no longer
+reproduces the published matrix — that is a different result and needs a new
+corpus, not a new stamp. `TestASupersededDecisionPathCarriesItsReason` asserts
+every entry has a reason, distinct hashes, and a recorded matrix that held.
+
+The matrix is unchanged: TP 54 FP 17 TN 19 FN 0, all 90 decisions identical,
+because arm D's corpus contains only plain integers. `ASSESSMENT-armD.md` now
+says the freeze was broken once, harmlessly, and points at the trail as the
+evidence for "harmlessly" rather than asserting it.

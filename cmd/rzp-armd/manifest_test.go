@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"go/parser"
 	"go/token"
 	"os"
@@ -129,5 +130,39 @@ func TestArmDStillVerifies(t *testing.T) {
 	repoRoot(t)
 	if err := verifyArmD(); err != nil {
 		t.Fatalf("arm D verification failed: %v", err)
+	}
+}
+
+// A re-record must leave a trail. Deleting the manifest and regenerating it
+// would make "decision path unchanged since scoring" true of the newest stamp
+// and silent about every one before it -- which is how a freeze stops meaning
+// anything while still reporting green.
+func TestASupersededDecisionPathCarriesItsReason(t *testing.T) {
+	repoRoot(t)
+	b, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mf armDManifest
+	if err := json.Unmarshal(b, &mf); err != nil {
+		t.Fatal(err)
+	}
+	for i, p := range mf.PriorPaths {
+		if strings.TrimSpace(p.Reason) == "" {
+			t.Errorf("superseded path %d has no reason. A re-record without one "+
+				"is indistinguishable from quietly reapplying the stamp", i)
+		}
+		if p.TreeSHA256 == "" || p.SupersededAt == "" {
+			t.Errorf("superseded path %d is missing its hash or its date", i)
+		}
+		if !p.MatrixHeld {
+			t.Errorf("superseded path %d records that the published matrix did "+
+				"NOT survive the change. That is a different result, and it needs "+
+				"a new corpus rather than a new manifest", i)
+		}
+		if p.TreeSHA256 == mf.DecisionPath.TreeSHA256 {
+			t.Errorf("superseded path %d equals the current tree hash, so nothing "+
+				"was actually superseded", i)
+		}
 	}
 }

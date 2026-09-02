@@ -1,6 +1,6 @@
 {
   "note": "Everything the published arm D numbers depend on. `rzp-armd verify` checks all of it and writes nothing. None of this makes the labels independent; see study/ASSESSMENT-armD.md.",
-  "recorded_at_utc": "2026-09-01T14:06:31Z",
+  "recorded_at_utc": "2026-09-02T07:32:17Z",
   "decision_path": {
     "note": "Non-test sources of the scorer's import closure (`go list -deps ./cmd/rzp-armd`), plus cmd/rzp-armd/main.go. internal/storage is absent because it is not in that closure: the scorer's persister is nil.",
     "packages": [
@@ -10,7 +10,7 @@
       "internal/policy",
       "cmd/rzp-armd"
     ],
-    "tree_sha256": "b62ea2facbe78c84faae482d0bc7e7dde9c46887e27a7bbfba57bfa6d2ac7b18",
+    "tree_sha256": "ffe496807fda1de4126fe77bfb5b752d237e4137ef63c5abc8fdebe2fdfd0351",
     "files": {
       "cmd/rzp-armd/main.go": "31901382821ac6fe506681c9f5db2761c3df4684fe2a4e9192911023ddf2640f",
       "internal/lifecycle/lifecycle.go": "f5b59d977a35c05c300393b09a7a09adfead6a99cc2fa698684e7a16666c4f70",
@@ -18,7 +18,7 @@
       "internal/opauth/deliver.go": "2c09319729a9b76e2f0a9b071ec3e0b8a9fc6a607074f0fa268f3621b66dfbc1",
       "internal/opauth/opauth.go": "8857267918089da6703914b043ca4b4a4c5689cdabe1ae6368af4db003efc2c3",
       "internal/opauth/syncdir.go": "c055f5b59d667bf4aaf9a80fcd3927817c9cab0482f6e85bbf0a17589078d2ae",
-      "internal/policy/policy.go": "225e4ba9ba7b54ddc81f6f3c14553f1e26e26fd3beefcfc43ef71c4aceaed48d"
+      "internal/policy/policy.go": "85d73b48464c9ef2a376afb4bed43174e80834bb33abd526da4f1f0e1b480876"
     }
   },
   "corpus": {
@@ -53,6 +53,15 @@
       "preserved_from_commit": "f87c86b",
       "preserved_git_blob": "49ec6ae34ac78f84ac445b6fafc3a7be9780af4e",
       "preserved_body_sha256": "5be948497ba95fa99a41135f16767f4aeec9c24df2a521a32136cef53838dcc9"
+    }
+  ],
+  "superseded_decision_paths": [
+    {
+      "tree_sha256": "b62ea2facbe78c84faae482d0bc7e7dde9c46887e27a7bbfba57bfa6d2ac7b18",
+      "recorded_at_utc": "2026-09-01T14:06:31Z",
+      "superseded_at_utc": "2026-09-02T07:32:17Z",
+      "reason": "internal/policy/policy.go: parseAmountPaise now rejects amounts that strconv accepts but JSON does not (+N, leading zeros). Arm D's corpus uses plain integers only, so all 90 decisions are unchanged and the matrix reproduces exactly.",
+      "published_matrix_still_reproduced": true
     }
   ],
   "published_matrix": {

@@ -745,3 +745,47 @@ func TestConcurrentDistinctRefundsRespectCumulativeCap(t *testing.T) {
 }
 
 var _ = payB
+
+// strconv accepts a leading "+" and leading zeros; JSON does not. Before this
+// was checked, "+24000" and "024000" both parsed and were AUTHORIZED against an
+// exact 24000 action. Nothing was reachable through the relay -- a compliant
+// decoder rejects those documents before the guard sees them -- but the error
+// message beside the check promised "a plain JSON integer", and a validator
+// looser than the rule it states is how a defence stops defending after the
+// next refactor.
+func TestAmountsMustBeJSONIntegersNotJustParseable(t *testing.T) {
+	for _, bad := range []string{
+		"+24000",  // strconv accepts a leading plus
+		"024000",  // and leading zeros
+		"-024000", // both, with a sign
+		"00",      // zero is only ever spelled "0"
+		"+0",
+		"1_000", // Go integer literals are not JSON either
+		"0x5DC",
+		"",
+	} {
+		if _, err := parseAmountPaise(json.Number(bad)); err == nil {
+			t.Errorf("amount %q was accepted; it is not a valid JSON integer", bad)
+		}
+	}
+	// The forms JSON does allow must still work, including the boundaries.
+	for _, good := range []struct {
+		in   string
+		want int64
+	}{
+		{"0", 0},
+		{"100", 100},
+		{"24000", 24000},
+		{"-24000", -24000},
+		{"9223372036854775807", 9223372036854775807},
+	} {
+		got, err := parseAmountPaise(json.Number(good.in))
+		if err != nil {
+			t.Errorf("amount %q was refused: %v", good.in, err)
+			continue
+		}
+		if got != good.want {
+			t.Errorf("amount %q parsed to %d, want %d", good.in, got, good.want)
+		}
+	}
+}
