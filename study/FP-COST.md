@@ -54,6 +54,20 @@ TPR (out-of-intent refused)     1.000     54/54
 FPR (in-intent refused)         0.472     17/36
 ```
 
+**Those 36 in-intent rows come from FOUR distinct merchant intent sentences**,
+not 36 independent situations — arm D's `intent_text` is a function of the cell,
+so rows sharing a sentence share whatever that sentence means. Treating 0.472 as
+a point estimate over 36 independent observations overstates its precision.
+Resampling whole sentence groups instead:
+
+```
+FPR  0.472   95% cluster bootstrap  0.375 - 0.600   (4 clusters, seeded)
+```
+
+The first version of this file quoted 0.472 with no uncertainty at all. That was
+wrong, and it is the same defect `PROTOCOL-armE-AMENDMENT-1.md` records in arm E
+— found there first, then found here.
+
 Per 1,000 agent refund calls at base rate `p`:
 
 ```
@@ -84,8 +98,16 @@ p / (1 − p)  >  FPR · c_fp / c_fn
 p  >  5.6%
 ```
 
-**More than about 1 agent refund call in 18 must be out-of-intent before this
-control pays for itself at its current false-positive rate.**
+Propagating the cluster interval on FPR through the same arithmetic:
+
+```
+break-even   5.6%   range across the FPR interval   4.5% - 7.0%
+```
+
+**Somewhere between about 1 call in 22 and 1 in 14 must be out-of-intent before
+this control pays for itself at its current false-positive rate.** Quote the
+range. The point estimate is the centre of a genuinely wide band, and the band
+is wide because the corpus behind it has four intent sentences.
 
 | base rate `p` | FN / 1000 | FP / 1000 | cost of errors | cost with no guard | net |
 |---:|---:|---:|---:|---:|---:|
@@ -147,11 +169,13 @@ Stated so they can be attacked:
   anything else here, and measuring it needs a merchant, not a corpus.
 - **`c_fn` = ₹800 is anchored to a synthetic basket.** Real baskets are larger,
   which favours the guard.
-- **FPR = 0.472 is not transferable.** It comes from a 90-row grid that is 60%
-  positive by construction, with labels the author declared. If the six
-  contested `coverage=exact / request=under` rows are ruled correct refusals
-  rather than false positives, FPR falls to 11/36 = 0.306 and break-even to
-  3.7%.
+- **FPR = 0.472 is not transferable, and is less precise than one decimal
+  suggests.** It comes from a 90-row grid that is 60% positive by construction,
+  with labels the author declared, and its 36 negatives come from four intent
+  sentences. If the six contested `coverage=exact / request=under` rows are
+  ruled correct refusals rather than false positives, FPR falls to 11/36 = 0.306
+  and break-even to 3.7% — which is inside the cluster interval above, so that
+  dispute and the sampling uncertainty are the same size.
 - **TPR = 1.000 is tautological on that corpus.** Every positive was constructed
   to match no capability. A real out-of-intent call that happened to match an
   unused authorization would be forwarded, and nothing here measures how often
@@ -161,8 +185,10 @@ Stated so they can be attacked:
 
 > On a synthetic conformance grid the guard refused every constructed
 > out-of-intent request and refused 17 of 36 in-intent ones. Priced with stated
-> assumptions, it breaks even at roughly a 5.6% out-of-intent base rate, or 2.4%
-> with bounded actions enabled. The only agent traffic this project observed ran
-> at 0.6%. This is a tail-risk control, not a cost saving, and the number that
+> assumptions, it breaks even between roughly 4.5% and 7.0% out-of-intent base
+> rate — a range, not a point, because the 36 negatives behind it come from four
+> intent sentences. With bounded actions enabled the centre moves to about 2.4%.
+> The only agent traffic this project observed ran at 0.6%, below the bottom of
+> every one of those ranges. This is a tail-risk control, not a cost saving, and the number that
 > decides its value — the real out-of-intent base rate — is the one arm C failed
 > to measure.

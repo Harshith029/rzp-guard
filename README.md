@@ -20,10 +20,12 @@ If you only have a few minutes, this is the whole project:
 | **4. What it costs** | [`study/FP-COST.md`](study/FP-COST.md) — both error directions priced, with the break-even |
 | **5. What it has not shown** | [Honest evaluation status](#honest-evaluation-status) — the recall experiment failed, and it is published as a failure |
 
-The one number worth arguing about: **this control breaks even at roughly a 5.6%
-out-of-intent base rate, and the only agent traffic we observed ran at 0.6%.**
-That is in `study/FP-COST.md`, with the assumptions that produce it and the ones
-that would overturn it.
+The one number worth arguing about: **this control breaks even somewhere between
+a 4.5% and 7.0% out-of-intent base rate, and the only agent traffic we observed
+ran at 0.6%.** It is a range rather than a point because the corpus behind it has
+four distinct merchant intents, not thirty-six. That is in
+[`study/FP-COST.md`](study/FP-COST.md), with the assumptions that produce it and
+the ones that would overturn it.
 
 ---
 

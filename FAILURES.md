@@ -1984,3 +1984,84 @@ worthless whatever its merits.
 the container lane did not execute. 13 of 14 packages pass on the Windows host;
 the four failures in `cmd/rzp-guard-operator` are the documented mode-bit
 limitation, unrelated to this change. CI on Linux is the verification.
+
+---
+
+## F37 — The independence sweep: this project set the right standard and then abandoned it
+
+**Severity: P1.** After finding the clustering defect in arm E (F36.3), I swept
+every document that reports a rate for the same error. It is not confined to arm
+E, and the most embarrassing part is that the correct method is written down in
+this repository's own founding document.
+
+### F37.1 — PREREGISTRATION.md already required cluster bootstrapping
+
+`PREREGISTRATION.md` lines 73 and 153:
+
+> **Confidence intervals by cluster bootstrap.** Calls within a session are not
+> independent — they share a mandate, an agent and a template.
+
+> The independence unit is the template, not five mechanically generated
+> sessions from one template — those are replicas differing only by payment id
+> and an amount from a fixed pool. Bootstrapping over them is
+> **pseudoreplication**.
+
+That is exactly right, it was written before any arm ran, and **arms D and E
+both ignored it.** Arm E is fixed (F36.3). Arm D is addressed below. The failure
+was not ignorance of the method; it was not re-reading my own protocol.
+
+### F37.2 — Arm D is more clustered than arm E, and FP-COST inherited it
+
+Arm D: **90 rows, four distinct intent sentences.** Its 36 in-intent rows — the
+entire denominator of the false-positive rate — come from four sentences in
+groups of 12, 12, 6 and 6.
+
+Arm D itself survives this. Its banner already says the matrix is "exact for
+that finite grid" and "does not establish transferable recall, precision, or
+false-positive cost", and a confusion matrix over 90 specific rows genuinely is
+exact for those rows. Clustering only bites when a number is generalised.
+
+**`study/FP-COST.md` generalised it.** It took FPR = 0.472, computed a break-even
+of 5.6%, and presented that as a decision-relevant figure with **no uncertainty
+of any kind** — no interval, no mention of clustering, nothing. I wrote it two
+days ago and had been recommending it as the strongest evaluation asset in the
+project.
+
+Resampling whole intent-sentence groups:
+
+```
+FPR        0.472   ->  95% cluster bootstrap  0.375 - 0.600
+break-even 5.6%    ->  4.5% - 7.0%
+```
+
+**Fixed.** `FP-COST.md` and the README now quote the range and say why it is a
+range. The qualitative conclusion is unchanged and survives comfortably — arm C's
+observed 0.6% is below the bottom of every band — but "5.6%" implied a precision
+the corpus cannot support, and a judge checking the denominator would have found
+four sentences behind a three-significant-figure number.
+
+Worth noting: the contested six `coverage=exact / request=under` rows would move
+break-even to 3.7%, which is *inside* the cluster interval. The labelling dispute
+and the sampling uncertainty are the same size, which is a more useful thing to
+know than either alone.
+
+### F37.3 — The arm C audit would have the same defect if it ever runs
+
+The 72 audited rows come from **22 distinct scenarios**, mean 3.3 rows each, up
+to 5 from one scenario. `cmd/rzp-study/armc_audit.go` contains no interval
+machinery at all, so nothing false has been published — the audit has never run.
+But any conditional rate computed over those 72 rows as independent observations
+would be pseudoreplication by the founding protocol's own definition.
+
+**Not fixed, deliberately.** The audit has no valid labels and is a candidate for
+withdrawal. Building cluster machinery for a study that may not run is the wrong
+order of work. Recorded here so that if it does run, the requirement is already
+written down: **cluster by scenario, not by row.**
+
+### The pattern
+
+Three arms, three versions of the same mistake, and the fix was in the repository
+the whole time. What made it findable was going looking for it while there was
+still time to act — the arm E fix was only possible because no label had
+returned, and the FP-COST fix only mattered because the number had not yet been
+said out loud to a judge.
