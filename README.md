@@ -8,6 +8,34 @@ amount, which is the default and the form every shipped mandate uses.
 
 ---
 
+## Track 02 — AI Risk Manager
+
+*Razorpay AI Buildathon 2026. Every claim below links to the artifact behind it.*
+
+| the bar | this project | where |
+|---|---|---|
+| **one class of loss** | agent-initiated unauthorized refunds — `create_refund` only | [The problem](#the-problem) |
+| **detector, verifier or auto-responder** | a deterministic **verifier**. No model, no score, no threshold | [What this is](#what-this-is) |
+| **working** | `./run.sh demo` — 15s. Also run against the live Razorpay Test Mode API on this commit | [Evidence](#evidence) |
+| **measured precision** | **0.423** | [`study/RESULTS-armE.md`](study/RESULTS-armE.md) |
+| **measured recall** | **0.733**, cluster-robust 95% CI 0.600–0.900 | same |
+| **held-out test set** | **partial, and stated as such.** Labels independent of the implementation; policy frozen and hash-pinned before the corpus existed. **Traffic is constructed, not observed** — quantified at 2.6× more adversarial than the real agent traffic captured | [`study/FINDINGS-armE.md`](study/FINDINGS-armE.md) |
+| **honest metrics incl. false-positive cost** | both directions priced; break-even **5.4–9.3%** against an observed base rate of **0.6%** | [`study/FP-COST.md`](study/FP-COST.md) |
+| **strictly defense-only** | no money-moving command in the released surface; 10/10 previously-working bypasses still blocked on Linux CI; 139 commits scanned for a self-authorizing launcher | [Defence-only](#defence-only) |
+
+**The number worth arguing about is recall 0.733, not the blocks.** Eight
+out-of-intent requests — 444,000 paise — were forwarded, and every one is in a
+cell where the compiled authorization covered more than the merchant's sentence
+asked for. **This project reports its own miss rate and names the cause.**
+
+**What it does not do:** score fraud risk, handle chargebacks, or reduce return
+abuse. It stops one mechanism, and it misses about a quarter of what it targets.
+
+Evaluation index, including the arms that failed:
+[`study/README.md`](study/README.md).
+
+---
+
 ## Two minutes
 
 If you only have a few minutes, this is the whole project:
@@ -316,7 +344,7 @@ merchant traffic, and no claim is made about which model produced the calls.
 | | |
 |---|---|
 | `cmd/`, `internal/` | the guard, the operator tool, the study runner |
-| `study/` | the evaluation: protocol, corpus, traces, results |
+| `study/` | the evaluation — start at [`study/README.md`](study/README.md), which says which arms failed and which one counts |
 | `study/FP-COST.md` | what each error direction costs, and the break-even base rate |
 | `study/FINDINGS-armE.md` | the measured result, the five predictions, and the 8 misses |
 | `evidence/` | live-gate projections and CI references |
