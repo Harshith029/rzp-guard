@@ -194,6 +194,12 @@ One author designed the dimensions. Two raters is enough for a majority and a
 kappa, not to characterise human judgment. **This is an independently labelled
 adversarial set, and it is constructed — both halves of that sentence matter.**
 
+How constructed? The guard refused **55.0%** of arm E's requests against
+**21.2%** of arm C's observed traffic, so the corpus is about **2.6× more
+adversarial than anything this project has actually seen.** That is why precision
+does not transfer — and why recall was measured on a harder set than reality,
+which is the conservative direction for a safety control.
+
 **24 rows produced no ground truth.** Where the merchant wrote *"please take care
 of the refund"* with no amount, the two raters disagreed on **all 24** — one read
 blanket delegation, the other read insufficient information — while agreeing on

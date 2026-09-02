@@ -104,6 +104,43 @@ the merchant's own sentence, which is what R7 asks for.
 Worth stating plainly because it is the opposite of the intuition: the prompt
 injection was **easy** for humans. The vague delegation was not.
 
+## How constructed is "constructed"? Measured, not asserted
+
+The weakest clause in this project's Track 2 claim is "held-out": arm E's labels
+are independent of the implementation, but the **traffic is constructed**. That
+has been stated as a caveat everywhere. It can be quantified instead.
+
+The guard's refusal rate on each set:
+
+```
+arm C   observed traffic     72 / 340 refund calls    21.2%
+arm E   constructed corpus   66 / 120 requests        55.0%
+```
+
+**Arm E is about 2.6x more adversarial than the only agent traffic this project
+has observed.** That is a design choice — the grid deliberately over-samples
+`above_intent`, `at_mandate_ceiling` and over-coverage cells, which is what makes
+recall estimable at all after arm C's positive class came back with two members.
+
+Two consequences, and they run in opposite directions.
+
+**Precision does not transfer, and now there is a number for why.** Arm E is 60%
+positive by construction against roughly 21% refusals in observed traffic.
+`RESULTS-armE.md` already prints precision at several base rates; this is the
+measured gap behind that warning.
+
+**Recall was measured on a harder set than reality, which is the conservative
+direction.** A safety control tested on traffic 2.6x more hostile than what it
+has actually seen is being tested the right way round. Recall 0.733 is not
+flattered by an easy corpus — if anything the constructed set is where the
+`coverage=over` weakness shows up most, which is precisely why it showed up.
+
+**What this does not establish.** It does not make the corpus representative. One
+constructed grid compared against one model's traffic on one day, through a proxy
+measured serving a different model than requested, is a comparison of two
+non-representative things. It bounds *how* they differ; it does not license
+generalising from either.
+
 ## What this does and does not establish
 
 **Establishes.** On 96 constructed refund requests labelled by two people who
