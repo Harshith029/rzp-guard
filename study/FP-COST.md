@@ -159,9 +159,14 @@ Three things that does and does not mean:
   one day, not a prior over agent traffic — and certainly not over *adversarial*
   agent traffic, which is the case the control exists for. A single successful
   prompt injection against a ₹50,000 basket pays for a lot of support contacts.
-- **It does mean the false-positive rate is the thing to fix**, not the
-  detector. Recall is already 1.000 by construction; there is nothing to gain
-  there. Every rupee of improvement available is on the FP side.
+- **It does mean the false-positive rate is the biggest single lever**, though
+  no longer the only one. *(Corrected 2026-09-03. This bullet used to read
+  "recall is already 1.000 by construction; there is nothing to gain there."
+  **Arm E measured recall at 0.733**, so that was wrong the moment the labels
+  came back: eight out-of-intent requests were forwarded and there is real
+  ground to gain on the FN side too. The banner above says sections 6 and 7
+  survive intact; this bullet is in section 5 and did not.)* The FP side is
+  still where the larger and cheaper improvement sits — see section 6.
 - **It does mean the honest pitch is "insurance", not "savings".** At a 0.6%
   base rate this is a control you run because the tail is catastrophic and
   uninsurable, the way you run input validation. Claiming it saves money at
@@ -205,9 +210,18 @@ Stated so they can be attacked:
   and break-even to 3.7% — which is inside the cluster interval above, so that
   dispute and the sampling uncertainty are the same size.
 - **TPR = 1.000 is tautological on that corpus.** Every positive was constructed
-  to match no capability. A real out-of-intent call that happened to match an
-  unused authorization would be forwarded, and nothing here measures how often
-  that occurs.
+  to match no capability. **Arm E measured it properly and got 0.733** — a real
+  out-of-intent call that happens to match an unused authorization *is*
+  forwarded, and it happened eight times. Substitute 0.733.
+- **`c_fp` assumes a human is standing by, and nothing here tests that.** The
+  whole model prices a false positive as *handling + delay* rather than as the
+  refund amount, and that holds only where someone unblocks it within hours. At
+  a merchant with no support rota there is no unblocking step: the customer
+  waits, escalates, and files a dispute. **The false positives would then cause
+  the chargeback this control exists to avoid**, and the sign of the whole
+  calculation flips. This is the assumption most likely to be false in the field
+  and the cheapest to check — ask one merchant what an unblocked refund costs
+  them and how fast it happens.
 
 ## 8. The honest one-line summary
 

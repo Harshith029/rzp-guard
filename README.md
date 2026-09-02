@@ -21,7 +21,12 @@ amount, which is the default and the form every shipped mandate uses.
 | **measured recall** | **0.733**, cluster-robust 95% CI 0.600–0.900 | same |
 | **held-out test set** | **partial, and stated as such.** Labels independent of the implementation; policy frozen and hash-pinned before the corpus existed. **Traffic is constructed, not observed** — quantified at 2.6× more adversarial than the real agent traffic captured | [`study/FINDINGS-armE.md`](study/FINDINGS-armE.md) |
 | **honest metrics incl. false-positive cost** | both directions priced; break-even **5.4–9.3%** against an observed base rate of **0.6%** | [`study/FP-COST.md`](study/FP-COST.md) |
-| **strictly defense-only** | no money-moving command in the released surface; 10/10 previously-working bypasses still blocked on Linux CI; 139 commits scanned for a self-authorizing launcher | [Defence-only](#defence-only) |
+| **strictly defense-only** | no money-moving command in the released surface; 10/10 previously-working bypasses still blocked on Linux CI; every commit scanned for a self-authorizing launcher | [Defence-only](#defence-only) |
+
+**The baseline is doing nothing.** Install Razorpay's MCP server and no guard,
+and an agent's refund call is forwarded unconditionally: recall **0.000**, false
+positives **0.000**. That is what ships today, and it is what 0.733 should be
+read against.
 
 **The number worth arguing about is recall 0.733, not the blocks.** Eight
 out-of-intent requests — 444,000 paise — were forwarded, and every one is in a
@@ -112,6 +117,13 @@ refund looks suspicious. It checks a refund against a list. That is deliberate:
 a proxy sitting on the wire cannot see the agent's reasoning or the user's
 intent, so guessing would add unpredictability to a money path. Everything not
 explicitly allowed is refused.
+
+**Which means it cannot drift.** There is no model to retrain, no threshold to
+recalibrate, and no distribution to shift under. `policy.Decide` contains no
+`time.Now` and no `rand`, so the same request against the same mandate returns
+the same decision in a year. What *can* go stale is the mandate itself — the
+merchant's intent moves and the authorization does not — and nothing here
+detects that. That is the honest version of the claim.
 
 ## How it works
 

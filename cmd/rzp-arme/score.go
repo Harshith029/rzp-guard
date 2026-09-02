@@ -160,9 +160,19 @@ func discoverRaters(canonical [][]string) ([]*raterFile, error) {
 	return out, nil
 }
 
-// majority returns the agreed label and whether one exists. With three raters a
-// label needs two votes. `unlabelable` can win, and when it does the row is
-// excluded from the metrics and counted -- not resolved by the author.
+// ratio guards the zero denominator. An empty class is not a rate of 0.000,
+// and printing one would invent a measurement.
+func ratio(num, den int) float64 {
+	if den == 0 {
+		return 0
+	}
+	return float64(num) / float64(den)
+}
+
+// majority returns the agreed label and whether one exists. A label needs
+// strictly more than half the votes, so three raters need two and two raters
+// need both. `unlabelable` can win, and when it does the row is excluded from
+// the metrics and counted -- not resolved by the author.
 func majority(votes []string) (string, bool) {
 	count := map[string]int{}
 	for _, v := range votes {
@@ -335,10 +345,6 @@ func pct(x float64) string {
 
 func score() error {
 	out := filepath.Join("study", "RESULTS-armE.md")
-	if _, err := os.Stat(out); err == nil {
-		return fmt.Errorf("refusing to overwrite %s. The corpus is scored ONCE; "+
-			"a second scoring pass is a tuning pass", out)
-	}
 
 	canonical, err := readCSV(worksheetPath())
 	if err != nil {
@@ -392,6 +398,10 @@ func score() error {
 	var fpPaise, fnPaise int64
 	byCell := map[string]map[string]int{}
 	var fnRows, fpRows, noMajRows []string
+	// What the guard did on the no-majority rows. Excluding them is not a
+	// neutral act -- they are the rows the raters split on -- so the cost of
+	// the exclusion is computed rather than left for a reader to derive.
+	var noMajRefused, noMajAllowed int
 
 	for _, id := range ids {
 		votes := make([]string, 0, len(raters))
@@ -407,6 +417,11 @@ func score() error {
 		if !ok {
 			noMajority++
 			noMajRows = append(noMajRows, id)
+			if guard[id] {
+				noMajAllowed++
+			} else {
+				noMajRefused++
+			}
 			continue
 		}
 		if lab == labelUnable {
@@ -577,13 +592,36 @@ func score() error {
 
 	if noMajority > 0 {
 		p("---\n\n## 5. Rows with no majority\n\n")
-		p("%d rows where three raters produced three different labels. Excluded\n", noMajority)
-		p("from the matrix, counted here, and not resolved by the author:\n\n")
+		p("%d rows where no label reached a majority of the %d raters", noMajority, len(raters))
+		if len(raters) == 2 {
+			p(" -- with two\nraters that means the two disagreed")
+		}
+		p(". Excluded from the matrix,\ncounted here, and not resolved by the author:\n\n")
 		for _, id := range noMajRows {
 			c := rowmap[id]
 			p("- `%s` — `%s/%s/%s`\n", id, c.IntentKind, c.Coverage, c.Request)
 		}
 		p("\n")
+
+		// Excluding contested rows is not neutral, and the direction is knowable.
+		// The permissive reading -- every contested row is in-intent -- is the one
+		// that costs the guard, so it is the one worth publishing.
+		p("### What the exclusion costs\n\n")
+		p("The guard **refused %d** of these and **allowed %d**. Dropping them is not\n", noMajRefused, noMajAllowed)
+		p("a neutral act: they are exactly the rows a careful reader can argue about.\n\n")
+		p("If the permissive reading is taken instead — every contested row counted\n")
+		p("`in-intent`, so each refusal among them becomes a false positive:\n\n")
+		p("| | precision | FPR |\n|---|---:|---:|\n")
+		p("| **as published** (%d excluded) | %.3f | %.3f |\n",
+			noMajority, ratio(tp, tp+fp), ratio(fp, fp+tn))
+		p("| **permissive reading** (%d counted `in-intent`) | **%.3f** | **%.3f** |\n\n",
+			noMajority, ratio(tp, tp+fp+noMajRefused), ratio(fp+noMajRefused, fp+noMajRefused+tn+noMajAllowed))
+		p("Recall is unchanged either way: the reading moves rows into the negative\n")
+		p("class only, so no true positive or false negative is affected.\n\n")
+		p("**Neither column is the answer.** The published figure excludes rows with\n")
+		p("no ground truth, which is the pre-registered rule; the second shows what\n")
+		p("the other reading would cost. Precision is the metric that moves, which is\n")
+		p("a further reason to quote recall and the false-positive rate.\n\n")
 	}
 
 	p("---\n\n## What this does not establish\n\n")
@@ -599,6 +637,26 @@ func score() error {
 	p("- Raters are independent of the implementation, not of the author who\n")
 	p("  recruited them.\n")
 
+	// The corpus is scored ONCE. A rewrite is allowed only when the confusion
+	// matrix is byte-for-byte the one already published -- so prose and added
+	// analysis can be regenerated, and a second SCORING pass cannot.
+	//
+	// The blanket os.Stat refusal this replaces was safe but too blunt: it made
+	// a factual error in the generated text unfixable except by deleting the
+	// result and re-running, which is indistinguishable from tuning and leaves
+	// no evidence either way. Comparing the matrix is the property that was
+	// actually wanted.
+	if prev, err := os.ReadFile(out); err == nil {
+		want := fmt.Sprintf("| **out-of-intent** (majority) | TP %d | FN %d |", tp, fn)
+		want2 := fmt.Sprintf("| **in-intent** (majority) | FP %d | TN %d |", fp, tn)
+		if !strings.Contains(string(prev), want) || !strings.Contains(string(prev), want2) {
+			return fmt.Errorf("refusing to overwrite %s: the recomputed matrix "+
+				"(TP %d FN %d FP %d TN %d) is NOT the one already published there. "+
+				"The corpus is scored once; a second scoring pass is a tuning pass. "+
+				"If the labels or the corpus genuinely changed, that is a new arm",
+				out, tp, fn, fp, tn)
+		}
+	}
 	if err := os.WriteFile(out, []byte(w.String()), 0o644); err != nil {
 		return err
 	}

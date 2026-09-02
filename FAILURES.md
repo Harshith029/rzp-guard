@@ -2548,3 +2548,73 @@ the suite reports, not what the product does. Making it work needs an OS secret
 store — DPAPI or the credential manager — not a relaxed assertion, and that is a
 feature, not a submission fix. The skip message says so in the place someone will
 read it.
+
+## F44 — The results document said "three raters" and there were two
+
+**Severity: P1**, and worse than P1 in what it would have cost. Found by
+red-teaming the documents rather than the code, two days before submission.
+
+`RESULTS-armE.md` is generated, never hand-written — which is the property that
+makes it trustworthy and the property that let this survive. `score.go` emitted a
+hardcoded sentence from the three-rater design:
+
+```
+24 rows where three raters produced three different labels.
+```
+
+There were **two** raters. The same file's own header says `Raters | 2` four
+sections earlier, and with two raters three different labels are arithmetically
+impossible — those rows are 1–1 splits.
+
+**Why this mattered more than its severity suggests.** Every claim this project
+makes rests on the evaluation being honest. The one document carrying the numbers
+contradicted itself, in a way any careful reader would catch, and it would have
+been read as something worse than a stale format string.
+
+### The exclusion was also unpriced
+
+24 of 120 rows were dropped for want of a majority. That is defensible — the
+raters split 24/24 on one construct and agreed 96/96 on everything else — but
+dropping the contested rows is **not neutral**, and the sensitivity was left for a
+reader to derive. It is now computed:
+
+| | precision | FPR |
+|---|---:|---:|
+| as published (24 excluded) | 0.423 | 0.455 |
+| permissive reading (24 counted `in-intent`) | **0.333** | 0.489 |
+
+The guard refused 14 of the 24 and allowed 10. **Precision moves 21% relative**
+depending on which careful reader is believed. Recall is untouched — the reading
+moves rows into the negative class only.
+
+### The fix changed a guard that was too blunt
+
+`score()` refused to run at all if `RESULTS-armE.md` existed: the corpus is scored
+once, and a second scoring pass is a tuning pass. Correct instinct, wrong
+mechanism — it made a **factual error in the generated text unfixable** except by
+deleting the result and re-running, which is indistinguishable from tuning and
+leaves no evidence either way.
+
+The guard now compares the **recomputed confusion matrix against the one already
+published** and allows the write only when they are identical. Prose and added
+analysis can be regenerated; a second scoring pass cannot. Verified in both
+directions:
+
+```
+matrix unchanged        -> rewrite allowed, TP 22 FP 30 TN 36 FN 8 unchanged
+published TP altered    -> REFUSED, naming both matrices
+```
+
+### Also corrected in the same pass
+
+`FP-COST.md` §5 still asserted *"recall is already 1.000 by construction; there is
+nothing to gain there"* — written under arm D and disproved by arm E's 0.733. The
+superseding banner said sections 6 and 7 survive intact, which implicitly excluded
+§5 but never named the claim, so a reader reaching it found a false statement in
+the economics document. Corrected in place, with the original text quoted.
+
+**The lesson is narrower than "check your docs".** Generated artifacts are trusted
+*because* they are generated, so a hardcoded string inside a generator inherits
+that trust without earning it. Anything a generator prints as fact should be
+derived from the data it was handed — `len(raters)`, not the number the design
+expected.

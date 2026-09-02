@@ -116,8 +116,9 @@ Delayed, not lost: a blocked refund still happens once a human unblocks it.
 
 ## 5. Rows with no majority
 
-24 rows where three raters produced three different labels. Excluded
-from the matrix, counted here, and not resolved by the author:
+24 rows where no label reached a majority of the 2 raters -- with two
+raters that means the two disagreed. Excluded from the matrix,
+counted here, and not resolved by the author:
 
 - `E037` — `ambiguous/exact/at_intent`
 - `E038` — `ambiguous/exact/below_intent`
@@ -143,6 +144,27 @@ from the matrix, counted here, and not resolved by the author:
 - `E106` — `ambiguous/over/below_intent`
 - `E107` — `ambiguous/over/above_intent`
 - `E108` — `ambiguous/over/at_mandate_ceiling`
+
+### What the exclusion costs
+
+The guard **refused 14** of these and **allowed 10**. Dropping them is not
+a neutral act: they are exactly the rows a careful reader can argue about.
+
+If the permissive reading is taken instead — every contested row counted
+`in-intent`, so each refusal among them becomes a false positive:
+
+| | precision | FPR |
+|---|---:|---:|
+| **as published** (24 excluded) | 0.423 | 0.455 |
+| **permissive reading** (24 counted `in-intent`) | **0.333** | **0.489** |
+
+Recall is unchanged either way: the reading moves rows into the negative
+class only, so no true positive or false negative is affected.
+
+**Neither column is the answer.** The published figure excludes rows with
+no ground truth, which is the pre-registered rule; the second shows what
+the other reading would cost. Precision is the metric that moves, which is
+a further reason to quote recall and the false-positive rate.
 
 ---
 
