@@ -244,15 +244,29 @@ labels returned in
 and what they mean in [`study/FINDINGS-armE.md`](study/FINDINGS-armE.md).
 Reproduce the scoring with `go run ./cmd/rzp-arme verify`.
 
-**What is prepared, not yet run:** the guard refused **72 of those 340 calls**.
-Two blinded external-rater worksheets covering every one of them are prepared
-but **have not been distributed, and no external result exists.** Raters would
-see a sanitised view of each call and would not be told what the rows have in
-common. It is designed to report one
-conditional quantity — *in-intent calls among refused calls* — split so that a
-refusal correctly enforcing an incomplete mandate is never counted as a guard
-defect. It is **post-hoc, not pre-registered**, it cannot repair the failed
-recall experiment, and **no result is published until those labels return.**
+**The arm C blocked-call audit was withdrawn, deliberately.** The guard refused
+**72 of those 340 calls**, and two blinded rater worksheets covering all of them
+were prepared and never distributed. It is **withdrawn, not pending** — no labels
+were ever collected and none will be.
+
+It was post-hoc rather than pre-registered, and it would have reported a single
+conditional quantity — *in-intent calls among refused calls* — which is not
+precision or recall and could not have repaired arm C's failed recall experiment.
+Arm E answers the question it was reaching for, pre-registered and with
+independent labels. Running a second, weaker label study afterwards would add
+paperwork, not evidence.
+
+**Its one label-independent finding was extracted and is reproducible.** Of the
+72 refusals, **nine** asked for an amount the merchant's remaining authorizations
+did cover, reachable only by combining ten actions — two past `maxSetSize = 8`.
+That needed no raters, because it is decided by the guard's own refusal messages:
+
+```bash
+go run ./cmd/rzp-study reachability-armC
+```
+
+The worksheets, the protocol, the hashes and the distribution record are all kept
+as the historical record of a study that was designed and then stopped.
 
 Details: `study/PRELABEL-FINDING-armC.md`, `study/PROTOCOL-armC-AUDIT.md`.
 

@@ -1,5 +1,12 @@
 # Arm C labelling rubric
 
+> **The study this rubric was written for was WITHDRAWN on 2026-09-02.** The
+> blocked-call audit was never run, no labels were collected, and this document
+> was never delivered to anyone — `PROTOCOL-armC-AUDIT-AMENDMENT-3.md` records
+> why it could not be (it names the component under test). It is preserved as
+> the internal instrument it always was. See `PROTOCOL-armC-AUDIT.md` for the
+> withdrawal, and `FINDINGS-armE.md` for the study that replaced it.
+
 Fixed before any label was assigned. Do not change it while labelling — if it
 turns out to be wrong, stop, record why, and re-label from the start.
 

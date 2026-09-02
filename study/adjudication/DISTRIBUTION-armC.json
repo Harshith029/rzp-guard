@@ -42,5 +42,12 @@
     "status": "SUPERSEDED - not the anchor. Retained for provenance only.",
     "why": "Recorded as the anchor, then invalidated by a history rewrite before anything was distributed. cmd_preflight was refusing the repository's own history: N9's test fixture was written literally into run.sh and matched the rule preflight enforces. The fixture is now assembled at runtime. No rater ever held a hash tied to this SHA.",
     "worksheet_hashes_unchanged_by_the_rewrite": true
+  },
+  "withdrawn": {
+    "date": "2026-09-02",
+    "status": "WITHDRAWN. The worksheets recorded here were never distributed and no labels were ever collected. AUDIT-armC.md does not exist.",
+    "reason": "Post-hoc rather than pre-registered, and it would have reported one conditional quantity that is neither precision nor recall. Arm E answers the same question pre-registered and with independent labels; a second, weaker label study afterwards would add paperwork rather than evidence.",
+    "label_independent_finding_extracted": "Of the 72 refusals, nine asked for an amount reachable only by combining ten actions, two past maxSetSize = 8. Reproduce with `rzp-study reachability-armC`; it needs no raters.",
+    "artifacts_preserved": "The worksheets, sums file, protocol and this record are kept as the historical record of a study that was designed and then stopped."
   }
 }

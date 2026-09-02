@@ -1,5 +1,42 @@
 # Arm C — post-hoc, exhaustive conditional audit of guard-blocked calls
 
+> ## WITHDRAWN, 2026-09-02 — this study was never run and never will be
+>
+> **No labels were ever collected.** The two blinded worksheets described below
+> were prepared, pinned, anchored to a public commit, and **never distributed**.
+> `AUDIT-armC.md` does not exist and will not be written.
+>
+> **Why it was withdrawn rather than left pending.** This audit was post-hoc
+> rather than pre-registered, and it would have reported one conditional quantity
+> — *in-intent calls among refused calls* — which is neither precision nor recall
+> and could not have repaired arm C's failed recall experiment. Arm E answers the
+> question this was reaching for: pre-registered before its corpus existed, with
+> ground truth from raters who saw neither the authorization nor the guard's
+> decision. Running a second, weaker label study afterwards would have added
+> paperwork rather than evidence, and two half-finished label studies read worse
+> than one finished one.
+>
+> **Its one label-independent finding was extracted and is reproducible.** Of the
+> 72 refusals, nine asked for an amount the merchant's remaining authorizations
+> did cover — reachable only by combining ten actions, two past `maxSetSize = 8`.
+> That never needed raters: it is decided by the guard's own recorded refusal
+> messages, which name the actions still available at that moment.
+>
+> ```
+> go run ./cmd/rzp-study reachability-armC
+> ```
+>
+> See `FAILURES.md` F38 for why that number existed in the README for days with
+> nothing in the repository computing it, and F41 for the arm E result that
+> supersedes this design.
+>
+> **Nothing below is edited.** The protocol, the design reasoning, the category
+> definitions and the stated limitations are preserved exactly as written, as the
+> record of a study that was designed and then stopped. Everything it describes in
+> the future tense — the report, the rater labels, the kappa — never happened.
+
+<!-- PRESERVED-ORIGINAL-BELOW -->
+
 **Post-hoc, and not pre-registered.** This audit was designed *after* arm C's
 outcome was known. Arm C's pre-registration covers the grid, the ground-truth
 rule, the policy freeze and predictions C1–C7; **it does not cover this**, and
