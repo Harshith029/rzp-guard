@@ -1,5 +1,11 @@
 # Arm C, Amendment 2 — collection, 2026-09-01
 
+> **The `study/VOID-RUN-1/` traces this amendment voided have been REMOVED from
+> the tree (2026-09-03).** 165 files from a run this document declares void, kept
+> for a while as history and referenced by nothing else. They are in git history
+> if anyone wants them. The amendment itself is unchanged — the reason the run
+> was voided is the part that mattered, and it is below.
+
 Amendment 1 covered the labelling and blinding surface. This one covers
 **collection**: a run was discarded, a re-run replaced it, and a void-recovery
 policy is defined here **before** it is executed.

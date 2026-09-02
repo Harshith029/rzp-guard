@@ -1,5 +1,24 @@
 # PREREGISTRATION.md — rzp-guard evaluation, frozen before implementation
 
+> ## SUPERSEDED, 2026-09-03 — kept as the record of the original design
+>
+> This is the project's **first** pre-registration. Its corpus, split and
+> analysis plan were superseded by arms C, D and E, and the reported result comes
+> from `study/PROTOCOL-armE.md`.
+>
+> **The `corpus/` directory this document describes has been removed.** It held
+> 143 generated scenario files under `corpus/tuning/` and `corpus/heldout/`, was
+> read by no code in the repository, and its `tuning`-beside-`heldout` naming
+> invited a test-set-contamination question about a split that no published
+> result ever used. It is recoverable from git history; nothing depends on it.
+>
+> **What survived is the method, not the data.** This document is where cluster
+> bootstrapping and the pseudoreplication warning were written down, before any
+> arm ran — and arms D and E both ignored it until the sweep recorded in
+> `FAILURES.md` F37 caught them. That is why it is kept rather than deleted.
+>
+> Read `study/README.md` for which arm produced the live result.
+
 **Committed:** 2026-08-24, Phase 0.5 · **Corpus version:** 1.0.0 · **Seed:** 20260824
 **Status at time of commit:** no policy code, no detector, no `src/` exists. Verifiable from `git log`.
 
