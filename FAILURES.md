@@ -2209,3 +2209,96 @@ The matrix is unchanged: TP 54 FP 17 TN 19 FN 0, all 90 decisions identical,
 because arm D's corpus contains only plain integers. `ASSESSMENT-armD.md` now
 says the freeze was broken once, harmlessly, and points at the trail as the
 evidence for "harmlessly" rather than asserting it.
+
+---
+
+## F40 — A JSON parser differential smuggled an unauthorized refund past the classifier
+
+**Severity: P0.** The most serious defect found in this project. A real bypass on
+the money path, reproduced against the running relay before it was fixed.
+
+### The attack
+
+RFC 8259 permits an object to repeat a key and calls the result unpredictable.
+Parsers resolve it differently: Go's `encoding/json` takes the **last**
+occurrence, while many JavaScript and Python paths take the **first**.
+
+The relay reads a line, classifies it, and forwards anything that is not
+`tools/call` **byte-for-byte**. So:
+
+```json
+{"jsonrpc":"2.0","id":1,
+ "method":"tools/call","method":"tools/list",
+ "params":{"name":"create_refund",
+           "arguments":{"payment_id":"pay_X","amount":900000}}}
+```
+
+The guard read `method = "tools/list"`, classified it as a read, applied no
+authorization check, and forwarded the raw bytes. A child parser taking the
+first occurrence receives `tools/call` with `create_refund` for **900,000
+paise** — an amount no mandate authorized, through a boundary whose entire
+purpose is that this cannot happen.
+
+Verified against the real relay: the child received the whole line.
+
+### Why the existing defences did not catch it
+
+Every one of them was pointed at a different thing, and each was correct on its
+own terms.
+
+`parseAmountPaise` never ran, because the message was never classified as a
+refund. The duplicate-**request-id** check did not apply, because the id was used
+once. The `tools/call` path **already defeats this attack** — its arguments are
+rebuilt from the parsed map before forwarding, which is why the same trick with a
+duplicate `amount` key fails — but that re-serialisation protects only the path
+that was already recognised as dangerous.
+
+The relay states the right principle in its own comment: *"the child must never
+receive bytes this relay could not inspect."* Bytes it inspected and read one
+way, while the next hop reads another, are the same failure wearing a disguise.
+The principle was written down and enforced for parse **errors** only.
+
+### The fix
+
+`duplicateKey` walks the JSON token stream and reports any object that repeats a
+key at any depth. `handleAgentLine` refuses such a message with `-32600` before
+reading anything out of it, and nothing reaches the child.
+
+**Refusal rather than canonicalisation, deliberately.** Re-serialising every
+message would make the guard's reading authoritative — that is exactly what
+protects `tools/call` today. But rewriting arbitrary pass-through MCP traffic
+means reordering keys and reformatting numbers in messages this relay does not
+understand, risking protocol breakage to repair an input that should never have
+been sent. Refusing is fail-closed and requires no knowledge of the message.
+
+**The reverse direction too.** A child reply with a duplicate key is one the
+relay reads one way and the agent may read another, so the commit decision it
+would drive is untrustworthy. `markAmbiguous` puts those actions **IN_DOUBT**
+rather than committing — not a release, because the bytes already reached the
+child and the refund may have executed. The raw reply still goes upstream,
+because the agent needs it.
+
+### False positives were the real risk in the fix
+
+A detector that refuses legitimate traffic is worse than the bug it closes. MCP
+messages reuse key *names* constantly — `name` appears in `params` and again in
+`arguments` on every single `tools/call`. Only a repeat **within one object** is
+ambiguous.
+
+Pinned by test in both directions: five nesting shapes are caught, including
+inside arrays and arrays of arrays; six legitimate shapes are not, including the
+ordinary `tools/call` skeleton, sibling objects in an array, a string *value*
+equal to a key already seen in the same object, and arrays of scalars. Malformed
+input reports no duplicate, leaving the parse error to the caller.
+
+### What this says about the rest of the sweep
+
+The previous four entries were reporting defects — claims carrying more support
+than they had. This one is a control that did not control. It was found by
+probing the relay with hostile input instead of reading it and concluding it
+looked right, which is the same method that found nothing in the money path and
+everything here.
+
+The guard has been treating "I parsed it" as "I understand it". Those are
+different, and the gap is exactly the size of whatever the next hop does
+differently.

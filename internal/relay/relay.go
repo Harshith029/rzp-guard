@@ -175,6 +175,15 @@ func (r *Relay) PumpAgent(agentIn io.Reader) error {
 }
 
 func (r *Relay) handleAgentLine(line []byte) error {
+	// Before anything is read out of this line: refuse it if any object in it
+	// repeats a key. Parsers disagree about which occurrence wins, so a message
+	// with duplicates is one this relay cannot inspect on the child's behalf --
+	// see duplicate_keys.go for the create_refund that reached a child inside a
+	// message the guard had classified as a read.
+	if k, dup := duplicateKey(line); dup {
+		return r.writeAgent(errorResponse(nil, -32600, duplicateKeyError(k)))
+	}
+
 	var msg rpcMessage
 	dec := json.NewDecoder(bytes.NewReader(line))
 	dec.UseNumber()
@@ -373,6 +382,27 @@ func rewriteArguments(line []byte, msg rpcMessage, tp toolCallParams,
 
 // PumpChild reads the child's stream, resolves reservations, and forwards
 // results to the agent unchanged.
+// markAmbiguous settles a correlation this relay cannot read unambiguously.
+//
+// Not a release: the bytes already reached the child, so the refund may have
+// executed. Not a commit either, because the reply that would justify one is a
+// reply whose meaning depends on which parser reads it. IN_DOUBT is the only
+// honest outcome, and it is the same one an unrecognisable reply already gets.
+func (r *Relay) markAmbiguous(id, key string) {
+	r.mu.Lock()
+	p, ok := r.inflight[id]
+	if ok {
+		delete(r.inflight, id)
+	}
+	r.mu.Unlock()
+	if !ok || !p.isRefund {
+		return
+	}
+	r.markInDoubt(p.actionIDs, fmt.Sprintf(
+		"child reply repeats the key %q, so what this relay read is not "+
+			"necessarily what the agent or the provider read", key))
+}
+
 func (r *Relay) PumpChild(childOut io.Reader) error {
 	sc := bufio.NewScanner(childOut)
 	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
@@ -391,7 +421,15 @@ func (r *Relay) PumpChild(childOut io.Reader) error {
 		// carries an id, and feeding it to resolve() could settle an unrelated
 		// refund whose id happened to match.
 		if err := dec.Decode(&msg); err == nil && isResponse(msg) {
-			r.resolve(string(msg.ID), msg)
+			// A reply whose object repeats a key is one this relay reads one way
+			// and the agent may read another, so the commit/in-doubt decision it
+			// would drive is not trustworthy. Hold it for an operator instead --
+			// the bytes still go upstream, because the agent needs the reply.
+			if k, dupe := duplicateKey(out); dupe {
+				r.markAmbiguous(string(msg.ID), k)
+			} else {
+				r.resolve(string(msg.ID), msg)
+			}
 		}
 		if err := r.writeAgent(out); err != nil {
 			return err
