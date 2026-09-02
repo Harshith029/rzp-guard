@@ -49,6 +49,8 @@ func main() {
 		err = cmdArmCReport(os.Args[2:])
 	case "audit-armC":
 		err = cmdArmCAuditReport(os.Args[2:])
+	case "reachability-armC":
+		err = cmdArmCReachability(os.Args[2:])
 	case "predistribute-armC":
 		err = cmdArmCPreDistribute(os.Args[2:])
 	default:

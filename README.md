@@ -232,6 +232,12 @@ refuses rather than spends. In arm C this refused **nine** refunds whose entries
 summed exactly to the requested amount — the measured price of that trade, not a
 verdict on whether the bound is set correctly.
 
+Reproduce it: `go run ./cmd/rzp-study reachability-armC`. It re-derives the count
+from the guard's own refusal messages, needs no labels, and searches *without* a
+bound so a refusal caused only by the bound cannot hide. **All nine need exactly
+ten actions**, so the real choice on this corpus is 8 versus 10, not 8 versus
+unbounded.
+
 **`COMMITTED` means created, not settled.** The provider confirmed a refund
 entity exists. No synchronous reply can prove money moved.
 

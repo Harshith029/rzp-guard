@@ -2065,3 +2065,66 @@ the whole time. What made it findable was going looking for it while there was
 still time to act — the arm E fix was only possible because no label had
 returned, and the FP-COST fix only mattered because the number had not yet been
 said out loud to a judge.
+
+---
+
+## F38 — A correct number in the README that nothing in the repository computed
+
+**Severity: P1.** Found by continuing the independence sweep into every numeric
+claim rather than stopping at the statistical ones.
+
+`README.md` states that the `maxSetSize = 8` combining bound refused **nine**
+refunds in arm C whose entries summed exactly to the requested amount. It entered
+in `77dd09c` ("Rewrite the README for a non-technical panel").
+
+**The number is correct.** I recomputed it independently: of 72 blocked refund
+calls, 63 asked for an amount no subset of the remaining authorizations reaches,
+and 9 asked for an amount that is reachable — every one of them needing ten
+actions, two past the bound.
+
+**Nothing in the repository computed it.** `PROTOCOL-armC-AUDIT.md` says the
+audit report "will list every category C call individually" — future tense, and
+that report has never run, because the blocked-call audit has no labels. So the
+most-read document in the project carried a specific measured figure that a
+reader could not check and a judge could not reproduce.
+
+That is the same defect as an unsourced metric wearing different clothes, and it
+is worse in one way than F37.2: FP-COST's break-even was at least derived from a
+published matrix. This was a bare assertion.
+
+### Fix
+
+`rzp-study reachability-armC` re-derives it. It needs **no rater labels** —
+category C is decided by the guard's own recorded refusal message, which names
+the actions still available at that moment and already accounts for actions
+consumed earlier in the same trace. Separating it from the stalled audit means
+the `maxSetSize` evidence stands on its own instead of waiting on labels that may
+never arrive.
+
+The search here is deliberately **unbounded** where the guard stops at eight. A
+bounded check would agree with the guard and report nothing, which is exactly the
+failure mode: the instrument would hide the thing it exists to measure.
+`TestSubsetSizeFindsTheSmallestReachingSubset` pins that with a ten-action case.
+
+A refusal reason that fails to parse is an **error**, not a skipped row. Silently
+dropping an unparseable refusal would under-report the count in the direction
+that flatters the guard.
+
+### What it surfaced
+
+**All nine need exactly ten actions.** Nothing said this before, and it changes
+the shape of the decision: the trade on this corpus is **8 versus 10**, not 8
+versus unbounded. Raising the bound to ten recovers all nine and leaves the
+search finite. Whether that is worth the extra agent-controlled computation is a
+design question, and neither the command nor this entry takes it — but the
+question is now answerable instead of rhetorical.
+
+### The pattern this sweep is finding
+
+Three entries in a row, all the same shape: a number that is *true* but whose
+support is weaker than its presentation. F37.2 quoted a point estimate from four
+clusters. F36.3 used an interval that assumed independence. This one had no
+derivation at all. In every case the fix was to make the uncertainty or the
+provenance visible rather than to change the claim — which suggests the defect is
+not in the analysis but in the habit of writing the conclusion before checking
+what supports it.
