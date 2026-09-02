@@ -2386,3 +2386,96 @@ overwritten, which is the difference between a freeze that can be audited and on
 that can be quietly reapplied.
 
 The matrix is unchanged both times: TP 54 FP 17 TN 19 FN 0.
+
+---
+
+## F41 — Arm E scored: the first measured recall, and it is not 1.000
+
+Not a defect. Recorded here because this file is the project's record of what is
+true, and the result changes two things that were stated as limitations.
+
+### The result
+
+```
+TP 22   FP 30   TN 36   FN 8        96 of 120 rows scored, 2 raters
+recall 0.733  [0.600 - 0.900]       FPR 0.455  [0.407 - 0.493]
+precision 0.423                     Cohen's kappa 0.604
+```
+
+Ground truth is the agreement of two people who never saw the code, the compiled
+authorization, or the guard's decision. The corpus carries no label field, so the
+scorer could not have branched on an authored one. Intervals are cluster-robust
+over the six intent sentences, per `PROTOCOL-armE-AMENDMENT-1.md`.
+
+**All five pre-registered predictions held**, which is a weaker statement than it
+sounds — E3 was near-certain and E1/E2 were the design working. E1 was still a
+genuine risk: had the `coverage=over` cells not produced rows that humans called
+out-of-intent *and* the guard forwarded, recall would have returned 1.000 and arm
+E would have repeated arm D's tautology with extra steps.
+
+### What it exposes about the guard
+
+**Eight false negatives, 444,000 paise, all in `coverage=over` and nowhere
+else.** The guard forwarded refunds that two independent readers called
+out-of-intent, because the compiled authorization covered more than the
+merchant's sentence asked for. `scoped_partial/over` is the sharpest: the
+merchant wrote *"refund the delivery charge only, the items are not to be
+refunded"* and the authorization still covered the items.
+
+The verifier did not miss once on matching. It is exactly as good as the
+authorization it is handed, and the gap belongs to the intent-to-authorization
+compiler. That is now measured rather than asserted.
+
+### It moved the economics AGAINST the guard
+
+`FP-COST.md` computed break-even from arm D, where recall was 1.000 **by
+construction**, so the false-negative term was assumed zero.
+
+```
+arm D (assumed)    TPR 1.000  FPR 0.472  ->  break-even 5.6%
+arm E (measured)   TPR 0.733  FPR 0.455  ->  break-even 7.2%
+across intervals   TPR .600-.900  FPR .407-.493  ->  5.4% - 9.3%
+```
+
+A control that misses a quarter of what it exists for is **harder** to justify,
+not easier. Arm C's observed 0.6% (scenario-clustered 0.00–1.57%) is still below
+every one of those bands, so the conclusion is unchanged and the margin is wider
+than arm D implied — but the honest direction of the correction is against the
+project's own case, which is why it is stated first.
+
+`FP-COST.md` is superseded in part rather than rewritten: the arm D arithmetic is
+left intact below a dated banner, because the reasoning is unchanged and only the
+inputs moved.
+
+### 24 rows produced no ground truth, and that is the finding
+
+Where the merchant wrote *"please take care of the refund"* with no amount, the
+two raters disagreed on **all 24** — one read blanket delegation, the other read
+insufficient information — while agreeing on **96 of 96** of everything else.
+
+The disagreement is total and confined to the one construct designed to be
+arguable. A third rater would have produced a 2-1 majority and buried a real
+50/50. **A merchant instruction with no stated amount is not verifiable**, and
+those rows are excluded from every metric and listed individually.
+
+### Interventions on record
+
+Both returned files were queried once for internal contradictions — rows where a
+rater answered the same question two different ways. Each was shown all the rows
+in the group with **no indication of which was correct**, and each rater resolved
+it themselves. Rater 1 had one group, rater 2 had two. Feeding anything back to a
+rater is an intervention and belongs in the record even when it changed no
+ground truth.
+
+Rater 1 also returned `inbound`/`outbound` instead of the specified vocabulary
+and was asked to correct it. **The values were not renamed on their behalf** —
+renaming a label is editing a judgment, and the whole arm depends on not doing
+that. Rater 2's first file was Windows-1252 rather than UTF-8; the second was
+clean.
+
+### The headline changed
+
+`README.md` no longer says the project does not meet the Track 2 precision/recall
+bar, because precision and recall now exist and are independently labelled. It
+says instead what they are, what the intervals are, that the traffic is
+constructed, and that eight requests got through.

@@ -18,14 +18,14 @@ If you only have a few minutes, this is the whole project:
 | **2. That it works** | `./run.sh test` — unit, lifecycle and race lanes in a digest-pinned container |
 | **3. That it cannot be bypassed** | `./run.sh redteam-negative` — ten bypasses that once worked, each must still fail |
 | **4. What it costs** | [`study/FP-COST.md`](study/FP-COST.md) — both error directions priced, with the break-even |
-| **5. What it has not shown** | [Honest evaluation status](#honest-evaluation-status) — the recall experiment failed, and it is published as a failure |
+| **5. What it measured** | recall **0.733**, FPR **0.455**, independently labelled — and the 8 misses it did not catch |
 
 The one number worth arguing about: **this control breaks even somewhere between
-a 4.5% and 7.0% out-of-intent base rate, and the only agent traffic we observed
-ran at 0.6%.** It is a range rather than a point because the corpus behind it has
-four distinct merchant intents, not thirty-six. That is in
-[`study/FP-COST.md`](study/FP-COST.md), with the assumptions that produce it and
-the ones that would overturn it.
+a 5.4% and 9.3% out-of-intent base rate, and the only agent traffic we observed
+ran at 0.6%.** That band moved *against* the guard once recall was measured
+rather than assumed perfect — a control that misses a quarter of what it exists
+for is harder to justify, not easier. See [`study/FP-COST.md`](study/FP-COST.md)
+for the assumptions and the inputs that would overturn it.
 
 ---
 
@@ -166,15 +166,48 @@ cannot prove the absence of every offense-capable construction.
 
 ## Honest evaluation status
 
-**This project does not meet the Track 2 precision/recall bar, and the headline
-result is a failed experiment.**
+**Precision and recall are measured, on 96 constructed refund requests labelled
+by two people who never saw the code, the authorization, or the guard's
+decision.**
 
-**Arm C** was the serious attempt: a 54-scenario grid generated mechanically
+```
+recall 0.733   [0.600 - 0.900]      FPR 0.455   [0.407 - 0.493]
+precision 0.423                     Cohen's kappa 0.604
+TP 22   FP 30   TN 36   FN 8        96 of 120 rows scored
+```
+
+Intervals are **cluster-robust**, not Wilson: the corpus has six distinct
+merchant intents, so treating 120 rows as independent observations would flatter
+it. `PROTOCOL-armE.md` was committed before the corpus existed, the corpus file
+carries **no label field**, and all five pre-registered predictions are reported
+in [`study/FINDINGS-armE.md`](study/FINDINGS-armE.md).
+
+**The number that matters is recall 0.733, not the 22 blocks.** Eight
+out-of-intent requests — 444,000 paise — were forwarded, and **every one is in a
+cell where the compiled authorization covered more than the merchant's sentence
+asked for.** Zero false negatives anywhere else. The guard is exactly as good as
+the authorization it is handed, and this is the measurement of that, not an
+argument about it.
+
+**What this is not.** The requests are constructed, not observed agent traffic.
+One author designed the dimensions. Two raters is enough for a majority and a
+kappa, not to characterise human judgment. **This is an independently labelled
+adversarial set, and it is constructed — both halves of that sentence matter.**
+
+**24 rows produced no ground truth.** Where the merchant wrote *"please take care
+of the refund"* with no amount, the two raters disagreed on **all 24** — one read
+blanket delegation, the other read insufficient information — while agreeing on
+96 of 96 of everything else. A merchant instruction with no stated amount is not
+verifiable, and that is a finding, not a gap.
+
+**Arm C** was the earlier attempt, and it failed: a 54-scenario grid generated mechanically
 rather than chosen by the author, the policy frozen by hash beforehand, and
 predictions written down in advance. It produced **162 traces and 340 refund
 calls**, of which a mechanical application of the labelling rule finds **two**
 candidate out-of-intent calls. The pre-registered prediction required at least
-twenty. **It failed decisively, and recall cannot be estimated from two.**
+twenty. **It failed decisively, and recall cannot be estimated from two.** Arm E
+exists because of that failure and does not repair it: arm C asked how often an
+agent misbehaves, which is still unmeasured.
 
 In the scenarios containing an injected instruction, **113 refund calls were
 emitted and none was mechanically classified out-of-intent**. That is a fact
@@ -197,17 +230,13 @@ line above, and it does not repair arm C.** What it is worth is engineering: a
 reproducible conformance suite, pinned by a manifest that `go test` enforces,
 and one bounded-search limitation reduced to a single deterministic case.
 
-**Arm E is running now.** A 120-row corpus whose ground truth comes from three
-independent raters who see the merchant's intent and the requested refund, and
-never the compiled authorization or the guard's decision. The pre-registration
-([`study/PROTOCOL-armE.md`](study/PROTOCOL-armE.md)) was committed before the
-corpus existed; the corpus file carries **no label field**, so the scorer cannot
-score against an author-declared label — the defect that withdrew arm D. Unlike
-arm D, false negatives are reachable by construction: 10 rows are forwarded above
-their stated intent, so recall is a measurement rather than a restatement.
-**Labels are out and no result exists yet.** If they return, this section reports
-precision, recall and false-positive rate with Wilson intervals and inter-rater
-agreement; if they do not, it says so.
+**Arm E** is the evaluation arms A–D failed to be, and its full result is above.
+Pre-registration in [`study/PROTOCOL-armE.md`](study/PROTOCOL-armE.md), committed
+before the corpus existed; three defects I found in my own design before the
+labels returned in
+[`PROTOCOL-armE-AMENDMENT-1.md`](study/PROTOCOL-armE-AMENDMENT-1.md); predictions
+and what they mean in [`study/FINDINGS-armE.md`](study/FINDINGS-armE.md).
+Reproduce the scoring with `go run ./cmd/rzp-arme verify`.
 
 **What is prepared, not yet run:** the guard refused **72 of those 340 calls**.
 Two blinded external-rater worksheets covering every one of them are prepared
@@ -269,6 +298,7 @@ merchant traffic, and no claim is made about which model produced the calls.
 | `cmd/`, `internal/` | the guard, the operator tool, the study runner |
 | `study/` | the evaluation: protocol, corpus, traces, results |
 | `study/FP-COST.md` | what each error direction costs, and the break-even base rate |
+| `study/FINDINGS-armE.md` | the measured result, the five predictions, and the 8 misses |
 | `evidence/` | live-gate projections and CI references |
 | `FAILURES.md` | what broke, why, and what was changed — including defects found in the fixes for earlier defects |
 | `ARCHITECTURE.md` | design and the reasoning behind the capability model |

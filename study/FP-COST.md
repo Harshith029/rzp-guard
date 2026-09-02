@@ -1,5 +1,33 @@
 # What the errors cost
 
+> ## SUPERSEDED IN PART, 2026-09-02
+>
+> Everything below was computed from **arm D**, whose recall was 1.000 *by
+> construction* — every positive was built to match no authorization, so the
+> false-negative term was assumed to be zero rather than measured.
+>
+> **Arm E measured it.** Recall is **0.733**, not 1.000: eight out-of-intent
+> requests were forwarded. A control that misses a quarter of what it is for is
+> harder to justify, not easier, and the break-even moves against it:
+>
+> | | recall | FPR | break-even |
+> |---|---:|---:|---:|
+> | arm D (assumed) | 1.000 | 0.472 | 5.6% |
+> | **arm E (measured)** | **0.733** | **0.455** | **7.2%** |
+> | across arm E's cluster intervals | 0.600–0.900 | 0.407–0.493 | **5.4% – 9.3%** |
+>
+> **Arm C observed 0.6%** (scenario-clustered 0.00–1.57%), still below every one
+> of those bands — so the qualitative conclusion is unchanged and the margin is
+> wider than arm D suggested.
+>
+> The cost model, the assumptions and the reasoning below are unaltered and still
+> apply. **Substitute recall 0.733 and FPR 0.455 wherever arm D's figures
+> appear**, and read the break-even as 5.4–9.3% rather than 4.5–7.0%.
+>
+> Sections 6 and 7 are the parts that survive intact: the false positives are
+> still attributable to named causes, and the inputs that would overturn the
+> conclusion are still the same ones. See `FINDINGS-armE.md`.
+
 Track 2 asks for "honest metrics including false-positive cost". The rates were
 published and never priced. This prices them.
 

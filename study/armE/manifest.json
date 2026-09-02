@@ -1,0 +1,18 @@
+{
+  "excluded": {
+    "no_majority": 24,
+    "unlabelable": 0
+  },
+  "labels_sha256": {
+    "labels-armE-r1.csv": "71b3eabb29669e33ba020005df88bb5cbc48715e1a518a45cfc89c4d27c1af46",
+    "labels-armE-r2.csv": "1e9885437d71dc6f54992de1be282461ad8e9acff14f2ad2b194e77ff4ba8bab"
+  },
+  "matrix": {
+    "fn": 8,
+    "fp": 30,
+    "tn": 36,
+    "tp": 22
+  },
+  "note": "Everything the arm E numbers depend on. `rzp-arme verify` recomputes and compares.",
+  "raters": 2
+}
