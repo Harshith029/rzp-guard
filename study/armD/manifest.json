@@ -1,6 +1,6 @@
 {
   "note": "Everything the published arm D numbers depend on. `rzp-armd verify` checks all of it and writes nothing. None of this makes the labels independent; see study/ASSESSMENT-armD.md.",
-  "recorded_at_utc": "2026-09-02T07:32:17Z",
+  "recorded_at_utc": "2026-09-02T10:19:04Z",
   "decision_path": {
     "note": "Non-test sources of the scorer's import closure (`go list -deps ./cmd/rzp-armd`), plus cmd/rzp-armd/main.go. internal/storage is absent because it is not in that closure: the scorer's persister is nil.",
     "packages": [
@@ -10,13 +10,13 @@
       "internal/policy",
       "cmd/rzp-armd"
     ],
-    "tree_sha256": "ffe496807fda1de4126fe77bfb5b752d237e4137ef63c5abc8fdebe2fdfd0351",
+    "tree_sha256": "6912bb01667786732e95689aca44e2cd7f2c497fff8d8fd6c1f26883092aad40",
     "files": {
       "cmd/rzp-armd/main.go": "31901382821ac6fe506681c9f5db2761c3df4684fe2a4e9192911023ddf2640f",
       "internal/lifecycle/lifecycle.go": "f5b59d977a35c05c300393b09a7a09adfead6a99cc2fa698684e7a16666c4f70",
       "internal/mandate/mandate.go": "e63eeb856350cb0dcb5feaf0a1410253e192c0656b952b92ade5750f389bc0e5",
       "internal/opauth/deliver.go": "2c09319729a9b76e2f0a9b071ec3e0b8a9fc6a607074f0fa268f3621b66dfbc1",
-      "internal/opauth/opauth.go": "8857267918089da6703914b043ca4b4a4c5689cdabe1ae6368af4db003efc2c3",
+      "internal/opauth/opauth.go": "f7541b9534aa7a0e33fbe5a9f7e2145dfb2dbc59d3c0f572830261cff85a0912",
       "internal/opauth/syncdir.go": "c055f5b59d667bf4aaf9a80fcd3927817c9cab0482f6e85bbf0a17589078d2ae",
       "internal/policy/policy.go": "85d73b48464c9ef2a376afb4bed43174e80834bb33abd526da4f1f0e1b480876"
     }
@@ -61,6 +61,13 @@
       "recorded_at_utc": "2026-09-01T14:06:31Z",
       "superseded_at_utc": "2026-09-02T07:32:17Z",
       "reason": "internal/policy/policy.go: parseAmountPaise now rejects amounts that strconv accepts but JSON does not (+N, leading zeros). Arm D's corpus uses plain integers only, so all 90 decisions are unchanged and the matrix reproduces exactly.",
+      "published_matrix_still_reproduced": true
+    },
+    {
+      "tree_sha256": "ffe496807fda1de4126fe77bfb5b752d237e4137ef63c5abc8fdebe2fdfd0351",
+      "recorded_at_utc": "2026-09-02T07:32:17Z",
+      "superseded_at_utc": "2026-09-02T10:19:04Z",
+      "reason": "internal/opauth/opauth.go: Verify now validates the argon2 parameters read from a stored credential before calling argon2.IDKey, which panicked on t=0 and p=0 and would have attempted a 4 TiB allocation for m near uint32 max. opauth is in the scorer's import closure but is only reached through operator grants; the scorer's persister is nil and no refund decision consults it. All 90 decisions and the matrix are unchanged.",
       "published_matrix_still_reproduced": true
     }
   ],

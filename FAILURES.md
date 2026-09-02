@@ -2302,3 +2302,87 @@ everything here.
 The guard has been treating "I parsed it" as "I understand it". Those are
 different, and the gap is exactly the size of whatever the next hop does
 differently.
+
+---
+
+## F40 — Two panics on the operator recovery path
+
+**Severity: P2.** Found by probing the operator credential path with hostile
+stored parameters rather than reading it and concluding it was sound.
+
+### F40.1 — What held up
+
+The primitives are right and I could not break them:
+
+- **Argon2id**, t=3, m=64 MiB, p=4, 32-byte key. Costly on purpose: the verifier
+  sits in a file that may be copied, so offline guessing is the threat model.
+- **`subtle.ConstantTimeCompare`** for the hash comparison.
+- **`opauth.Grant` cannot be forged outside the package.** Its fields are
+  unexported and the only constructor that sets `ok = true` is `Authenticate`,
+  which requires `Verify` to pass first. `lifecycle.ResolveInDoubt` refuses a
+  zero-value Grant.
+- **`resolveInDoubt` demands the action already be IN_DOUBT**, so a resolution
+  cannot be replayed, and it writes the state change and the audit record in one
+  transaction or neither.
+- **The automatic path back to AVAILABLE is correctly fenced.** Three callers,
+  all pre-dispatch: a rate-window write failure, a re-encode failure, and a child
+  write that moved **zero** bytes. A partial write goes IN_DOUBT instead, because
+  bytes the child accepted may already have reached Razorpay. That distinction is
+  the one that matters and it is drawn correctly.
+
+### F40.2 — Verify handed unvalidated parameters to argon2
+
+`Verify` parses `t`, `m` and `p` out of the stored verifier string and passed
+them straight to `argon2.IDKey`. Reproduced:
+
+```
+t=0   PANIC  argon2: number of rounds too small
+p=0   PANIC  argon2: parallelism degree too low
+```
+
+and `m` near uint32 max asks for a **4 TiB allocation**.
+
+**Not a privilege escalation.** Anyone who can write that file already controls
+the credential; there is nothing to escalate to. What it is instead is a crash on
+the **operator recovery path** — the tool you reach for when a refund is already
+IN_DOUBT and money may have moved. A truncated write or an interrupted sync gets
+there with no attacker at all, and a Go stack trace is a poor thing to meet at
+that moment.
+
+**Fixed.** `checkArgonParams` runs before argon2 sees anything: it refuses
+parameters that would panic (`t<1`, `p<1`), that violate argon2's own
+`m >= 8*p`, or that exceed sane upper bounds. The exhaustion cases are now
+refused *before* the allocation is attempted, which is why they can be tested at
+all.
+
+### F40.3 — A downgraded credential verified successfully
+
+Separate from the panics and arguably worse: `argon2id$1$8$1$...` — trivially
+weak — **verified fine**. A credential quietly downgraded to parameters that can
+be brute-forced offline kept reporting success, with no signal anywhere.
+
+**Fixed with a floor**, reported through its own error (`ErrWeakVerifier`) so an
+operator mid-incident can tell "this file is corrupt, that's why nothing works"
+from "this file must be re-provisioned". The floor sits deliberately *below* the
+constants this build writes, so raising them later strengthens new credentials
+without locking anyone out of recovery; going beneath the floor requires
+re-provisioning, which is the correct response to a downgrade.
+
+A test asserts the floor is below what provisioning produces — otherwise the two
+halves of the system disagree and a freshly created credential is refused by its
+own verifier.
+
+### F40.4 — The arm D gate caught this change too
+
+`internal/opauth` is in the scorer's import closure, so hardening it moved the
+decision-path hash and `rzp-armd verify` failed, exactly as it did for the
+`internal/policy` change in F39.3.
+
+Superseded with a stated reason rather than re-stamped. `manifest.json` now
+carries **two** entries in `superseded_decision_paths`, each with its hash, both
+dates, the reason, and a recorded confirmation that the published matrix still
+reproduced. Two entries is the point: the trail is accumulating rather than being
+overwritten, which is the difference between a freeze that can be audited and one
+that can be quietly reapplied.
+
+The matrix is unchanged both times: TP 54 FP 17 TN 19 FN 0.

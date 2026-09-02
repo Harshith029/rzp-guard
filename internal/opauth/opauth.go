@@ -41,7 +41,65 @@ const (
 var (
 	ErrMalformedVerifier = errors.New("stored operator verifier is malformed")
 	ErrTokenRejected     = errors.New("operator token rejected")
+	// ErrWeakVerifier means the stored parameters are structurally usable but
+	// weaker than this build will accept. Separate from ErrMalformedVerifier so an
+	// operator can tell "this file is corrupt" from "this file must be
+	// re-provisioned".
+	ErrWeakVerifier = errors.New("stored operator verifier uses weaker parameters than this build accepts")
 )
+
+// Bounds on the parameters read out of a stored verifier.
+//
+// WHY THIS EXISTS. Verify parses t, m and p from the stored string and passed
+// them straight to argon2.IDKey, which PANICS on t=0 ("number of rounds too
+// small") and on p=0 ("parallelism degree too low"), and would attempt a 4 TiB
+// allocation for m near uint32 max. Both were reproduced.
+//
+// That is not a privilege escalation -- anyone who can write this file already
+// controls the credential -- but it crashes the OPERATOR RECOVERY PATH, which is
+// the tool you reach for when a refund is already IN_DOUBT and money may have
+// moved. A truncated write or a bad sync gets there with no attacker at all, and
+// a Go stack trace is a poor thing to meet at that moment.
+//
+// The floor is separate from the structural check. A verifier weaker than this
+// build writes is refused rather than silently honoured, because a credential
+// quietly downgraded to t=1,m=8 is a credential that can be brute-forced offline
+// while still reporting success. The floor sits BELOW the current constants so
+// that strengthening them later does not lock an operator out; weakening past it
+// requires re-provisioning, which is the correct answer to a downgrade.
+const (
+	minArgonTime    uint32 = 2
+	minArgonMemory  uint32 = 32 * 1024 // 32 MiB
+	minArgonThreads uint8  = 1
+	maxArgonTime    uint32 = 64
+	maxArgonMemory  uint32 = 1 << 20 // 1 GiB
+	maxArgonThreads uint8  = 32
+)
+
+// checkArgonParams rejects parameters that would panic, exhaust memory, or make
+// offline guessing cheap.
+func checkArgonParams(t, m uint32, p uint8) error {
+	switch {
+	case p < 1:
+		return fmt.Errorf("%w: parallelism %d would panic inside argon2", ErrMalformedVerifier, p)
+	case t < 1:
+		return fmt.Errorf("%w: %d rounds would panic inside argon2", ErrMalformedVerifier, t)
+	case m < 8*uint32(p):
+		return fmt.Errorf("%w: memory %d KiB is below argon2's 8*parallelism minimum of %d",
+			ErrMalformedVerifier, m, 8*uint32(p))
+	case t > maxArgonTime || m > maxArgonMemory || p > maxArgonThreads:
+		return fmt.Errorf("%w: parameters t=%d m=%d p=%d exceed the accepted bounds "+
+			"(t<=%d, m<=%d KiB, p<=%d); a verifier asking for that much work is a "+
+			"denial of the recovery path, not a stronger credential",
+			ErrMalformedVerifier, t, m, p, maxArgonTime, maxArgonMemory, maxArgonThreads)
+	case t < minArgonTime || m < minArgonMemory || p < minArgonThreads:
+		return fmt.Errorf("%w: t=%d m=%d p=%d is below the floor (t>=%d, m>=%d KiB, "+
+			"p>=%d). Re-provision the credential; lowering the floor to accept it "+
+			"would make offline guessing cheaper while still reporting success",
+			ErrWeakVerifier, t, m, p, minArgonTime, minArgonMemory, minArgonThreads)
+	}
+	return nil
+}
 
 // NewToken returns a fresh high-entropy operator token, URL-safe so it survives
 // copy/paste and environment variables intact.
@@ -85,6 +143,10 @@ func Verify(token, stored string) error {
 	want, err := base64.RawURLEncoding.DecodeString(parts[5])
 	if err != nil {
 		return ErrMalformedVerifier
+	}
+	// Before argon2 sees them: these came off disk and can panic or exhaust it.
+	if err := checkArgonParams(t, m, p); err != nil {
+		return err
 	}
 	got := argon2.IDKey([]byte(token), salt, t, m, p, uint32(len(want)))
 	if subtle.ConstantTimeCompare(got, want) != 1 {
