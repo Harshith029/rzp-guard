@@ -73,6 +73,19 @@ jobs:
         working-directory: repo
         run: bash ./run.sh help
 
+      # This job checked line endings, run.sh, and gofmt -- and never ran the Go
+      # suite. `go test ./...` on Windows was failing the whole time and nothing
+      # here noticed: four operator tests need a completed `init`, which the
+      # guard correctly REFUSES on a platform that cannot hold a file at 0600.
+      # They now skip on Windows with that reason and run for real on Linux
+      # above. A reviewer's first command on their own machine should not be red
+      # for a guard that is behaving.
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26', cache: false }
+      - name: Go suite must pass on Windows too
+        working-directory: repo
+        run: go test -buildvcs=false ./...
+
       - name: Go sources must be gofmt-clean
         working-directory: repo
         run: |

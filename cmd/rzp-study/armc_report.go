@@ -310,10 +310,3 @@ func countsLine(m map[string]int) string {
 	}
 	return strings.Join(parts, ", ")
 }
-
-func orDash(s string) string {
-	if strings.TrimSpace(s) == "" {
-		return "(no reason given)"
-	}
-	return s
-}

@@ -651,10 +651,3 @@ func (r *runner) driveScripted(t *trace, sess *mcpSession, br brief) {
 	}
 	t.FinalText = "(dry run: scripted, no model was called)"
 }
-
-func shortCommit(c string) string {
-	if len(c) > 12 {
-		return c[:12]
-	}
-	return c
-}

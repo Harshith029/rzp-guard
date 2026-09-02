@@ -2305,7 +2305,14 @@ differently.
 
 ---
 
-## F40 — Two panics on the operator recovery path
+## F42 — Two panics on the operator recovery path
+
+*(Written as a second `F40` by mistake and renumbered on 2026-09-03. It keeps
+the out-of-sequence number **deliberately**: an earlier commit message and
+`study/PROTOCOL-armC-AUDIT.md` both cite `F41` meaning the arm E result below,
+and renumbering that to close a cosmetic gap would have silently invalidated a
+reference in history. A number out of order is cheaper than a citation that
+points at the wrong entry.)*
 
 **Severity: P2.** Found by probing the operator credential path with hostile
 stored parameters rather than reading it and concluding it was sound.
@@ -2479,3 +2486,65 @@ clean.
 bar, because precision and recall now exist and are independently labelled. It
 says instead what they are, what the intervals are, that the traffic is
 constructed, and that eight requests got through.
+
+## F43 — The test suite was red on Windows, and CI was scoped so it could not notice
+
+**Severity: P2.** Found during submission cleanup by running the suite on the
+development machine instead of trusting the green badge.
+
+`go test ./...` on Windows failed four tests in `cmd/rzp-guard-operator`, and had
+been failing for as long as those tests existed:
+
+```
+--- FAIL: TestGuardCannotReplaceTheOperatorCredential
+--- FAIL: TestRotationRequiresTheCurrentToken
+--- FAIL: TestInitRefusesUnprovableDeliveryAndCommitsNothing
+--- FAIL: TestFailedTokenDeliveryLeavesInitRetryable
+```
+
+### The failures meant the opposite of what they looked like
+
+All four need a completed `init`, and `init` **correctly refuses to run on
+Windows**. It will not hand over an operator token it cannot protect: the file
+lands `0666` because Windows does not honour Unix mode bits, the check fires, and
+nothing is written. That refusal is the product working, and F35 already records
+it as an accepted consequence rather than something to be worked around.
+
+So the suite was reporting a red failure for a guard declining to leak a
+credential. That is the worst kind of broken test — it trains a reader to ignore
+red, and the next red one will be real.
+
+### Why CI never saw it
+
+The workflow has a `windows-latest` job. It checked line endings, that `run.sh
+help` executes, and `gofmt`. **It never ran `go test`.** Every Go test in CI ran
+on `ubuntu-latest`, where provisioning works and all four pass.
+
+That job exists because of F15, where a CRLF checkout broke the runner. It was
+built to catch *that*, and it caught that. It is the second time this exact shape
+has appeared in this repository: the CR check inside the same job carries a
+comment saying it was "scoped to `run.sh` at first. That was too narrow." **A job
+written around the last failure does not cover the next one**, and adding a
+platform to CI is not the same as testing on that platform.
+
+### Fixed
+
+`requireProvisioning(t)` skips the four tests on Windows with the reason printed,
+naming `FAILURES.md`, so a reader sees *why* rather than a silent skip. Verified
+both directions rather than assumed:
+
+```
+windows   --- SKIP  x4, reason printed
+linux     --- PASS  x4        (pinned container, go test -run ...)
+```
+
+The `windows-latest` job now runs `go test -buildvcs=false ./...`, so a Windows
+regression fails CI instead of waiting for someone to run the suite by hand.
+
+### Not fixed, and the skip does not pretend otherwise
+
+**Operator provisioning still does not work on Windows.** The skip changes what
+the suite reports, not what the product does. Making it work needs an OS secret
+store — DPAPI or the credential manager — not a relaxed assertion, and that is a
+feature, not a submission fix. The skip message says so in the place someone will
+read it.

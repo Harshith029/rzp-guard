@@ -100,6 +100,27 @@ func runOperator(t *testing.T, bin, token string, args ...string) (string, error
 	return string(out), err
 }
 
+// requireProvisioning skips a test that has to complete a real `init`.
+//
+// It cannot complete on Windows, and that is the product working. init refuses
+// to hand over a token it cannot protect: the file lands 0666 because Windows
+// does not honour Unix mode bits, so the check fails and nothing is written.
+// FAILURES.md records that consequence as accepted rather than worked around.
+//
+// So on Windows these tests have no behaviour to exercise, and a red failure
+// here would mean the OPPOSITE of what it looks like -- the guard refusing to
+// leak a credential. They run for real on Linux, where CI runs them with -race.
+//
+// This is a skip, not a fix. If provisioning ever needs to work on Windows it
+// needs an OS secret store, not a relaxed assertion.
+func requireProvisioning(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("operator provisioning is refused on Windows by design: the token " +
+			"file cannot be restricted to 0600 (see FAILURES.md). Exercised on Linux in CI.")
+	}
+}
+
 func stateOf(t *testing.T, dbPath string) lifecycle.State {
 	t.Helper()
 	st, err := storage.Open(dbPath, "mnd_operator_test")
@@ -213,6 +234,7 @@ func TestFlagsAreParsedAfterTheSubcommand(t *testing.T) {
 // the attacker was rejected, restarted the guard with their own token, and
 // resolved the action.
 func TestGuardCannotReplaceTheOperatorCredential(t *testing.T) {
+	requireProvisioning(t)
 	bin := buildOperator(t)
 	dbPath, mandatePath, realToken := stuckState(t, true)
 
@@ -237,6 +259,7 @@ func TestGuardCannotReplaceTheOperatorCredential(t *testing.T) {
 
 // Rotation requires the CURRENT token and is audited.
 func TestRotationRequiresTheCurrentToken(t *testing.T) {
+	requireProvisioning(t)
 	bin := buildOperator(t)
 	dbPath, mandatePath, realToken := stuckState(t, true)
 	newTokPath := filepath.Join(t.TempDir(), "newtok")
@@ -350,6 +373,7 @@ func TestReadCommandsRequireTheCredential(t *testing.T) {
 // disconnect or a lost scrollback leaves a state file whose recovery authority
 // nobody can exercise.
 func TestInitRefusesUnprovableDeliveryAndCommitsNothing(t *testing.T) {
+	requireProvisioning(t)
 	bin := buildOperator(t)
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "fresh.db")
@@ -402,6 +426,7 @@ func TestInitRefusesUnprovableDeliveryAndCommitsNothing(t *testing.T) {
 }
 
 func TestFailedTokenDeliveryLeavesInitRetryable(t *testing.T) {
+	requireProvisioning(t)
 	bin := buildOperator(t)
 	dir := t.TempDir()
 	mandatePath := filepath.Join(dir, "mandate.json")
