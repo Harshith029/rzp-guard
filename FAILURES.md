@@ -1913,3 +1913,74 @@ The document states the four inputs that would overturn it, including that
   transient failure reported as a permanent one is still a false statement about
   the system. Undiagnosed. Arm D is verified in the container, which is
   unaffected.
+
+---
+
+## F36 — Three defects in arm E, found by attacking my own corpus before the labels came back
+
+**Severity: P1 (one, fixed), P2 (two, unfixable).** Found by deliberately trying
+to break arm E while three raters were working, on the principle that a design
+flaw discovered after the labels arrive cannot be fixed at all.
+
+Recorded in full in `study/PROTOCOL-armE-AMENDMENT-1.md`, dated and written
+before any rater file existed.
+
+### F36.1 — A rule taught and never exercised
+
+`RATER-INSTRUCTIONS-armE.md` carries R3 -- a refund from a payment the merchant
+never mentions is out-of-intent -- with a worked example.
+**`intent_payment` equals `request_payment` on all 120 rows.** The payment axis
+was dropped when the request dimension was fixed at four amount-shaped levels,
+and the instrument was written from the rule set rather than from the corpus.
+
+The corpus matches its own pre-registration; the instrument overreaches. Cost:
+raters check something that never varies, and arm E is narrower than arm D,
+which did cover the wrong-payment case. **Not fixed** -- the worksheet is with
+three people, and reissuing a corrected file mid-flight is worse than a
+documented gap.
+
+### F36.2 — 120 rows, 6 sentences
+
+`intent_text` is a function of `intent_kind` and `size` alone, so the corpus
+contains **six distinct intent sentences**, each repeated 12 to 24 times with
+the amount varying underneath. It was visible in `grid_e.py` from the first line
+and I did not look until the worksheet was already out.
+
+The corpus is six semantic situations sampled at several amounts, not 120
+scenarios, and every report must say so. The `ambiguous` cluster is the sharpest
+case: 24 rows, one identical sentence, seven amounts, and no anchor to judge any
+amount against -- which makes prediction E4 (kappa below 0.4 there) more likely
+to fail, for a reason recorded before the data rather than after.
+
+### F36.3 — The pre-registered interval was the wrong one, and is fixed
+
+**P1, and the only one that could still be fixed.** `PROTOCOL-armE.md` §6
+committed to Wilson intervals. Wilson assumes independent observations. Given
+F36.2 the rows are clustered into six groups whose outcomes are correlated, so
+**Wilson understates the uncertainty in the direction that flatters the
+result** -- the same class of error as everything else in this file.
+
+`rzp-arme score` now reports a seeded cluster bootstrap alongside Wilson,
+resampling whole sentence groups. Both are printed; the report says to quote the
+bootstrap. Wilson stays because it was pre-registered, and silently replacing it
+after the fact would be the substitution this entry exists to avoid.
+
+Measured on a synthetic dry run, recall's interval widened from 0.284 to 0.341.
+**The false-positive rate's came out narrower**, which the first draft of the
+report text did not allow for -- it claimed the bootstrap corrects Wilson
+upward. With five or six clusters the estimator is coarse enough to land either
+way, and the report now says that explicitly rather than implying a one-sided
+correction. A cluster whose rows are all excluded drops out entirely and
+coarsens it further.
+
+### What this cost, and what it bought
+
+Two of the three cannot be fixed, because I looked after the packet was sent
+rather than before. The fix for the third was still available only because no
+label had returned; an analysis change made after seeing results would have been
+worthless whatever its merits.
+
+**Local verification was partial for this commit.** Docker was not running, so
+the container lane did not execute. 13 of 14 packages pass on the Windows host;
+the four failures in `cmd/rzp-guard-operator` are the documented mode-bit
+limitation, unrelated to this change. CI on Linux is the verification.

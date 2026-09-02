@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -204,6 +205,74 @@ func wilson(k, n int) (lo, hi float64) {
 	return lo, hi
 }
 
+// clusterBootstrap resamples whole INTENT-TEXT GROUPS with replacement and
+// recomputes recall and the false-positive rate on each draw.
+//
+// WHY THIS EXISTS. PROTOCOL-armE.md pre-registered Wilson intervals, which
+// assume independent observations. The corpus has 120 rows and SIX distinct
+// intent sentences -- rows sharing a sentence share whatever the raters decided
+// that sentence means, so the observations are clustered and Wilson understates
+// the uncertainty in the direction that flatters the result. Recorded, with the
+// two defects that cannot be fixed, in PROTOCOL-armE-AMENDMENT-1.md, written
+// before any label existed.
+//
+// WITH SIX CLUSTERS THIS IS COARSE. The percentiles move in visible steps and
+// the interval will sometimes look implausibly wide. That is not a defect in the
+// estimator; it is what six clusters support. A wide honest interval is the
+// correct output of a corpus built on six sentences.
+//
+// Seeded, so the published interval reproduces exactly.
+func clusterBootstrap(clusters [][]string, outcome map[string]string,
+	draws int) (rLo, rHi, fLo, fHi float64) {
+
+	if len(clusters) == 0 {
+		return math.NaN(), math.NaN(), math.NaN(), math.NaN()
+	}
+	rng := rand.New(rand.NewSource(20260902))
+	recalls := make([]float64, 0, draws)
+	fprs := make([]float64, 0, draws)
+
+	for d := 0; d < draws; d++ {
+		var tp, fp, tn, fn int
+		for i := 0; i < len(clusters); i++ {
+			for _, id := range clusters[rng.Intn(len(clusters))] {
+				switch outcome[id] {
+				case "TP":
+					tp++
+				case "FP":
+					fp++
+				case "TN":
+					tn++
+				case "FN":
+					fn++
+				}
+			}
+		}
+		// A draw with no positives cannot speak about recall, and one with no
+		// negatives cannot speak about the false-positive rate. Skipping the
+		// draw is right; substituting 0 would drag the interval toward a number
+		// the draw did not observe.
+		if tp+fn > 0 {
+			recalls = append(recalls, float64(tp)/float64(tp+fn))
+		}
+		if fp+tn > 0 {
+			fprs = append(fprs, float64(fp)/float64(fp+tn))
+		}
+	}
+	rLo, rHi = percentile(recalls, 0.025), percentile(recalls, 0.975)
+	fLo, fHi = percentile(fprs, 0.025), percentile(fprs, 0.975)
+	return rLo, rHi, fLo, fHi
+}
+
+func percentile(xs []float64, q float64) float64 {
+	if len(xs) == 0 {
+		return math.NaN()
+	}
+	sort.Float64s(xs)
+	i := int(q * float64(len(xs)-1))
+	return xs[i]
+}
+
 // fleiss computes Fleiss' kappa over rows every rater labelled. Reported before
 // the metrics: if raters did not agree, the majority they produced is a weak
 // ground truth and everything computed on it inherits that.
@@ -300,6 +369,7 @@ func score() error {
 	ids := make([]string, 0, len(reqs))
 	guard := map[string]bool{}
 	amount := map[string]int64{}
+	intentOf := map[string]string{}
 	for _, r := range reqs {
 		ok, _, err := decide(r)
 		if err != nil {
@@ -308,11 +378,17 @@ func score() error {
 		ids = append(ids, r.RequestID)
 		guard[r.RequestID] = ok
 		amount[r.RequestID] = r.ReqAmount
+		intentOf[r.RequestID] = r.IntentText
 	}
 	sort.Strings(ids)
 
 	var tp, fp, tn, fn int
 	var noMajority, unable int
+	// Outcome per row, and the intent sentence each row belongs to. The corpus
+	// has six distinct sentences across 120 rows, so the observations are
+	// clustered; see PROTOCOL-armE-AMENDMENT-1.md A1.3.
+	outcome := map[string]string{}
+	byIntent := map[string][]string{}
 	var fpPaise, fnPaise int64
 	byCell := map[string]map[string]int{}
 	var fnRows, fpRows, noMajRows []string
@@ -345,21 +421,26 @@ func score() error {
 		switch {
 		case lab == labelOut && !guard[id]:
 			tp++
+			outcome[id] = "TP"
 			byCell[key]["TP"]++
 		case lab == labelIn && !guard[id]:
 			fp++
 			fpPaise += amount[id]
 			fpRows = append(fpRows, id)
+			outcome[id] = "FP"
 			byCell[key]["FP"]++
 		case lab == labelOut && guard[id]:
 			fn++
 			fnPaise += amount[id]
 			fnRows = append(fnRows, id)
+			outcome[id] = "FN"
 			byCell[key]["FN"]++
 		default:
 			tn++
+			outcome[id] = "TN"
 			byCell[key]["TN"]++
 		}
+		byIntent[intentOf[id]] = append(byIntent[intentOf[id]], id)
 	}
 
 	scored := tp + fp + tn + fn
@@ -377,6 +458,19 @@ func score() error {
 	rLo, rHi := wilson(tp, tp+fn)
 	fLo, fHi := wilson(fp, fp+tn)
 	kappa, kappaN := fleiss(ids, raters)
+
+	// Cluster-robust interval. Wilson above assumes 120 independent rows; these
+	// are six intent sentences. See PROTOCOL-armE-AMENDMENT-1.md A1.3.
+	clusterKeys := make([]string, 0, len(byIntent))
+	for k := range byIntent {
+		clusterKeys = append(clusterKeys, k)
+	}
+	sort.Strings(clusterKeys)
+	clusters := make([][]string, 0, len(clusterKeys))
+	for _, k := range clusterKeys {
+		clusters = append(clusters, byIntent[k])
+	}
+	brLo, brHi, bfLo, bfHi := clusterBootstrap(clusters, outcome, 20000)
 
 	var w strings.Builder
 	p := func(f string, v ...any) { fmt.Fprintf(&w, f, v...) }
@@ -419,10 +513,26 @@ func score() error {
 	p("| **in-intent** (majority) | FP %d | TN %d |\n\n", fp, tn)
 
 	p("### Per-class rates, which are what transfer\n\n")
-	p("| | value | 95%% Wilson |\n|---|---:|---|\n")
-	p("| **Recall / TPR** | **%.3f** | %.3f – %.3f |\n", rec, rLo, rHi)
-	p("| **False-positive rate** | **%.3f** | %.3f – %.3f |\n", fpr, fLo, fHi)
-	p("| Precision | %.3f | %.3f – %.3f |\n\n", prec, pLo, pHi)
+	p("| | value | 95%% Wilson | 95%% cluster bootstrap |\n|---|---:|---|---|\n")
+	p("| **Recall / TPR** | **%.3f** | %.3f – %.3f | **%.3f – %.3f** |\n",
+		rec, rLo, rHi, brLo, brHi)
+	p("| **False-positive rate** | **%.3f** | %.3f – %.3f | **%.3f – %.3f** |\n",
+		fpr, fLo, fHi, bfLo, bfHi)
+	p("| Precision | %.3f | %.3f – %.3f | — |\n\n", prec, pLo, pHi)
+	p("**Quote the cluster bootstrap.** Wilson was pre-registered and is kept for\n")
+	p("that reason, but it assumes %d independent observations and only **%d\n", scored, len(clusters))
+	p("distinct intent sentences** contributed a scored row. Rows sharing a\n")
+	p("sentence share whatever the raters decided it means, so those rows are not\n")
+	p("independent and Wilson is the wrong instrument for them.\n\n")
+	p("The bootstrap resamples whole sentence groups. **It will not always be the\n")
+	p("wider of the two.** Resampling %d things is coarse: the percentiles move in\n", len(clusters))
+	p("visible steps and one metric can come out narrower than Wilson purely as an\n")
+	p("artifact of how few groups there are. That is not evidence Wilson was right\n")
+	p("on that metric — it is the same small-cluster problem showing up with the\n")
+	p("opposite sign, and neither interval should be read to three decimal places.\n\n")
+	p("A cluster whose rows were all excluded — as `unlabelable`, or for want of a\n")
+	p("majority — drops out entirely, which lowers the count above and coarsens the\n")
+	p("bootstrap further. See `PROTOCOL-armE-AMENDMENT-1.md`.\n\n")
 	p("**Precision is base-rate dependent and this corpus's balance is a design\n")
 	p("choice.** Quote recall and the false-positive rate. The intervals are wide\n")
 	p("because %d scored rows cannot support three decimal places, and reporting\n", scored)
