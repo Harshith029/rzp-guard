@@ -223,9 +223,15 @@ func run() error {
 
 	// Every byte the relay writes toward the child, recorded verbatim. This is
 	// the evidence that a blocked call never crossed the boundary.
+	var alertMu sync.Mutex
+
 	var childWriter io.Writer = childIn
 	if *childTee != "" {
-		tee, err := os.Create(*childTee)
+		// 0600, not os.Create's 0666. This file records every byte sent toward
+		// the provider -- payment ids, amounts, receipts -- and a world-readable
+		// copy of that on a shared host is the kind of evidence file that
+		// becomes the incident.
+		tee, err := os.OpenFile(*childTee, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
 			return fmt.Errorf("child tee: %w", err)
 		}
@@ -234,8 +240,17 @@ func run() error {
 		// failed, so a failing tee after a successful child write reports
 		// zero, which the relay reads as "nothing was dispatched" and
 		// releases the authorization on. See internal/relay/child_tee.go.
+		//
+		// A broken audit copy goes to the SAME channel an operator watches for
+		// IN_DOUBT, under its own event name. It is not an action transition --
+		// no money is stuck and nothing needs resolving -- but the guard has
+		// stopped being able to prove what crossed the boundary, and that is
+		// not a thing to leave in an unread stderr line.
 		childWriter = relay.NewChildTee(childIn, tee, func(err error) {
-			fmt.Fprintf(os.Stderr, "rzp-guard: %v\n", err)
+			alertMu.Lock()
+			defer alertMu.Unlock()
+			fmt.Fprintf(os.Stderr, "%s AUDIT_BROKEN file=%q reason=%q\n",
+				alertToken, *childTee, err.Error())
 		})
 	}
 
@@ -251,7 +266,6 @@ func run() error {
 	// Deliberately NOT the decision log: that records authorization decisions,
 	// and this is an outcome. Conflating them would bury the event that needs a
 	// human among thousands that do not.
-	var alertMu sync.Mutex
 	r.SetAlerter(func(actionID, reason string) {
 		alertMu.Lock()
 		defer alertMu.Unlock()

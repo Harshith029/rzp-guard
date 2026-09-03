@@ -108,4 +108,17 @@ func TestFailedTeeDoesNotReleaseAfterTheChildAcceptedTheBytes(t *testing.T) {
 			"have been dispatched and the authorization can be spent a second time.",
 			child.Len())
 	}
+
+	// The consequence, asserted rather than reasoned about: a second identical
+	// refund must not go through. "Not AVAILABLE" is the mechanism; "the replay
+	// is refused" is what it buys, and only the second one is the property
+	// anyone cares about.
+	before := child.Len()
+	_ = r.PumpAgent(strings.NewReader(
+		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":` +
+			`{"name":"create_refund","arguments":{"payment_id":"pay_SYN0001","amount":20000}}}` + "\n"))
+	if child.Len() != before {
+		t.Fatalf("a replay reached the child after the tee failed: %d new bytes.\n%s",
+			child.Len()-before, child.String()[before:])
+	}
 }

@@ -682,6 +682,33 @@ func score() error {
 			return m
 		}(),
 	}
+	// The matrix is four integers, so it cannot detect a change that moves one
+	// row from TP to TN while moving another the other way -- nor say which
+	// inputs produced it. These two can. See integrity.go.
+	if d, err := decisionsDigest(reqs); err == nil {
+		man["decisions_sha256"] = d
+	} else {
+		return err
+	}
+	if d, err := inputsDigest(); err == nil {
+		man["inputs_sha256"] = d
+	} else {
+		return err
+	}
+	// Carry forward anything already recorded that this function does not own --
+	// notably policy_tree, the supersession record from AMENDMENT-2. Rewriting
+	// the manifest wholesale would silently erase the evidence that the freeze
+	// was broken, which is the exact history worth keeping.
+	if prev, err := os.ReadFile(filepath.Join(armEDir, "manifest.json")); err == nil {
+		var old map[string]any
+		if json.Unmarshal(prev, &old) == nil {
+			for k, v := range old {
+				if _, owned := man[k]; !owned {
+					man[k] = v
+				}
+			}
+		}
+	}
 	mb, _ := json.MarshalIndent(man, "", "  ")
 	if err := os.WriteFile(filepath.Join(armEDir, "manifest.json"), append(mb, '\n'), 0o644); err != nil {
 		return err
@@ -704,9 +731,11 @@ func verifyArmE() error {
 		return fmt.Errorf("no arm E manifest: score the corpus first: %w", err)
 	}
 	var man struct {
-		Raters int            `json:"raters"`
-		Matrix map[string]int `json:"matrix"`
-		Labels map[string]string
+		Raters    int            `json:"raters"`
+		Matrix    map[string]int `json:"matrix"`
+		Labels    map[string]string
+		Decisions string `json:"decisions_sha256"`
+		Inputs    string `json:"inputs_sha256"`
 	}
 	if err := json.Unmarshal(b, &man); err != nil {
 		return err
@@ -763,6 +792,40 @@ func verifyArmE() error {
 		return fmt.Errorf("arm E no longer reproduces its published matrix: the " +
 			"policy or the returned labels have changed since scoring, and the " +
 			"published result is VOID")
+	}
+	// The matrix alone is a weak gate: four integers cannot distinguish a run
+	// where one row moved TP->TN and another moved the opposite way, and they
+	// say nothing about which inputs produced them. Both digests are checked,
+	// and each failure names what actually moved.
+	if man.Decisions != "" {
+		got, derr := decisionsDigest(reqs)
+		if derr != nil {
+			return derr
+		}
+		if got != man.Decisions {
+			return fmt.Errorf("arm E reproduces its matrix but NOT its decisions: "+
+				"recomputed %s, published %s. At least one row's allow/refuse or its "+
+				"refusal rule changed while the totals happened to stay put. The "+
+				"published result is VOID until the change is explained",
+				got[:16], man.Decisions[:16])
+		}
+		fmt.Println("  every decision and rule string matches")
+	} else {
+		fmt.Println("  NOTE: manifest predates per-decision digests; matrix only")
+	}
+	if man.Inputs != "" {
+		got, ierr := inputsDigest()
+		if ierr != nil {
+			return ierr
+		}
+		if got != man.Inputs {
+			return fmt.Errorf("arm E still reproduces its numbers, but the INPUTS "+
+				"changed: recomputed %s, published %s. Corpus, mandates, worksheet, "+
+				"labels or internal/policy differ from what was scored. Reproducing "+
+				"the same answer from different inputs is not the same claim",
+				got[:16], man.Inputs[:16])
+		}
+		fmt.Println("  corpus, mandates, worksheet, labels and policy all unchanged")
 	}
 	fmt.Println("  reproduces the published matrix exactly")
 	return nil

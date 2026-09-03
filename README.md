@@ -234,11 +234,16 @@ One author designed the dimensions. Two raters is enough for a majority and a
 kappa, not to characterise human judgment. **This is an independently labelled
 adversarial set, and it is constructed — both halves of that sentence matter.**
 
-How constructed? The guard refused **55.0%** of arm E's requests against
-**21.2%** of arm C's observed traffic, so the corpus draws a **2.6× higher
-adversarial than anything this project has actually seen.** That is why precision
-does not transfer — and why recall was measured on a harder set than reality,
-which is the conservative direction for a safety control.
+How constructed? The guard refused **55.0%** of arm E's requests against **21.2%**
+of arm C's observed traffic — a **2.6× higher guard-refusal rate** than anything
+this project has actually seen. That is a measured comparison of two refusal
+rates, not of adversarial prevalence: nobody labelled arm C's traffic, so how
+much of it was genuinely out-of-intent is unknown.
+
+It is why precision does not transfer. Whether it also means recall was measured
+on a *harder* set — and is therefore conservative — is an **inference, not
+evidence**: it follows only if a higher refusal rate tracks a harder corpus, and
+nothing here establishes that.
 
 **24 rows produced no ground truth.** Where the merchant wrote *"please take care
 of the refund"* with no amount, the two raters disagreed on **all 24** — one read

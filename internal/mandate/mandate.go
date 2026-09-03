@@ -15,7 +15,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strings"
@@ -121,6 +123,16 @@ func Load(raw []byte) (*Mandate, error) {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&m); err != nil {
 		return nil, fmt.Errorf("mandate: %w", err)
+	}
+	// A mandate file holds exactly one document. Decode stops at the end of the
+	// first value, so a file carrying a second one would have it silently
+	// ignored -- and the authority a reviewer reads would not be the authority
+	// the guard enforces. Signature verification covers the whole file and would
+	// catch this, but signing is opt-in, so the parser cannot rely on it.
+	if _, err := dec.Token(); err != io.EOF {
+		return nil, errors.New("mandate: file carries more than one JSON value. " +
+			"A mandate is one document; a second would be ignored, so what is " +
+			"reviewed would not be what is enforced")
 	}
 	if err := m.validate(); err != nil {
 		return nil, fmt.Errorf("mandate: %w", err)

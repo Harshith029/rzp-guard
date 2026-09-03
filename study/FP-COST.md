@@ -174,6 +174,25 @@ Three things that does and does not mean:
 
 ## 6. Where the false positives come from, and what each would cost to fix
 
+> ### THIS SECTION IS AN ARM D COUNTERFACTUAL, NOT ARM E EVIDENCE
+>
+> Everything below — the attribution of 17 false positives, `FPR = 7/36 = 0.194`
+> and the **≈2.4% break-even** — is computed from **arm D's retracted,
+> author-labelled conformance grid**. Arm D was withdrawn by its own author
+> because its scorer branched on a label the author wrote.
+>
+> **It is not a measurement of the submitted configuration.** Nobody has run arm
+> E with bounded actions enabled. The claim it supports is *"here is where arm D's
+> false positives came from, and what the same change would have done there"* —
+> not *"the guard achieves FPR 0.194"*, and not that recall would still be 0.733
+> after the change. A wider authorization admits more requests, so recall could
+> fall, and no experiment here has measured by how much.
+>
+> **Current measured performance is arm E's alone:** recall **0.733**, FPR
+> **0.455**, precision **0.423**, on constructed traffic
+> (`RESULTS-armE.md`). Quote those. Quote 0.194 only as *"a retracted arm's
+> counterfactual for a feature that ships off by default."*
+
 `study/FINDINGS-armD.md` attributes all 17, and **none is a matching error**:
 
 | cause | n | fixable? | effect on FPR |
@@ -225,12 +244,23 @@ Stated so they can be attacked:
 
 ## 8. The honest one-line summary
 
-> On a synthetic conformance grid the guard refused every constructed
-> out-of-intent request and refused 17 of 36 in-intent ones. Priced with stated
-> assumptions, it breaks even between roughly 4.5% and 7.0% out-of-intent base
-> rate — a range, not a point, because the 36 negatives behind it come from four
-> intent sentences. With bounded actions enabled the centre moves to about 2.4%.
-> The only agent traffic this project observed ran at 0.6%, below the bottom of
-> every one of those ranges. This is a tail-risk control, not a cost saving, and the number that
+**Current, from arm E — the measured configuration:**
+
+> Against labels from two people who saw neither the authorization nor the
+> decision, the guard catches **73.3%** of out-of-intent requests and refuses
+> **45.5%** of in-intent ones. Priced with the stated assumptions that puts
+> break-even between roughly **5.4% and 9.3%** out-of-intent base rate — a range,
+> not a point, because only five intent sentences sit behind it. The only agent
+> traffic this project has observed ran at **0.6%**, below the bottom of that
+> range. **This is a tail-risk control, not a cost saving**, and the number that
 > decides its value — the real out-of-intent base rate — is the one arm C failed
 > to measure.
+
+**Legacy, from arm D — a retracted arm's counterfactual, not a prediction:**
+
+> On the synthetic conformance grid the guard refused every constructed
+> out-of-intent request (recall 1.000 *by construction*) and refused 17 of 36
+> in-intent ones, breaking even between 4.5% and 7.0%. Enabling bounded actions
+> would have moved that grid's centre to about 2.4%. **Nobody has run arm E with
+> bounded actions**, so this is not evidence about the submitted configuration,
+> and it says nothing about what recall would be afterwards.

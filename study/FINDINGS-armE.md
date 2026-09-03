@@ -129,11 +129,17 @@ positive by construction against roughly 21% refusals in observed traffic.
 `RESULTS-armE.md` already prints precision at several base rates; this is the
 measured gap behind that warning.
 
-**Recall was measured on a harder set than reality, which is the conservative
-direction.** A safety control tested on traffic refused 2.6x more often than what it
-has actually seen is being tested the right way round. Recall 0.733 is not
-flattered by an easy corpus — if anything the constructed set is where the
-`coverage=over` weakness shows up most, which is precisely why it showed up.
+**Recall may have been measured on a harder set than reality — but that is an
+inference, and it is marked as one.** A control tested on traffic it refuses 2.6x
+more often *looks* like it is being tested the right way round, and the reading is
+tempting because it flatters the result. It does not follow. The 2.6x compares
+two **guard-refusal rates**; arm C's traffic was never labelled, so its true
+out-of-intent rate is unknown, and a higher refusal rate is the guard's own
+output rather than an independent measure of difficulty.
+
+What can be said without inference: recall 0.733 was not obtained on a corpus
+built to be easy. The `coverage=over` weakness surfaced here, which is why the
+eight misses exist to be reported at all.
 
 **What this does not establish.** It does not make the corpus representative. One
 constructed grid compared against one model's traffic on one day, through a proxy

@@ -2741,3 +2741,62 @@ reported only `IN_DOUBT`, so a stranded `RESERVED` could not be seen at all. It
 now reports both, says the state is normally momentary, and explains that a
 restart promotes them. The limitation is in `README.md` under Known limits rather
 than in a backlog.
+
+## F47 — The arm E gate compared four integers and called it verification
+
+**Severity: P1**, and it is the reason F44's freeze break went unnoticed for a
+day. Raised by the same external reviewer.
+
+`rzp-arme verify` recomputed the confusion matrix and compared it to the
+published one. That sounds like reproduction and is not:
+
+- **Four integers cannot distinguish a run where one row moved TP→TN while
+  another moved the opposite way.** The totals reproduce; the guard behaved
+  differently on two rows.
+- **A row that changes its refusal *reason* is invisible.** Same allow/refuse
+  bit, same matrix, different behaviour.
+- **It says nothing about which inputs produced the numbers.** A swapped label
+  file, an edited mandate or a different policy all pass, provided the totals
+  land in the same place.
+
+That last one is not hypothetical: `internal/policy` changed after the corpus
+existed and this gate did not notice, because the matrix happened not to move.
+It genuinely did not move — every decision was verified identical afterwards —
+but *"we checked and it held"* and *"we could not have told"* are different
+states, and only one of them is a control.
+
+### Fixed
+
+`cmd/rzp-arme/integrity.go` records two digests at scoring time, both checked on
+every verify:
+
+| digest | covers |
+|---|---|
+| `decisions_sha256` | the guard's answer for **every** row, rule string included |
+| `inputs_sha256` | `requests.json`, `rowmap.json`, the worksheet, every mandate, every returned label file, and `internal/policy` |
+
+Each failure names which of the two moved, because they mean different things: a
+decision change voids the result, while an input change means the same answer was
+reproduced from something other than what was scored — *"reproducing the same
+answer from different inputs is not the same claim."*
+
+Demonstrated rather than asserted. Changing one character of a **comment** in
+`internal/policy` — which moves no decision at all — now fails:
+
+```
+every decision and rule string matches
+FAIL: arm E still reproduces its numbers, but the INPUTS changed:
+      recomputed ee75d58001600e2a, published 42bd71cca5b5ebe1
+```
+
+CI runs `rzp-arme verify` on every push, so this is enforced rather than
+available.
+
+### And a correction to F44
+
+F44 said the manifest records both policy tree hashes. **It did not.** The key
+was written by hand and the next `score` run rebuilt the manifest from scratch
+and erased it, before any of it was committed — so the record that the freeze had
+broken was itself lost, which is a small version of the same failure. `score` now
+carries forward every key it does not own, and the preservation is verified by
+re-running it.
