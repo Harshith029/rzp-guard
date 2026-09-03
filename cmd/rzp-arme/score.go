@@ -528,12 +528,18 @@ func score() error {
 	p("| **in-intent** (majority) | FP %d | TN %d |\n\n", fp, tn)
 
 	p("### Per-class rates, which are what transfer\n\n")
-	p("| | value | 95%% Wilson | 95%% cluster bootstrap |\n|---|---:|---|---|\n")
+	p("| | value | 95%% Wilson | cluster resampling range |\n|---|---:|---|---|\n")
 	p("| **Recall / TPR** | **%.3f** | %.3f – %.3f | **%.3f – %.3f** |\n",
 		rec, rLo, rHi, brLo, brHi)
 	p("| **False-positive rate** | **%.3f** | %.3f – %.3f | **%.3f – %.3f** |\n",
 		fpr, fLo, fHi, bfLo, bfHi)
 	p("| Precision | %.3f | %.3f – %.3f | — |\n\n", prec, pLo, pHi)
+	p("**The right-hand column is NOT a 95%% confidence interval, and naming it\n")
+	p("one would be an overclaim.** Bootstrap coverage assumes clusters drawn from\n")
+	p("a population. These are intent sentences chosen by the author to span a\n")
+	p("design grid -- a deliberate selection, not a sample of merchant intents. It\n")
+	p("says how far the estimate moves when those particular sentences are\n")
+	p("resampled, and nothing about long-run coverage.\n\n")
 	p("**Quote the cluster bootstrap.** Wilson was pre-registered and is kept for\n")
 	p("that reason, but it assumes %d independent observations and only **%d\n", scored, len(clusters))
 	p("distinct intent sentences** contributed a scored row. Rows sharing a\n")

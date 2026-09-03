@@ -8,7 +8,7 @@ recall 0.733   FPR 0.455   precision 0.423
 Fleiss' kappa 0.604        2 raters
 ```
 
-**Recall 0.733, cluster-robust 95% interval 0.600 – 0.900.** That is the first
+**Recall 0.733, cluster resampling range 0.600 – 0.900** — a range, not a 95% interval; see `RESULTS-armE.md`. That is the first
 measured recall in this project against ground truth its author did not produce.
 
 ---
@@ -117,7 +117,7 @@ arm C   observed traffic     72 / 340 refund calls    21.2%
 arm E   constructed corpus   66 / 120 requests        55.0%
 ```
 
-**Arm E is about 2.6x more adversarial than the only agent traffic this project
+**Arm E draws a 2.6x higher guard-refusal rate than the only agent traffic this project
 has observed.** That is a design choice — the grid deliberately over-samples
 `above_intent`, `at_mandate_ceiling` and over-coverage cells, which is what makes
 recall estimable at all after arm C's positive class came back with two members.
@@ -130,7 +130,7 @@ positive by construction against roughly 21% refusals in observed traffic.
 measured gap behind that warning.
 
 **Recall was measured on a harder set than reality, which is the conservative
-direction.** A safety control tested on traffic 2.6x more hostile than what it
+direction.** A safety control tested on traffic refused 2.6x more often than what it
 has actually seen is being tested the right way round. Recall 0.733 is not
 flattered by an easy corpus — if anything the constructed set is where the
 `coverage=over` weakness shows up most, which is precisely why it showed up.
@@ -145,7 +145,7 @@ generalising from either.
 
 **Establishes.** On 96 constructed refund requests labelled by two people who
 never saw the code, the authorization, or the guard's decision, and against a
-policy frozen and hash-pinned before the corpus existed:
+policy not fitted to this data (`PROTOCOL-armE-AMENDMENT-2.md`):
 
 - recall **0.733** (0.600 – 0.900 cluster-robust)
 - false-positive rate **0.455** (0.407 – 0.493)

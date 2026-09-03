@@ -12,6 +12,7 @@ be guessed at.
 | [`FINDINGS-armE.md`](FINDINGS-armE.md) | **what it means.** the five predictions, the eight misses, and how constructed the corpus is |
 | [`PROTOCOL-armE.md`](PROTOCOL-armE.md) | pre-registration, committed **before** the corpus existed |
 | [`PROTOCOL-armE-AMENDMENT-1.md`](PROTOCOL-armE-AMENDMENT-1.md) | three defects found in my own design **before** the labels returned |
+| [`PROTOCOL-armE-AMENDMENT-2.md`](PROTOCOL-armE-AMENDMENT-2.md) | **the policy freeze broke** — found by external review, and all 120 decisions re-run under both trees to prove no number moved |
 | [`RATER-INSTRUCTIONS-armE.md`](RATER-INSTRUCTIONS-armE.md) | the only document the raters received |
 | [`FP-COST.md`](FP-COST.md) | both error directions priced; break-even with intervals |
 

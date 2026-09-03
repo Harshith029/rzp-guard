@@ -40,11 +40,18 @@ Predicted positive: the guard refused it.
 
 ### Per-class rates, which are what transfer
 
-| | value | 95% Wilson | 95% cluster bootstrap |
+| | value | 95% Wilson | cluster resampling range |
 |---|---:|---|---|
 | **Recall / TPR** | **0.733** | 0.556 – 0.858 | **0.600 – 0.900** |
 | **False-positive rate** | **0.455** | 0.340 – 0.574 | **0.407 – 0.493** |
 | Precision | 0.423 | 0.299 – 0.558 | — |
+
+**The right-hand column is NOT a 95% confidence interval, and naming it
+one would be an overclaim.** Bootstrap coverage assumes clusters drawn from
+a population. These are intent sentences chosen by the author to span a
+design grid -- a deliberate selection, not a sample of merchant intents. It
+says how far the estimate moves when those particular sentences are
+resampled, and nothing about long-run coverage.
 
 **Quote the cluster bootstrap.** Wilson was pre-registered and is kept for
 that reason, but it assumes 96 independent observations and only **5

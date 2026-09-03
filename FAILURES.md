@@ -2618,3 +2618,64 @@ the economics document. Corrected in place, with the original text quoted.
 that trust without earning it. Anything a generator prints as fact should be
 derived from the data it was handed — `len(raters)`, not the number the design
 expected.
+
+## F45 — A failed audit copy could release an authorization the child already had
+
+**Severity: P0, money path.** Found by an external reviewer, not by me, and not
+by any test in this repository. Reproduced before it was fixed.
+
+`-child-tee` records every byte written toward the child; it is the evidence a
+blocked call never crossed the boundary. `cmd/rzp-guard/main.go` built it the
+obvious way:
+
+```go
+childWriter = io.MultiWriter(childIn, tee)
+```
+
+**`io.MultiWriter` returns the byte count of the writer that FAILED**, not of the
+ones that succeeded. So a child that accepted every byte, followed by a tee that
+accepted none — a full disk, an unlinked file — returns `n == 0`.
+
+The relay's release rule reads exactly that signal, and the reasoning is sound
+for a single writer:
+
+```go
+// Only a write that moved ZERO bytes is provably pre-dispatch and safe to release.
+if n == 0 { _ = r.guard.ReleaseConfirmedRejectionMany(d.MatchedActionIDs) }
+```
+
+**So the refund reached the child, and its single-use authorization went back to
+AVAILABLE.** It could then be spent a second time. Measured, not argued:
+
+```
+state = AVAILABLE after 167 bytes reached the child
+```
+
+This is the failure mode the whole lifecycle exists to prevent, reached through
+the flag whose purpose is producing evidence that it cannot happen.
+
+### Why nothing caught it
+
+There were tests for both single-writer cases — `TestPartialChildWriteMarksThe
+ActionInDoubt` and `TestZeroByteChildWriteReleasesTheAuthorization`. Both pass a
+writer directly to `New`. **No test wired the writer the way `main.go` wires
+it.** The unit under test was never the unit that ships.
+
+### Fixed
+
+`internal/relay/child_tee.go` replaces `io.MultiWriter`. It writes to the child
+first and returns the child's count unmodified, because that count is the only
+one that answers "did this leave the process". A failed audit copy is reported
+loudly on stderr, marks the evidence file as short, and stops further teeing —
+but it does not fail the write, because the child holds the bytes and its
+response still has to be handled. Turning a disk-full on an audit file into an
+IN_DOUBT lock would trade one wrong answer for another.
+
+Four tests now cover it, including one that asserts `io.MultiWriter` really does
+return 0 in this shape — so the reason for not using it is encoded, not
+remembered.
+
+**The lesson is about test wiring, not about MultiWriter.** Both existing tests
+were correct and neither exercised the composition the binary constructs. When a
+safety decision keys off a value, every wrapper that can change that value on the
+way to the decision is part of the unit under test.

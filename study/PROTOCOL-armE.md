@@ -68,7 +68,15 @@ labelling.
 Two separate claims, each with its own evidence. Arm D conflated them.
 
 **The implementation was not fitted to this data.** `internal/policy` was last
-changed in `fb87b12` (2026-08-30) and its tree hash is recorded. This corpus is
+changed in `fb87b12` (2026-08-30) and its tree hash is recorded.
+
+> **CORRECTED 2026-09-03 — both halves of the sentence above became false.**
+> `internal/policy` changed again in `8a25767`, *after* this corpus existed, and
+> no tree hash was ever recorded anywhere. The freeze was real as an intention
+> and absent as a control. All 120 decisions have since been re-run under both
+> policy trees and are byte-identical, rule strings included, so no reported
+> number moves — but that is now proven rather than asserted, and the manifest
+> records both hashes. See [`PROTOCOL-armE-AMENDMENT-2.md`](PROTOCOL-armE-AMENDMENT-2.md). This corpus is
 generated after this document is committed. Both dates are in git and neither is
 an assertion by me.
 

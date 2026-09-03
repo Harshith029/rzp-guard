@@ -248,6 +248,18 @@ jobs:
       - name: The frozen protocol must match its manifest
         run: python study/freeze.py verify
 
+      # Arm E carries the headline result and had NO freeze gate at all: its
+      # policy changed after the corpus existed and nothing noticed for a day
+      # (study/PROTOCOL-armE-AMENDMENT-2.md). arms.json cannot cover it --
+      # that registry tracks model freeze hashes and arm E runs no model -- so
+      # the gate is the one that actually matters: recompute the matrix from
+      # the raters' returned files under the CURRENT tree. A policy change
+      # that moves a decision now fails CI instead of waiting for a reviewer.
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26', cache: false }
+      - name: Arm E must still reproduce its published matrix
+        run: go run ./cmd/rzp-arme verify
+
       - name: Each arm's traces must match the freeze that arm ran under
         run: |
           python - <<'EOF'

@@ -18,8 +18,8 @@ amount, which is the default and the form every shipped mandate uses.
 | **detector, verifier or auto-responder** | a deterministic **verifier**. No model, no score, no threshold | [What this is](#what-this-is) |
 | **working** | `./run.sh demo` — 15s. Also run against the live Razorpay Test Mode API on this commit | [Evidence](#evidence) |
 | **measured precision** | **0.423** | [`study/RESULTS-armE.md`](study/RESULTS-armE.md) |
-| **measured recall** | **0.733**, cluster-robust 95% CI 0.600–0.900 | same |
-| **held-out test set** | **partial, and stated as such.** Labels independent of the implementation; policy frozen and hash-pinned before the corpus existed. **Traffic is constructed, not observed** — quantified at 2.6× more adversarial than the real agent traffic captured | [`study/FINDINGS-armE.md`](study/FINDINGS-armE.md) |
+| **measured recall** | **0.733**, cluster resampling range 0.600–0.900 (**not** a 95% CI — only 5 intent sentences) | same |
+| **held-out test set** | **partial, and stated as such.** Labels independent of the implementation; policy **not** fitted to this data, and the one change that followed it is proven to move none of the 120 decisions ([Amendment 2](study/PROTOCOL-armE-AMENDMENT-2.md)). **Traffic is constructed, not observed** — its guard-refusal rate is 2.6× that of the real agent traffic captured | [`study/FINDINGS-armE.md`](study/FINDINGS-armE.md) |
 | **honest metrics incl. false-positive cost** | both directions priced; break-even **5.4–9.3%** against an observed base rate of **0.6%** | [`study/FP-COST.md`](study/FP-COST.md) |
 | **strictly defense-only** | no money-moving command in the released surface; 10/10 previously-working bypasses still blocked on Linux CI; every commit scanned for a self-authorizing launcher | [Defence-only](#defence-only) |
 
@@ -212,7 +212,7 @@ decision.**
 
 ```
 recall 0.733   [0.600 - 0.900]      FPR 0.455   [0.407 - 0.493]
-precision 0.423                     Cohen's kappa 0.604
+precision 0.423                     Fleiss' kappa 0.604
 TP 22   FP 30   TN 36   FN 8        96 of 120 rows scored
 ```
 
@@ -235,7 +235,7 @@ kappa, not to characterise human judgment. **This is an independently labelled
 adversarial set, and it is constructed — both halves of that sentence matter.**
 
 How constructed? The guard refused **55.0%** of arm E's requests against
-**21.2%** of arm C's observed traffic, so the corpus is about **2.6× more
+**21.2%** of arm C's observed traffic, so the corpus draws a **2.6× higher
 adversarial than anything this project has actually seen.** That is why precision
 does not transfer — and why recall was measured on a harder set than reality,
 which is the conservative direction for a safety control.

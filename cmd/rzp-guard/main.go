@@ -230,7 +230,13 @@ func run() error {
 			return fmt.Errorf("child tee: %w", err)
 		}
 		defer tee.Close()
-		childWriter = io.MultiWriter(childIn, tee)
+		// NOT io.MultiWriter: it returns the byte count of the writer that
+		// failed, so a failing tee after a successful child write reports
+		// zero, which the relay reads as "nothing was dispatched" and
+		// releases the authorization on. See internal/relay/child_tee.go.
+		childWriter = relay.NewChildTee(childIn, tee, func(err error) {
+			fmt.Fprintf(os.Stderr, "rzp-guard: %v\n", err)
+		})
 	}
 
 	sink, closeSink, err := decisionSink(*decisionLog)
