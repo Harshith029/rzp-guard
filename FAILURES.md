@@ -2792,6 +2792,21 @@ FAIL: arm E still reproduces its numbers, but the INPUTS changed:
 CI runs `rzp-arme verify` on every push, so this is enforced rather than
 available.
 
+### The first version of the gate was itself wrong
+
+It hashed raw file bytes, and failed CI on the very first run: every decision
+matched and the digest did not. This tree checks out CRLF on Windows and LF on
+the Linux runner, so the same content produced two hashes.
+
+**A gate that fires on the reader's git config is noise**, and noise is how a
+real alert gets ignored — the failure would have been dismissed as flaky within a
+week. Line endings and the path separator are both checkout artifacts and are now
+normalised before hashing. Verified across both: the digest computed on Windows
+verifies inside the pinned Linux container.
+
+Every hashed file is text, so stripping CR is safe. Nothing binary may be added
+to that list, and the code says so where someone would add one.
+
 ### And a correction to F44
 
 F44 said the manifest records both policy tree hashes. **It did not.** The key

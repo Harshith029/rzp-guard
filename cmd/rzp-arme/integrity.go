@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -99,9 +100,18 @@ func inputsDigest() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("integrity: %s: %w", p, err)
 		}
-		// Normalise the separator so a Windows run and a Linux run agree.
+		// Normalise the path separator AND the line endings.
+		//
+		// Both are checkout artifacts, not content. The first version hashed raw
+		// bytes and failed CI immediately: every decision matched and the digest
+		// did not, because this tree checks out CRLF on Windows and LF on the
+		// Linux runner. A gate that fires on the reader's git config is noise,
+		// and noise is how a real alert gets ignored.
+		//
+		// Every hashed file is text -- JSON, CSV, Go. Stripping CR from a binary
+		// would corrupt it, so nothing binary may be added to the list above.
 		fmt.Fprintf(h, "%s\n", filepath.ToSlash(p))
-		h.Write(b)
+		h.Write(bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")))
 		h.Write([]byte{'\n'})
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
