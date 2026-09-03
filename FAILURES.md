@@ -2679,3 +2679,65 @@ remembered.
 were correct and neither exercised the composition the binary constructs. When a
 safety decision keys off a value, every wrapper that can change that value on the
 way to the decision is part of the unit under test.
+
+## F46 — Three more from the same review: one silent, one harmless, one deliberate
+
+All three raised by the external reviewer that found F45. Each was checked before
+it was believed, and they did not all turn out the same way.
+
+### A failed commit was silent
+
+`resolve()` ended with `_ = r.guard.CommitMany(p.actionIDs)`. The refund had
+landed — the reply carried a matching payment, amount and receipt — but if the
+durable write recording that failed, the error went nowhere. The ledger keeps the
+action `RESERVED`, its budget encumbered against a refund that already happened,
+and nothing tells anyone. Reproduced with a store that fails only the move to
+`COMMITTED`:
+
+```
+a failed commit was silent ... state = RESERVED
+```
+
+`RecoverStartup` does promote a stranded `RESERVED` to `IN_DOUBT` — but only at
+the next restart, which on a long-running guard is days away or never.
+
+Now routed through `markInDoubt`, which alerts whether or not its own write
+succeeds. That property matters most here, because the reason the commit failed
+is usually that the store is the broken thing.
+
+`IN_DOUBT` is right even though the provider outcome is known: what is in doubt
+is the *ledger*, and `IN_DOUBT` is the state that summons a human.
+
+### The trailing-JSON risk was real but not a bypass
+
+`json.Decoder.Decode` reads the first value on a line and reports nothing about
+what follows, so a line carrying a permitted read *and* an unauthorized refund
+was classified on the read. The reviewer flagged this as an inference rather than
+a finding, and was right to: **nothing rode along.**
+
+```
+bytes reaching child: {"id":1,...,"name":"fetch_payment"}   <- re-encoded, refund absent
+```
+
+Every forwarded message is re-encoded from the parsed value rather than echoed
+from the line, so the second value never reached the child. What it *did* do was
+vanish: neither forwarded nor refused. The line is now rejected outright, and two
+tests pin both halves — nothing rides along, and an ordinary single-value line
+still forwards. **This closed a silent discard, not a bypass, and the entry says
+so because the difference is the whole point.**
+
+### The missing per-refund timeout stays missing
+
+Also real: nothing bounds how long the relay waits for a child's reply while a
+session is open. A hung child strands an action in `RESERVED`.
+
+**Not fixed, deliberately.** A timeout on a money path is a guess about how slow
+a provider may be, and guessing short converts a slow refund into an `IN_DOUBT`
+that needs an operator — trading a rare failure for a routine one, two days
+before submission, on the path that moves money.
+
+What was fixed is the part that made it invisible: `rzp-guard-operator list`
+reported only `IN_DOUBT`, so a stranded `RESERVED` could not be seen at all. It
+now reports both, says the state is normally momentary, and explains that a
+restart promotes them. The limitation is in `README.md` under Known limits rather
+than in a backlog.

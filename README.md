@@ -312,6 +312,19 @@ Details: `study/PRELABEL-FINDING-armC.md`, `study/PROTOCOL-armC-AUDIT.md`.
 
 ## Known limits
 
+**There is no per-refund timeout.** Once a refund is forwarded, the relay waits
+for the child's reply for as long as the session stays open; the ten-second grace
+period only starts after the agent's stdin closes. A child that hangs and never
+answers leaves its action `RESERVED`, holding budget, until the guard restarts —
+at which point recovery promotes it to `IN_DOUBT` so a human looks.
+
+This is deliberate rather than unfinished. A timeout on a money path is a guess
+about how slow a provider is allowed to be, and guessing short turns a slow
+refund into an `IN_DOUBT` that needs an operator. What was fixed instead is
+visibility: `rzp-guard-operator list` now reports actions held `RESERVED`
+alongside those `IN_DOUBT`, so a stuck refund is something you can see rather
+than something you discover on the next restart.
+
 **Mandate signing is available but off by default.** Without
 `-mandate-pubkey`, the guard reads the mandate from disk and does not verify who
 wrote it: anyone who can write that file can grant authority, including after

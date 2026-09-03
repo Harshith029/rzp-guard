@@ -430,8 +430,28 @@ func cmdList(store *storage.Store, m *mandate.Mandate, asJSON bool) error {
 		}
 		return json.NewEncoder(os.Stdout).Encode(out)
 	}
+	// RESERVED is normally momentary: it lasts from the moment a refund is
+	// authorized to the moment the child's reply settles it. An action still
+	// sitting there means the reply never came, or the commit that should have
+	// recorded it failed to persist -- budget encumbered against a refund that
+	// may already have happened, and nothing to resolve because it is not
+	// IN_DOUBT.
+	//
+	// It used to be invisible here. RecoverStartup does promote a stranded
+	// RESERVED to IN_DOUBT, but only at the next restart, so on a long-running
+	// guard the operator had no way to see one at all.
+	held, herr := store.ActionsInState(string(lifecycle.Reserved))
+	if herr != nil {
+		return herr
+	}
+
+	if len(rows) == 0 && len(held) == 0 {
+		fmt.Println("No actions are IN_DOUBT and none are held RESERVED. Nothing to resolve.")
+		return nil
+	}
 	if len(rows) == 0 {
-		fmt.Println("No actions are IN_DOUBT. Nothing to resolve.")
+		fmt.Println("No actions are IN_DOUBT.")
+		printHeld(held, m)
 		return nil
 	}
 	fmt.Printf("%d action(s) locked IN_DOUBT — money may or may not have moved.\n\n", len(rows))
@@ -445,7 +465,33 @@ func cmdList(store *storage.Store, m *mandate.Mandate, asJSON bool) error {
 	fmt.Println("Look each receipt up in the Razorpay dashboard, then:")
 	fmt.Println("  rzp-guard-operator ... resolve <action_id> -outcome landed|not-landed \\")
 	fmt.Println("      -operator you@merchant -reason \"what you saw\"")
+	printHeld(held, m)
 	return nil
+}
+
+// printHeld reports actions stuck in RESERVED.
+//
+// They cannot be resolved from here -- resolve accepts only IN_DOUBT -- so this
+// says what the state means and what to do about it, rather than offering a
+// command that would fail.
+func printHeld(held []storage.ActionRow, m *mandate.Mandate) {
+	if len(held) == 0 {
+		return
+	}
+	fmt.Printf("\n%d action(s) held RESERVED. That state is normally momentary:\n", len(held))
+	fmt.Println("the refund was authorized and the child's reply never settled it.")
+	fmt.Println("Budget stays encumbered until something does.")
+	fmt.Println()
+	for _, r := range held {
+		fmt.Printf("  action    %s\n", r.ActionID)
+		fmt.Printf("  payment   %s\n", paymentFor(m, r.ActionID))
+		fmt.Printf("  amount    %d paise\n", r.AmountPaise)
+		fmt.Printf("  receipt   %s   <- search Razorpay for this\n", r.Receipt)
+		fmt.Printf("  since     %s\n\n", r.UpdatedAt)
+	}
+	fmt.Println("If one has sat here longer than a few seconds the guard never")
+	fmt.Println("recorded an outcome. Restarting it promotes these to IN_DOUBT,")
+	fmt.Println("which is resolvable -- check the receipt in Razorpay first.")
 }
 
 func cmdAudit(store *storage.Store, asJSON bool) error {

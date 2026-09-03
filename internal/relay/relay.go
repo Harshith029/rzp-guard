@@ -193,6 +193,21 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		return r.writeAgent(errorResponse(nil, -32700,
 			fmt.Sprintf("rzp-guard: could not parse JSON-RPC message: %v", err)))
 	}
+	// One line carries exactly one message. Decode stops at the end of the first
+	// value and reports nothing about what follows, so a second value on the same
+	// line would be classified on the first and then SILENTLY DISCARDED -- the
+	// agent asked for something the relay neither forwarded nor refused.
+	//
+	// Measured, not assumed: today nothing rides along, because every forwarded
+	// message is re-encoded from the parsed value rather than echoed from the
+	// line (TestTrailingJSONValueOnOneLine). This is not a closed bypass; it
+	// removes the possibility that a future path which forwards raw bytes turns
+	// a silent discard into one.
+	if _, err := dec.Token(); err != io.EOF {
+		return r.writeAgent(errorResponse(nil, -32600,
+			"rzp-guard: refusing a line carrying more than one JSON value. "+
+				"One message per line; the trailing value was neither inspected nor forwarded"))
+	}
 
 	// An agent RESPONSE to a server-initiated request is forwarded untouched and
 	// never tracked. Tracking it would leak its id forever, because the child
@@ -479,7 +494,24 @@ func (r *Relay) resolve(id string, msg rpcMessage) {
 			"reply carried no refund entity matching payment+amount+receipt")
 		return
 	}
-	_ = r.guard.CommitMany(p.actionIDs)
+	if err := r.guard.CommitMany(p.actionIDs); err != nil {
+		// The refund LANDED -- the reply carried a matching entity -- but the
+		// write recording that failed, so the ledger still holds the action
+		// RESERVED. Its budget stays encumbered against a refund that already
+		// happened, and the action can neither be reconciled nor reused.
+		//
+		// Discarding this error left that state silent. RecoverStartup does
+		// promote a stranded RESERVED to IN_DOUBT, but only on the next restart,
+		// which on a long-running guard may be days away or never.
+		//
+		// IN_DOUBT is the right destination even though the provider outcome is
+		// known: what is in doubt is the ledger, and IN_DOUBT is the state that
+		// summons a human. markInDoubt alerts whether or not its own write
+		// succeeds, which matters most when the store is the thing that broke.
+		r.markInDoubt(p.actionIDs,
+			"refund landed but the commit did not persist: "+err.Error()+
+				" -- resolve as landed once the ledger is writable")
+	}
 }
 
 func isToolError(result json.RawMessage) bool {
