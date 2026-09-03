@@ -65,8 +65,20 @@ EV=evidence/live
 # "error obtaining VCS status: exit status 128". Reproduced against a tree with
 # an unreadable .git: eleven operator tests failed before reaching a single
 # assertion.
+# A named volume holds the Go module cache across runs.
+#
+# Without it every container starts empty and re-downloads the whole dependency
+# set: measured at 56 seconds of `go: downloading` before the demo printed its
+# first line, on every single invocation. A reviewer's first impression of this
+# project was a minute of scrolling module names.
+#
+# It stays hermetic. go.sum verifies the hash of every module, so a cache that
+# has been tampered with fails the build rather than poisoning it -- the volume
+# is a download cache, not a trust boundary.
 gorun() {
-  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src     -e GOFLAGS=-buildvcs=false "$GOIMAGE" "$@"
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWDW":/src -w /src \
+    -v rzpguard-gomodcache:/go/pkg/mod \
+    -e GOFLAGS=-buildvcs=false "$GOIMAGE" "$@"
 }
 
 need_keys() {
