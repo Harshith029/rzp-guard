@@ -58,6 +58,58 @@ signup — verified from a clean clone. Docker is the only prerequisite, and row
 1–2 pull the pinned image; run those before row 3, whose isolated lane is
 `--pull=never` by design and will refuse to fetch anything itself.
 
+---
+
+## Get it running
+
+```bash
+git clone https://github.com/Harshith029/rzp-guard.git
+cd rzp-guard
+./run.sh demo
+```
+
+That is the whole setup. **No `.env`, no keys, no account.** The first run pulls
+a digest-pinned Go image and takes about a minute; every run after that is
+**12 seconds**, because the module cache persists in a named volume.
+
+### What you need
+
+| | |
+|---|---|
+| **Docker** | Required. Everything `run.sh` does happens inside a container pinned by digest, so your host toolchain is never used or trusted. |
+| **bash** | `run.sh` is the documented entry point. Git Bash works on Windows; CI tests that path explicitly. |
+| **Go 1.25+** | **Optional** — only for the verification commands below, which run on the host rather than in the container. Skip it and everything in *Two minutes* still works. |
+
+```bash
+./run.sh help     # all 25 commands, grouped, with what each one does and does not cover
+```
+
+### Check the evaluation yourself
+
+These are the ones worth running if you doubt the numbers. They need local Go and
+nothing else — no container, no credentials, no network:
+
+```bash
+go run ./cmd/rzp-arme verify        # recompute recall/FPR from the raters' own files
+go run ./cmd/rzp-armd verify        # re-decide arm D's 90 requests against the frozen policy
+go run ./cmd/rzp-study reachability-armC   # the "nine reachable by combining" figure
+```
+
+`rzp-arme verify` is the one that matters. It rebuilds the confusion matrix from
+the returned label files, checks **every individual decision and its refusal
+rule** rather than just the totals, and hashes the corpus, the mandates, the
+worksheet, the labels and `internal/policy`. If any of those had been changed to
+flatter the result, it fails and names which. It runs in CI on every push.
+
+### If something does not run
+
+| Symptom | Cause |
+|---|---|
+| `Cannot connect to the Docker daemon` | Docker Desktop is not running. Start it; nothing here works without it. |
+| `CANNOT RUN: the pinned image is not present` | You ran `redteam-negative` first. Its lane is `--pull=never` by design and will not fetch anything. Run `./run.sh demo` once, or pull the digest the message prints. |
+| A minute of `go: downloading` | First run only, filling the module cache. |
+| `RAZORPAY_KEY_ID ... must be set` | You reached a **live gate**, not part of the two-minute path. Those need Test Mode keys and are not needed to evaluate anything above. |
+
 The one number worth arguing about: **this control breaks even somewhere between
 a 5.4% and 9.3% out-of-intent base rate, and the only agent traffic we observed
 ran at 0.6%.** That band moved *against* the guard once recall was measured

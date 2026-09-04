@@ -1151,6 +1151,7 @@ rzp-guard
   ./run.sh lifecycle-race    lifecycle lane under the race detector
   ./run.sh all               every lane: default, lifecycle, and BOTH race runs
   ./run.sh build             build all three binaries
+  ./run.sh vet               go vet, in the pinned container
   ./run.sh bench             measure the decision and the durable writes
   ./run.sh fuzz [TARGET] [BUDGET]
                              fuzz in the pinned container (default 60s)
@@ -1162,6 +1163,11 @@ rzp-guard
   ./run.sh release [VERSION] stamped static linux/amd64 build + checksums
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
+  ./run.sh preflight         PRE-PUSH: scan history for a self-authorizing
+                             refund launcher. Run before publishing.
+
+  ./run.sh study-build       Phase 4b: build the harness binaries (test-hook
+                             builds; they substitute only the CHILD process)
   ./run.sh study-verify      Phase 4b: check the frozen protocol is intact
   ./run.sh study-dry         Phase 4b: whole harness on a scripted fake model
                              (no API key, no spend, never a study result)
