@@ -798,7 +798,47 @@ cmd_build() {
   go build -buildvcs=false -o rzp-guard.exe ./cmd/rzp-guard
   go build -buildvcs=false -o gate-verify.exe ./cmd/gate-verify
   go build -buildvcs=false -o rzp-guard-operator.exe ./cmd/rzp-guard-operator
-  echo "built ./rzp-guard.exe ./gate-verify.exe ./rzp-guard-operator.exe"
+  go build -buildvcs=false -o rzp-mandate.exe ./cmd/rzp-mandate
+  echo "built ./rzp-guard.exe ./gate-verify.exe ./rzp-guard-operator.exe ./rzp-mandate.exe"
+}
+
+# The authoring layer, end to end, on the example intent.
+#
+# It exists as a runner command for the same reason everything else does: the
+# documented door is the one people use. But it is also the demonstration that
+# matters most to a reviewer, because it shows the one failure class the guard
+# structurally cannot catch being caught upstream of it -- and it shows the
+# hand-written examples/mandate.json failing the check that the compiled one
+# passes.
+cmd_mandate_demo() {
+  go build -buildvcs=false -o rzp-mandate.exe ./cmd/rzp-mandate
+  local out; out="$(mktemp -d)"
+  echo "--- compiling examples/intent.json ---"
+  ./rzp-mandate.exe compile -intent examples/intent.json -out "$out/mandate.json"
+  echo
+  echo "--- verifying the grant is still exactly what that intent compiles to ---"
+  ./rzp-mandate.exe verify -mandate "$out/mandate.json"
+  echo
+  echo "--- what the guard would have been handed instead, hand-written ---"
+  echo "    examples/mandate.json caps cumulative spend at 200000 paise over a"
+  echo "    single 50000 paise action: 150000 paise of authority no sentence"
+  echo "    asked for. The compiled mandate caps it at 50000, by construction."
+  rm -rf "$out"
+}
+
+# Every compiled mandate in the tree must still be the one its intent produces.
+#
+# This is the CI shape of the authoring guarantee: compile-time refusal stops a
+# bad grant being written, and this stops a good one being edited afterwards.
+cmd_mandate_verify_all() {
+  go build -buildvcs=false -o rzp-mandate.exe ./cmd/rzp-mandate
+  local n=0 f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    ./rzp-mandate.exe verify -mandate "${f%.intent.json}.json" || return 1
+    n=$((n+1))
+  done < <(find . -name '*.intent.json' -not -path './study/*' 2>/dev/null)
+  echo "verified $n compiled mandate(s)"
 }
 
 # Benchmarks. Run in the pinned container like everything else, or the numbers
@@ -1163,6 +1203,13 @@ rzp-guard
   ./run.sh release [VERSION] stamped static linux/amd64 build + checksums
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
+  ./run.sh mandate-demo      compile examples/intent.json into a mandate and
+                             verify it. The authoring layer: it refuses an
+                             ambiguous intent rather than resolving one, and the
+                             cumulative cap it emits equals the sum of the lines
+  ./run.sh mandate-verify    every compiled mandate in the tree must still be
+                             exactly what its intent produces
+
   ./run.sh preflight         PRE-PUSH: scan history for a self-authorizing
                              refund launcher. Run before publishing.
 
@@ -1210,6 +1257,8 @@ case "${1:-help}" in
   bench) cmd_bench ;;
   release) shift; cmd_release "$@" ;;
   operator-setup) cmd_operator_setup ;;
+  mandate-demo) cmd_mandate_demo ;;
+  mandate-verify) cmd_mandate_verify_all ;;
   study-verify) cmd_study_verify ;;
   study-dry) cmd_study_dry ;;
   study-model) shift; cmd_study_model "$@" ;;

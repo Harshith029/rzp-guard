@@ -1,0 +1,17 @@
+{
+  "intent_id": "int_demo_001",
+  "issued_by": "support@merchant.example",
+  "valid_for": "2h",
+  "max_calls_per_minute": 10,
+  "read_tools": ["fetch_payment", "fetch_all_payments"],
+  "items": [
+    {
+      "item_id": "rfa_demo_001",
+      "payment_id": "pay_SYN00000000001",
+      "captured_paise": 120000,
+      "refund": {"exact_paise": 50000},
+      "because": "customer returned the damaged jar; agreed full refund on that line"
+    }
+  ],
+  "total_paise": 50000
+}
