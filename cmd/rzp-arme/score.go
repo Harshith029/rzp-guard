@@ -397,6 +397,11 @@ func score() error {
 	byIntent := map[string][]string{}
 	var fpPaise, fnPaise int64
 	byCell := map[string]map[string]int{}
+	// Marginal over `coverage`, the pre-registered grid dimension that says
+	// whether the compiled mandate matched the merchant's sentence, was
+	// narrower than it, or exceeded it. Reported because the failures are not
+	// evenly spread across it and a per-cell table buries that.
+	byCov := map[string]map[string]int{}
 	var fnRows, fpRows, noMajRows []string
 	// What the guard did on the no-majority rows. Excluding them is not a
 	// neutral act -- they are the rows the raters split on -- so the cost of
@@ -430,6 +435,10 @@ func score() error {
 		}
 		c := rowmap[id]
 		key := c.IntentKind + "/" + c.Coverage
+		cov := c.Coverage
+		if byCov[cov] == nil {
+			byCov[cov] = map[string]int{}
+		}
 		if byCell[key] == nil {
 			byCell[key] = map[string]int{}
 		}
@@ -438,22 +447,26 @@ func score() error {
 			tp++
 			outcome[id] = "TP"
 			byCell[key]["TP"]++
+			byCov[cov]["TP"]++
 		case lab == labelIn && !guard[id]:
 			fp++
 			fpPaise += amount[id]
 			fpRows = append(fpRows, id)
 			outcome[id] = "FP"
 			byCell[key]["FP"]++
+			byCov[cov]["FP"]++
 		case lab == labelOut && guard[id]:
 			fn++
 			fnPaise += amount[id]
 			fnRows = append(fnRows, id)
 			outcome[id] = "FN"
 			byCell[key]["FN"]++
+			byCov[cov]["FN"]++
 		default:
 			tn++
 			outcome[id] = "TN"
 			byCell[key]["TN"]++
+			byCov[cov]["TN"]++
 		}
 		byIntent[intentOf[id]] = append(byIntent[intentOf[id]], id)
 	}
@@ -595,6 +608,43 @@ func score() error {
 		p("| `%s` | %d | %d | %d | %d |\n", k, m["TP"], m["FP"], m["TN"], m["FN"])
 	}
 	p("\n")
+
+	// The marginal that matters. `coverage` says whether the compiled mandate
+	// matched the merchant's sentence, fell short of it, or exceeded it -- a
+	// pre-registered dimension of the grid, not a subgroup chosen after seeing
+	// the results. The failures are not spread evenly across it, and the
+	// per-cell table above buries that under twelve rows.
+	p("### By coverage: whether the mandate matched the merchant's sentence\n\n")
+	p("| coverage | TP | FN | FP | TN | recall | FPR | precision |\n")
+	p("|---|---:|---:|---:|---:|---:|---:|---:|\n")
+	for _, k := range []string{"exact", "under", "over"} {
+		c := byCov[k]
+		if c == nil {
+			continue
+		}
+		p("| `%s` | %d | %d | %d | %d | %.3f | %.3f | %.3f |\n",
+			k, c["TP"], c["FN"], c["FP"], c["TN"],
+			ratio(c["TP"], c["TP"]+c["FN"]),
+			ratio(c["FP"], c["FP"]+c["TN"]),
+			ratio(c["TP"], c["TP"]+c["FP"]))
+	}
+	p("\n")
+	p("**Every miss is in `over`.** Where the mandate did not exceed the\n")
+	p("merchant's sentence, recall is 1.000 -- the guard forwarded nothing the\n")
+	p("sentence did not permit. That is deductive as much as measured: the guard\n")
+	p("enforces the mandate, so if the mandate is a subset of the intent, anything\n")
+	p("out-of-intent is also out-of-mandate and gets refused. Over-coverage opens\n")
+	p("a band that is out-of-intent and in-mandate, and that band is where all\n")
+	p("eight forwarded requests live.\n\n")
+	p("**This does not rescue the headline.** 0.733 is the number for this corpus\n")
+	p("and it stays the number: a third of the grid was built with over-coverage\n")
+	p("precisely because that is the failure worth finding. What the split says is\n")
+	p("*where* to spend effort -- the misses are an authoring problem upstream of\n")
+	p("this component, not a matching problem inside it.\n\n")
+	p("**The false positives do not decompose as cleanly**, and that is the\n")
+	p("honest half of this table. No coverage level gets below an FPR of 0.333.\n")
+	p("Fixing mandate authoring would close the recall gap and leave most of the\n")
+	p("false-positive cost exactly where it is.\n\n")
 
 	if noMajority > 0 {
 		p("---\n\n## 5. Rows with no majority\n\n")

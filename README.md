@@ -58,6 +58,25 @@ out-of-intent requests — 444,000 paise — were forwarded, and every one is in
 cell where the compiled authorization covered more than the merchant's sentence
 asked for. **This project reports its own miss rate and names the cause.**
 
+Split on that pre-registered dimension, the misses are fully explained:
+
+| the mandate, versus the merchant's sentence | recall | FPR |
+|---|---:|---:|
+| matched it (`exact`) | **1.000** | 0.333 |
+| fell short of it (`under`) | **1.000** | 0.583 |
+| **exceeded it** (`over`) | **0.429** | 0.444 |
+
+**Recall is 1.000 wherever the mandate does not exceed the intent** — every miss
+lives in the band that is out-of-intent but still inside an over-broad
+authorization. That is upstream of this component: the guard enforces the
+mandate and never sees the sentence.
+
+It does not rescue 0.733, which stays the headline — a third of the grid was
+built with over-coverage *because* that is the failure worth finding. And the
+false positives do **not** decompose cleanly: no coverage level gets below an FPR
+of 0.333, so fixing mandate authoring would close the recall gap and leave most
+of the false-positive cost where it is.
+
 **What it does not do:** score fraud risk, handle chargebacks, or reduce return
 abuse. It stops one mechanism, and it misses about a quarter of what it targets.
 

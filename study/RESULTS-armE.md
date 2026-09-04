@@ -119,6 +119,33 @@ Delayed, not lost: a blocked refund still happens once a human unblocks it.
 | `whole_order/over` | 2 | 2 | 4 | 0 |
 | `whole_order/under` | 2 | 4 | 2 | 0 |
 
+### By coverage: whether the mandate matched the merchant's sentence
+
+| coverage | TP | FN | FP | TN | recall | FPR | precision |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `exact` | 8 | 0 | 8 | 16 | 1.000 | 0.333 | 0.500 |
+| `under` | 8 | 0 | 14 | 10 | 1.000 | 0.583 | 0.364 |
+| `over` | 6 | 8 | 8 | 10 | 0.429 | 0.444 | 0.429 |
+
+**Every miss is in `over`.** Where the mandate did not exceed the
+merchant's sentence, recall is 1.000 -- the guard forwarded nothing the
+sentence did not permit. That is deductive as much as measured: the guard
+enforces the mandate, so if the mandate is a subset of the intent, anything
+out-of-intent is also out-of-mandate and gets refused. Over-coverage opens
+a band that is out-of-intent and in-mandate, and that band is where all
+eight forwarded requests live.
+
+**This does not rescue the headline.** 0.733 is the number for this corpus
+and it stays the number: a third of the grid was built with over-coverage
+precisely because that is the failure worth finding. What the split says is
+*where* to spend effort -- the misses are an authoring problem upstream of
+this component, not a matching problem inside it.
+
+**The false positives do not decompose as cleanly**, and that is the
+honest half of this table. No coverage level gets below an FPR of 0.333.
+Fixing mandate authoring would close the recall gap and leave most of the
+false-positive cost exactly where it is.
+
 ---
 
 ## 5. Rows with no majority
