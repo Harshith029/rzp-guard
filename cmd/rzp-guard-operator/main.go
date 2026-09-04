@@ -105,6 +105,9 @@ func run() error {
 		reason      = flag.String("reason", "", "what you checked and found (resolve only)")
 		asJSON      = flag.Bool("json", false, "machine-readable output")
 		out         = flag.String("out", "", "init/rotate: NEW file to write the token to (must not exist)")
+		allMandates = flag.Bool("all", false, "queue: every mandate in this state file, not just this one")
+		queueState  = flag.String("state-filter", "OPEN", "queue: OPEN | APPROVED | DECLINED, or empty for all")
+		ttl         = flag.String("ttl", "", "approve: how long the grant lives (default 15m, ceiling 1h)")
 	)
 	allowUnprot := allowUnprotectedFlag()
 	acceptRisk := acceptRiskFlag()
@@ -252,6 +255,22 @@ func run() error {
 			return errors.New("resolve needs an action_id")
 		}
 		return cmdResolve(store, m, grant, args[1], *outcome, *reason)
+	case "queue":
+		return cmdQueue(store, *allMandates, *queueState, *asJSON)
+	case "approve":
+		if len(args) < 2 {
+			return errors.New("approve needs a denial id; run `queue` for the ids")
+		}
+		d, terr := parseTTL(*ttl)
+		if terr != nil {
+			return terr
+		}
+		return cmdApprove(store, grant, args[1], *reason, d, lease)
+	case "decline":
+		if len(args) < 2 {
+			return errors.New("decline needs a denial id; run `queue` for the ids")
+		}
+		return cmdDecline(store, grant, args[1], *reason)
 	default:
 		flag.Usage()
 		return fmt.Errorf("unknown command %q", args[0])

@@ -294,7 +294,48 @@ func run() error {
 	}
 	defer closeSink()
 
-	r := relay.New(boot.Guard, childWriter, os.Stdout, sink)
+	// THE DENIAL QUEUE, and where the guard's half of the unblock workflow lives.
+	//
+	// The guard REFUSES 45% of legitimate refunds by its own published
+	// measurement, and until now a refusal went to stderr and, if configured, to
+	// an optional JSONL log. Neither is a queue: nothing tracked whether a
+	// blocked refund was ever looked at, and the decision log records the allowed
+	// calls too, so the events needing a human were buried among thousands that
+	// did not. Recording them durably is what gives rzp-guard-operator something
+	// to show, and what turns "a human unblocks it" from an assumption in a cost
+	// model into a thing somebody can actually do.
+	//
+	// The guard records refusals and NOTHING ELSE about this workflow. It cannot
+	// approve one: IssueGrant demands an opauth.Grant, which only the operator
+	// tool can obtain, and nothing on this side of the process can construct one.
+	//
+	// A failed write is reported once and then ignored. The refusal already
+	// happened and nothing was forwarded, so losing the queue entry costs
+	// visibility, not safety -- and a guard that died because it could not record
+	// something it correctly refused would be trading the money path against the
+	// reporting path.
+	store := boot.Store
+	var queueWarned sync.Once
+	recordingSink := func(d policy.Decision, id json.RawMessage) {
+		sink(d, id)
+		if d.Allowed || d.Tool != policy.RefundTool {
+			return
+		}
+		if err := store.RecordDenial(d.Tool, d.Rule, d.PaymentID,
+			d.RequestedPaise, clip(d.Reason, 512)); err != nil {
+			queueWarned.Do(func() {
+				fmt.Fprintf(os.Stderr, "%s QUEUE_BROKEN reason=%q\n", alertToken,
+					"refusals are no longer being recorded for operator review: "+err.Error())
+			})
+		}
+	}
+
+	// Where operator grants are read from. Set BEFORE any traffic; a Guard
+	// without a source cannot take the override path at all, which is the
+	// behaviour every test that predates this feature relies on.
+	boot.Guard.SetGrantSource(store)
+
+	r := relay.New(boot.Guard, childWriter, os.Stdout, recordingSink)
 
 	// Every mid-session IN_DOUBT transition, on stderr, one line each.
 	// Deliberately NOT the decision log: that records authorization decisions,

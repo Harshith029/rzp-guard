@@ -4,7 +4,7 @@
     "no_majority": 24,
     "unlabelable": 0
   },
-  "inputs_sha256": "970e74bd7d0773540140bd1ec6c98958286c1eae93e274622a96cf58235a9a35",
+  "inputs_sha256": "4f46bd92923a5db7c784d7655d224076d3db8d2a1150376eb3d028bc0649ed83",
   "labels_sha256": {
     "labels-armE-r1.csv": "71b3eabb29669e33ba020005df88bb5cbc48715e1a518a45cfc89c4d27c1af46",
     "labels-armE-r2.csv": "1e9885437d71dc6f54992de1be282461ad8e9acff14f2ad2b194e77ff4ba8bab"
@@ -17,14 +17,26 @@
   },
   "note": "Everything the arm E numbers depend on. `rzp-arme verify` recomputes and compares.",
   "policy_tree": {
-    "current_tree": "2289146a3c350dfa961deba7bbd503dd603163eb",
+    "current_tree": "b063b5cabcababd4de682b541b310d36a349c2e3",
     "decisions_differing": 0,
     "declared_frozen_at": "fb87b12",
     "declared_frozen_tree": "f18c634e303ee980d164e43321c149223701205f",
-    "equivalence_checked": "2026-09-03",
+    "equivalence_checked": "2026-09-05",
     "identical": false,
     "rows_checked": 120,
-    "superseded_reason": "internal/policy changed in 8a25767 AFTER the corpus existed (7d0405b). All 120 decisions and rule strings verified identical under both trees; see PROTOCOL-armE-AMENDMENT-2.md. No reported number changes."
+    "superseded_reason": "internal/policy changed again in the operator-grant work (override.go plus the Decide call sites and two new Decision fields). All 120 arm E decisions and rule strings verified identical under the new tree -- decisions_sha256 is unchanged and only inputs_sha256 moved. The new path cannot fire on this corpus by construction: it requires an operator grant, arm E has no grant source wired, and a Guard without one takes the branch not at all. See PROTOCOL-armE-AMENDMENT-3.md. No reported number changes.",
+    "prior_supersessions": [
+      {
+        "current_tree": "2289146a3c350dfa961deba7bbd503dd603163eb",
+        "decisions_differing": 0,
+        "declared_frozen_at": "fb87b12",
+        "declared_frozen_tree": "f18c634e303ee980d164e43321c149223701205f",
+        "equivalence_checked": "2026-09-03",
+        "identical": false,
+        "rows_checked": 120,
+        "superseded_reason": "internal/policy changed in 8a25767 AFTER the corpus existed (7d0405b). All 120 decisions and rule strings verified identical under both trees; see PROTOCOL-armE-AMENDMENT-2.md. No reported number changes."
+      }
+    ]
   },
   "raters": 2
 }

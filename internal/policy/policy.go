@@ -67,6 +67,17 @@ const (
 	CumulativeCapExceeded = "CUMULATIVE_CAP_EXCEEDED"
 	ToolNotSupported      = "TOOL_NOT_SUPPORTED"
 	Allowed               = "ALLOWED"
+
+	// OperatorApproved is an ALLOW the mandate did not produce.
+	//
+	// It fires only where the mandate has already refused, only against a grant
+	// a named human issued through rzp-guard-operator against a refusal this
+	// guard actually recorded, and only for the exact payment and amount that
+	// was refused. It is a distinct rule rather than a reuse of ALLOWED so the
+	// decision log and the audit trail can be asked the one question that
+	// matters afterwards: how much of what we forwarded did the merchant
+	// authorize, and how much did support?
+	OperatorApproved = "OPERATOR_APPROVED"
 )
 
 // Decision is the complete record of one authorization outcome.
@@ -83,6 +94,18 @@ type Decision struct {
 	Receipt          string         `json:"receipt,omitempty"`
 	AuthorizedPaise  int64          `json:"authorized_paise,omitempty"`
 	Forwarded        map[string]any `json:"-"`
+
+	// PaymentID and RequestedPaise are the refund this decision was about, in
+	// structured form. They exist because the denial queue needs them, and the
+	// only other place they appeared was inside the free-text Reason -- so
+	// recording a refusal meant parsing an English sentence that embeds an
+	// agent-controlled string. Both are empty for a non-refund tool.
+	PaymentID      string `json:"payment_id,omitempty"`
+	RequestedPaise int64  `json:"requested_paise,omitempty"`
+
+	// OperatorGrantID names the grant that allowed this, when the mandate did
+	// not. Empty on every ordinary decision.
+	OperatorGrantID string `json:"operator_grant_id,omitempty"`
 }
 
 // ForwardedAmountPaise reports the amount actually written to the child, so a
@@ -266,6 +289,12 @@ type Guard struct {
 	mandate *mandate.Mandate
 	ledger  *lifecycle.Ledger
 	rate    *rateLimiter
+
+	// Operator grants: a human's correction of a refusal this guard recorded.
+	// Both are nil unless SetGrantSource was called, and a Guard without them
+	// decides exactly as it always did. See override.go.
+	grants     GrantSource
+	grantCache *grantCache
 }
 
 // New builds a Guard with in-memory state only. Use NewWithStore for anything
@@ -340,6 +369,17 @@ func deny(tool, rule, reason, actionID string) Decision {
 	return Decision{Allowed: false, Rule: rule, Reason: reason, Tool: tool, MatchedActionID: actionID}
 }
 
+// refundDeny is deny plus the two structured fields a refusal of a REFUND
+// carries. They exist so the denial queue can record what was blocked without
+// parsing them back out of an English sentence that embeds an agent-controlled
+// payment id.
+func refundDeny(tool, rule, reason, actionID, paymentID string, amountPaise int64) Decision {
+	d := deny(tool, rule, reason, actionID)
+	d.PaymentID = paymentID
+	d.RequestedPaise = amountPaise
+	return d
+}
+
 // Decide authorizes one tools/call.
 //
 // The whole match-and-reserve sequence is under g.mu, so two concurrent
@@ -382,7 +422,12 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	}
 	amountPaise, err := parseAmountPaise(args["amount"])
 	if err != nil {
-		return deny(tool, MalformedArguments, err.Error(), "")
+		// PaymentID is carried even here, because a merchant looking at a queue of
+		// malformed calls still wants to know which payment they were aimed at.
+		// The amount is not: there isn't one this build was willing to read.
+		d := deny(tool, MalformedArguments, err.Error(), "")
+		d.PaymentID = paymentID
+		return d
 	}
 
 	g.mu.Lock()
@@ -391,8 +436,10 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	// 4. action match
 	forPayment := g.mandate.Find(paymentID)
 	if len(forPayment) == 0 {
-		return deny(tool, NoAuthorizedAction, fmt.Sprintf(
-			"no authorized refund action exists for %s", paymentID), "")
+		return g.operatorOverride(tool, args, paymentID, amountPaise, now,
+			refundDeny(tool, NoAuthorizedAction, fmt.Sprintf(
+				"no authorized refund action exists for %s", paymentID), "",
+				paymentID, amountPaise))
 	}
 	var admitting []mandate.Action
 	for _, a := range forPayment {
@@ -411,9 +458,11 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 		for _, a := range forPayment {
 			descs = append(descs, a.Describe())
 		}
-		return deny(tool, AmountNotAuthorized, fmt.Sprintf(
-			"%d paise is not authorized for %s; actions: %s",
-			amountPaise, paymentID, strings.Join(descs, ", ")), "")
+		return g.operatorOverride(tool, args, paymentID, amountPaise, now,
+			refundDeny(tool, AmountNotAuthorized, fmt.Sprintf(
+				"%d paise is not authorized for %s; actions: %s",
+				amountPaise, paymentID, strings.Join(descs, ", ")), "",
+				paymentID, amountPaise))
 	}
 	var available []mandate.Action
 	for _, a := range admitting {
@@ -426,9 +475,11 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 		for _, a := range admitting {
 			states = append(states, fmt.Sprintf("%s=%s", a.ActionID, g.ledger.State(a.ActionID)))
 		}
-		return deny(tool, ActionConsumed, fmt.Sprintf(
-			"every action authorizing %d paise on %s is already used (%s); treated as a replay",
-			amountPaise, paymentID, strings.Join(states, ", ")), admitting[0].ActionID)
+		return g.operatorOverride(tool, args, paymentID, amountPaise, now,
+			refundDeny(tool, ActionConsumed, fmt.Sprintf(
+				"every action authorizing %d paise on %s is already used (%s); treated as a replay",
+				amountPaise, paymentID, strings.Join(states, ", ")),
+				admitting[0].ActionID, paymentID, amountPaise))
 	}
 	action := pick(available)
 
@@ -534,6 +585,7 @@ func (g *Guard) reserveSet(tool string, args map[string]any, amountPaise int64,
 		Allowed: true, Rule: Allowed, Tool: tool,
 		MatchedActionID: first, MatchedActionIDs: ids, Receipt: receipt,
 		AuthorizedPaise: amountPaise, Forwarded: forwarded,
+		PaymentID: paymentIDOf(args), RequestedPaise: amountPaise,
 		Reason: fmt.Sprintf("matches %s; reserved %d paise (%d remaining of %d)",
 			matched, amountPaise, g.ledger.Remaining(), g.ledger.MaxCumulativePaise()),
 	}
@@ -636,4 +688,13 @@ func pick(candidates []mandate.Action) mandate.Action {
 		return candidates[i].ActionID < candidates[j].ActionID
 	})
 	return candidates[0]
+}
+
+// paymentIDOf reads the payment id back out of the arguments for the record.
+// Decide has already established it is a non-empty string by the time any
+// caller reaches here; this returns "" rather than panicking if that ever stops
+// being true, because a decision must not fail on the way to being logged.
+func paymentIDOf(args map[string]any) string {
+	s, _ := args["payment_id"].(string)
+	return s
 }
