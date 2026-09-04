@@ -190,6 +190,22 @@ func run() error {
 		defer close(stopStatus)
 	}
 
+	// Unresolved work belonging to OTHER mandates in this state file.
+	//
+	// The storage layer used to REFUSE to open a file whose previous mandate had
+	// unresolved actions, because every query is scoped by mandate and opening
+	// under a new one hid them permanently. A file may now hold several mandates
+	// on purpose -- that is what lets ten merchants share one queue, one operator
+	// credential and one alert sink -- so the guarantee moved from refusing to
+	// reporting. It is reported at every start, not once, which is strictly more
+	// than the refusal ever did.
+	for mid, ids := range boot.StrandedElsewhere {
+		fmt.Fprintf(os.Stderr,
+			"%s OTHER_MANDATE_UNRESOLVED mandate=%s actions=%v reason=%q\n",
+			alertToken, mid, ids,
+			"another mandate in this state file has refunds awaiting an operator")
+	}
+
 	if len(boot.RecoveredInDoubt) > 0 {
 		for _, id := range boot.RecoveredInDoubt {
 			fmt.Fprintf(os.Stderr,
@@ -205,6 +221,24 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Losing the mandate lease mid-session means another process now believes it
+	// owns this mandate's ledger. Two ledgers over one mandate is the condition
+	// the lease exists to prevent, and the only correct response is to stop
+	// forwarding: this process's in-memory view of what is consumed is no longer
+	// authoritative, so every further decision it makes could double-spend.
+	//
+	// Cancelling the context is what stops it. The child is torn down and the
+	// ordinary shutdown path runs, which marks anything in flight IN_DOUBT --
+	// the conservative direction, and the right one, because a refund forwarded
+	// under a lease this process no longer held is exactly the ambiguous case.
+	boot.OnLeaseLost(func(err error) {
+		fmt.Fprintf(os.Stderr,
+			"%s LEASE_LOST reason=%q\n", alertToken, err.Error())
+		fmt.Fprintln(os.Stderr, "rzp-guard: another process holds this mandate's "+
+			"lease; refusing to keep forwarding against a ledger that is no longer ours")
+		stop()
+	})
 
 	child, err := newChild(ctx, keyID, keySecret)
 	if err != nil {

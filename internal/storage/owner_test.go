@@ -18,8 +18,15 @@ import (
 
 // The claim is about two PROCESSES. An in-process second Open shares the
 // runtime and could in principle be refused by driver bookkeeping rather than
-// by a real file lock, which would not protect anything. This re-execs the test
-// binary so the lock is contended across an OS process boundary.
+// by durable state, which would not protect anything. This re-execs the test
+// binary so the lease is contended across an OS process boundary.
+//
+// THE CHILD NOW OPENS THE SAME MANDATE, and that is the whole change. Ownership
+// is leased per mandate rather than locked per file, because the money claim
+// was always about two ledgers over one mandate's actions and budget -- every
+// table here is scoped by mandate_id -- and never about the file. A second
+// process holding a DIFFERENT mandate is now the supported multi-tenant case;
+// a second process holding THIS one is still the two-ledger bug.
 func TestSecondGuardProcessIsRefused(t *testing.T) {
 	if os.Getenv("RZP_OWNER_CHILD") != "" {
 		return // the child runs the helper below, not this
@@ -42,11 +49,11 @@ func TestSecondGuardProcessIsRefused(t *testing.T) {
 	if !strings.Contains(got, "CHILD_REFUSED") {
 		t.Fatalf("child failed for some reason other than ownership:\n%s", got)
 	}
-	if !strings.Contains(got, "owned by another guard process") {
+	if !strings.Contains(got, "a live guard holds this mandate's lease") {
 		t.Fatalf("child was refused, but not as an ownership conflict:\n%s", got)
 	}
 
-	// The owner is unaffected by the contention.
+	// The holder is unaffected by the contention.
 	if err := owner.Reserve("rfa_001", "rzpg_bbbbbbbbbbbb", 5000); err != nil {
 		t.Fatalf("owner could not write after a cross-process takeover attempt: %v", err)
 	}
@@ -59,10 +66,10 @@ func TestChildOpenAttempt(t *testing.T) {
 	if os.Getenv("RZP_OWNER_CHILD") == "" || path == "" {
 		t.Skip("helper: runs only in the re-exec'd child")
 	}
-	s, err := Open(path, "mnd_child")
+	s, err := Open(path, "mnd_incumbent")
 	if err == nil {
 		s.Close()
-		t.Fatal("CHILD_OPENED: a second process took a state file that was owned")
+		t.Fatal("CHILD_OPENED: a second process took a mandate that was leased")
 	}
 	t.Fatalf("CHILD_REFUSED: %v", err)
 }

@@ -192,8 +192,9 @@ func TestConcurrentSessionsDoNotShareDurableState(t *testing.T) {
 	}
 }
 
-// The lock is per FILE. Two guards on the SAME file must still be refused --
-// that is the guarantee sharding relies on, so it must survive contention.
+// Ownership is per MANDATE. Two guards on the SAME mandate must still be
+// refused -- that is the guarantee sharding relies on, so it must survive
+// contention.
 //
 // THIS TEST CAUGHT A REAL DEFECT. On ca1e4c1 it failed in CI with "0 of 16
 // concurrent opens succeeded": not one winner and fifteen refusals, but NOBODY.
@@ -205,7 +206,7 @@ func TestConcurrentSessionsDoNotShareDurableState(t *testing.T) {
 // could see "0 of 16" but could not say whether the fifteen losers were refused
 // as owners, refused for some unrelated reason, or still running. It now checks
 // all four things the fix has to deliver.
-func TestTheExclusiveLockHoldsUnderConcurrentOpens(t *testing.T) {
+func TestTheMandateLeaseHoldsUnderConcurrentOpens(t *testing.T) {
 	const attempts = 16
 	// storage.Open waits out contention for its own internal deadline (2s at the
 	// time of writing) and then refuses. This bound is deliberately far looser,
@@ -282,7 +283,7 @@ func TestTheExclusiveLockHoldsUnderConcurrentOpens(t *testing.T) {
 	late, err := storage.Open(path, "mnd_contend")
 	if err == nil {
 		late.Close()
-		t.Fatal("a later open took the state file while the owner was still live")
+		t.Fatal("a later open took the mandate while the owner was still live")
 	}
 	if !errors.Is(err, storage.ErrNotOwner) {
 		t.Fatalf("a later open was refused with %v, want storage.ErrNotOwner", err)

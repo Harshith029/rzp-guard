@@ -31,6 +31,17 @@ type Result struct {
 	// RecoveredInDoubt lists actions that were mid-flight when the previous
 	// process died. Each is locked until an operator resolves it.
 	RecoveredInDoubt []string
+
+	// StrandedElsewhere is unresolved work belonging to OTHER mandates in the
+	// same state file. It is reported rather than refused: a shared file is the
+	// supported multi-tenant case now, and hiding another merchant's stuck
+	// refund behind a silent scope boundary is what the old refusal existed to
+	// prevent. See storage.StrandedElsewhere.
+	StrandedElsewhere map[string][]string
+
+	// stopBeat ends the lease heartbeat on Close.
+	stopBeat    chan struct{}
+	onLeaseLost func(error)
 }
 
 // Open performs, in order: exclusive ownership, crash recovery, lifecycle
@@ -71,7 +82,52 @@ func Open(dbPath string, m *mandate.Mandate, now time.Time) (*Result, error) {
 		return nil, fmt.Errorf("bootstrap: restore rate window: %w", err)
 	}
 
-	return &Result{Guard: guard, Store: store, RecoveredInDoubt: recovered}, nil
+	// 5. What ELSE is stuck in this file. Read once, at startup, before any
+	//    traffic -- the same moment the old ownership check ran, so nothing that
+	//    used to be refused now passes unmentioned.
+	stranded, err := store.StrandedElsewhere()
+	if err != nil {
+		store.Close()
+		return nil, fmt.Errorf("bootstrap: stranded elsewhere: %w", err)
+	}
+
+	res := &Result{
+		Guard: guard, Store: store,
+		RecoveredInDoubt:  recovered,
+		StrandedElsewhere: stranded,
+		stopBeat:          make(chan struct{}),
+	}
+
+	// 6. Start the heartbeat LAST, and only once everything above succeeded.
+	//
+	//    The lease is what stops a second guard building a second ledger over
+	//    this mandate, and it means "a guard is alive" only if something keeps
+	//    saying so. Without this the lease goes stale after leaseTTL and a
+	//    second process takes it over while this one is still forwarding
+	//    refunds -- which is the exact two-ledger bug, arrived at by omission.
+	//
+	//    onLost is deliberately not fatal here. bootstrap does not own the
+	//    process's exit path; it reports upward and main decides, which is the
+	//    same division as everywhere else in this package.
+	go store.HeartbeatLoop(res.stopBeat, func(err error) {
+		if res.onLeaseLost != nil {
+			res.onLeaseLost(err)
+		}
+	})
+
+	return res, nil
 }
 
-func (r *Result) Close() error { return r.Store.Close() }
+// OnLeaseLost installs the handler for losing the mandate lease mid-session.
+//
+// Losing it means another process believes it owns this mandate's ledger, so
+// the only correct response is to stop forwarding. Set it before any traffic.
+func (r *Result) OnLeaseLost(f func(error)) { r.onLeaseLost = f }
+
+func (r *Result) Close() error {
+	if r.stopBeat != nil {
+		close(r.stopBeat)
+		r.stopBeat = nil
+	}
+	return r.Store.Close()
+}
