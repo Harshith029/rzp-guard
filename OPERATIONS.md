@@ -31,6 +31,24 @@ in flight.
 producing these rather than guessing. But every one represents real money in an
 unknown state, and they do not clear on their own.
 
+### A second event on the same token
+
+```
+RZP_GUARD_ALERT AUDIT_BROKEN file="..." reason="..."
+```
+
+Only when running with `-child-tee`. It means the evidence file stopped being
+writable — a full disk, or the file removed underneath a running guard.
+
+**No money is stuck and nothing needs resolving.** The child received the bytes
+and its reply will settle the action normally. What has broken is the guard's
+ability to *prove* what crossed the boundary, so from that point the tee file is
+short and must not be read as a complete record. The guard keeps running and
+stops writing to it.
+
+Alert on it anyway. A control whose audit trail silently truncates is worth
+knowing about before someone cites the file as evidence.
+
 ---
 
 ## Is anything stuck right now?
@@ -46,6 +64,25 @@ rewritten atomically, so a read never sees a partial file, and it is published
 **without taking the state file's lock** — reading it cannot disturb the guard.
 
 `needs_operator: true` is the single field worth alerting on.
+
+### Actions held RESERVED, which are not IN_DOUBT
+
+```bash
+rzp-guard-operator -mandate m.json -state rzp-guard.db list
+```
+
+Alongside anything `IN_DOUBT`, this now reports actions sitting in `RESERVED`.
+That state is normally momentary — it lasts from the moment a refund is
+authorized to the moment the child's reply settles it. One that persists means
+either the reply never came, or the durable write recording the commit failed.
+
+**Neither case is resolvable from here**, because `resolve` accepts only
+`IN_DOUBT`. Budget stays encumbered until something moves it. Restarting the
+guard promotes a stranded `RESERVED` to `IN_DOUBT`, which *is* resolvable —
+check the receipt in Razorpay before deciding the outcome.
+
+This used to be invisible: `list` reported only `IN_DOUBT`, so on a
+long-running guard a stranded reservation could not be seen at all.
 
 ---
 

@@ -222,6 +222,15 @@ so **both are refused**. That is why the declared deployment target is Linux.
 | No refund-issuing command in this repo | A tool that takes an arbitrary payment and amount and writes its own authorizing mandate is a refund launcher whatever the intent. One existed; it was removed (FAILURES.md F18). |
 | No intent inference | The guard cannot see intent. Guessing at it would be a detector that fails silently. |
 | Provenance is forensic only | It detects a narrow literal-flow subclass and never gates a decision. |
+| No per-refund timeout | A deadline on a money path is a guess about how slow a provider may be, and guessing short converts a slow refund into an `IN_DOUBT` needing a human — trading a rare failure for a routine one. A hung child therefore leaves its action `RESERVED` until the guard restarts, which promotes it. What was fixed instead is visibility: `rzp-guard-operator list` reports held reservations. |
+| No auto-resolution of `IN_DOUBT` | Polling the provider and releasing on "refund not found" is the obvious automation and it is wrong: not-found is not evidence of rejection — it can mean not-yet-visible, replica lag, or a failed query. Releasing on it re-arms a single-use authorization for a refund that may have landed. `ReleaseConfirmedRejection` requires positive evidence, and a timeout is not evidence. |
+
+**On the eight false negatives.** Arm E's misses are all cases where the compiled
+mandate authorized more than the merchant's sentence asked for. That is not a
+matching error and no change to this component fixes it: **the guard never sees
+the merchant's sentence**, only the mandate compiled from it. Over-coverage is an
+authoring problem, upstream of everything described here. Row 4 of this table is
+the reason the guard cannot catch it, and the reason it does not pretend to.
 
 ---
 

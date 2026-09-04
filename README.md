@@ -53,6 +53,11 @@ If you only have a few minutes, this is the whole project:
 | **4. What it costs** | [`study/FP-COST.md`](study/FP-COST.md) — both error directions priced, with the break-even |
 | **5. What it measured** | recall **0.733**, FPR **0.455**, independently labelled — and the 8 misses it did not catch |
 
+**None of that needs an account anywhere.** No Razorpay key, no model key, no
+signup — verified from a clean clone. Docker is the only prerequisite, and rows
+1–2 pull the pinned image; run those before row 3, whose isolated lane is
+`--pull=never` by design and will refuse to fetch anything itself.
+
 The one number worth arguing about: **this control breaks even somewhere between
 a 5.4% and 9.3% out-of-intent base rate, and the only agent traffic we observed
 ran at 0.6%.** That band moved *against* the guard once recall was measured
