@@ -23,6 +23,31 @@ amount, which is the default and the form every shipped mandate uses.
 | **honest metrics incl. false-positive cost** | both directions priced; break-even **5.4–9.3%** against an observed base rate of **0.6%** | [`study/FP-COST.md`](study/FP-COST.md) |
 | **strictly defense-only** | no money-moving command in the released surface; 10/10 previously-working bypasses still blocked on Linux CI; every commit scanned for a self-authorizing launcher | [Defence-only](#defence-only) |
 
+### Which of the three losses this is, and which it is not
+
+The track names **fraud, returns and chargebacks**. This is **fraud** — and
+specifically the kind the track's own rationale calls out, *"AI-enabled fraud."*
+
+An agent holding `create_refund` that is prompt-injected, confused, or simply
+wrong sends the merchant's money to someone who was never owed it. Same loss as
+any refund fraud; new delivery mechanism, and one that did not exist before
+Razorpay shipped an MCP server. **It is not returns and it is not chargebacks,
+and nothing here claims them.**
+
+### It is none of the four example directions — on purpose
+
+A chargeback evidence responder, a return-risk scorer, a fraud-spike detector and
+an abuse-ring sentinel all **score something after it happened** and hand a number
+to a human who may or may not act on it. This refuses **inline, before the bytes
+reach the provider**, so there is no gap between the prediction and the
+intervention — the decision *is* the intervention.
+
+The track lists **verifier** alongside detector and auto-responder as an accepted
+form, and those four are directions rather than a menu. If a judge wants one of
+the four, this is not that project. What it is instead: the loss class that
+appears the moment an AI agent can move money, addressed at the only point where
+refusing it is still free.
+
 **The baseline is doing nothing.** Install Razorpay's MCP server and no guard,
 and an agent's refund call is forwarded unconditionally: recall **0.000**, false
 positives **0.000**. That is what ships today, and it is what 0.733 should be
