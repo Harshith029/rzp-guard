@@ -14,7 +14,10 @@ cd rzp-guard && ./run.sh demo
 **No `.env`, no keys, no account.** Docker is the only prerequisite. This is what
 it prints:
 
-![One refund allowed, four refused, and the money counted both ways](.github/demo.svg)
+<img src=".github/demo.png" width="640"
+     alt="Terminal output: one refund allowed, four refused, a tampered authorization rejected, and the money counted in both directions.">
+
+*A real capture of that command's output, not a mockup.*
 
 Two numbers, deliberately the same size. **₹1,095 of unauthorized movement
 stopped — and ₹120 the merchant actually wanted, that the guard blocked.** A
