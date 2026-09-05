@@ -96,6 +96,12 @@ type Relay struct {
 	// included, so a read cannot reuse a refund's id and have its success
 	// commit the refund.
 	inflight map[string]pending
+
+	// Bounded wait for a forwarded refund. Zero means unbounded, which is what
+	// this relay has always done. See deadline.go for why expiry locks rather
+	// than releases.
+	refundDeadline time.Duration
+	deadlines      *deadlines
 }
 
 func New(g *policy.Guard, childIn, agentOut io.Writer, sink DecisionSink) *Relay {
@@ -118,6 +124,22 @@ func (r *Relay) SetAlerter(a Alerter) {
 		return
 	}
 	r.alert = a
+}
+
+// forget stops tracking a request: it leaves the inflight map and its refund
+// deadline, if it had one.
+//
+// One function rather than a clear() beside each delete, for the same reason
+// markInDoubt exists: there are six call sites, and the sixth is the one that
+// gets added later without the second half.
+//
+// CALLER HOLDS r.mu. The deadline set has its own lock and never takes r.mu, so
+// there is no ordering to get wrong.
+func (r *Relay) forget(id string) {
+	delete(r.inflight, id)
+	if r.deadlines != nil {
+		r.deadlines.clear(id)
+	}
 }
 
 // markInDoubt is the ONLY route to IN_DOUBT in this package.
@@ -241,7 +263,7 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		_, err := r.writeChild(line)
 		if err != nil && tracked {
 			r.mu.Lock()
-			delete(r.inflight, string(msg.ID))
+			r.forget(string(msg.ID))
 			r.mu.Unlock()
 		}
 		return err
@@ -286,6 +308,12 @@ func (r *Relay) handleAgentLine(line []byte) error {
 		r.mu.Lock()
 		r.inflight[string(msg.ID)] = p
 		r.mu.Unlock()
+		// The clock starts BEFORE the write to the child, not after it. A write
+		// that blocks is exactly the case a deadline is for, and starting the
+		// clock afterwards would exempt it.
+		if p.isRefund && r.deadlines != nil {
+			r.deadlines.set(string(msg.ID), r.now().Add(r.refundDeadline))
+		}
 	}
 
 	forwarded, err := rewriteArguments(line, msg, tp, d)
@@ -297,7 +325,7 @@ func (r *Relay) handleAgentLine(line []byte) error {
 			_ = r.guard.ReleaseConfirmedRejectionMany(d.MatchedActionIDs)
 		}
 		r.mu.Lock()
-		delete(r.inflight, string(msg.ID))
+		r.forget(string(msg.ID))
 		r.mu.Unlock()
 		return r.writeAgent(errorResponse(msg.ID, -32603,
 			fmt.Sprintf("rzp-guard: refusing to forward, re-encode failed: %v", err)))
@@ -317,7 +345,7 @@ func (r *Relay) handleAgentLine(line []byte) error {
 			}
 		}
 		r.mu.Lock()
-		delete(r.inflight, string(msg.ID))
+		r.forget(string(msg.ID))
 		r.mu.Unlock()
 		return werr
 	}
@@ -407,7 +435,7 @@ func (r *Relay) markAmbiguous(id, key string) {
 	r.mu.Lock()
 	p, ok := r.inflight[id]
 	if ok {
-		delete(r.inflight, id)
+		r.forget(id)
 	}
 	r.mu.Unlock()
 	if !ok || !p.isRefund {
@@ -474,7 +502,7 @@ func (r *Relay) resolve(id string, msg rpcMessage) {
 	r.mu.Lock()
 	p, ok := r.inflight[id]
 	if ok {
-		delete(r.inflight, id)
+		r.forget(id)
 	}
 	r.mu.Unlock()
 	if !ok || !p.isRefund {
@@ -599,7 +627,7 @@ func (r *Relay) CloseInflight() []string {
 			calls = append(calls, p.actionIDs)
 			stranded = append(stranded, p.actionIDs...)
 		}
-		delete(r.inflight, id)
+		r.forget(id)
 	}
 	r.mu.Unlock()
 	for _, ids := range calls {

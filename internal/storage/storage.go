@@ -570,6 +570,40 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 // the same receipt, because that string is what an operator searches Razorpay
 // for -- rows disagreeing about it would mislead exactly when it matters.
 func (s *Store) ReserveMany(receipt string, rs []lifecycle.Reservation) error {
+	return s.reserveMany(receipt, rs, 0)
+}
+
+// ReserveManyWithCall reserves the actions AND records the rate-window slot in
+// ONE transaction, which is one fsync instead of two.
+//
+// WHY IT EXISTS -- THE PERFORMANCE HALF. At synchronous=FULL a commit costs
+// about 6.5ms on this hardware, and an allowed refund performed two of them:
+// 15.3ms measured end to end, against 779ns for a denial. Durability is the
+// whole design and is not up for negotiation, but performing it TWICE for one
+// decision was not a requirement, it was an artifact of the two writes living
+// in different packages. One transaction halves the cost of every authorized
+// refund and roughly doubles the ceiling, from ~65 to ~130 per second per
+// process, with no guarantee weakened -- both rows are still durable before a
+// byte reaches the child.
+//
+// WHY IT EXISTS -- THE CORRECTNESS HALF, WHICH MATTERS MORE. Two transactions
+// could half-succeed. policy.reserveSet dealt with that by attempting a
+// rollback, and said so honestly: "The rollback is attempted, not guaranteed:
+// the rate write failing usually means the store is broken, so the release will
+// fail too." That left a real state where actions sit RESERVED holding budget
+// against a refund that never left the building, discovered only at the next
+// restart as a spurious IN_DOUBT an operator has to ask about. One transaction
+// removes the state rather than compensating for it.
+//
+// atUnixNano of 0 means no slot -- the plain ReserveMany path, kept for callers
+// that do not own a rate window.
+func (s *Store) ReserveManyWithCall(receipt string, rs []lifecycle.Reservation,
+	atUnixNano int64) error {
+	return s.reserveMany(receipt, rs, atUnixNano)
+}
+
+func (s *Store) reserveMany(receipt string, rs []lifecycle.Reservation,
+	atUnixNano int64) error {
 	if len(rs) == 0 {
 		return errors.New("storage: reserve: no actions given")
 	}
@@ -631,6 +665,26 @@ func (s *Store) ReserveMany(receipt string, rs []lifecycle.Reservation) error {
 			return fmt.Errorf("storage: reserve: %w (receipt %s)", ErrReceiptExists, receipt)
 		}
 		return fmt.Errorf("storage: reserve: claim receipt: %w", err)
+	}
+
+	// The rate-window slot, in the SAME transaction as the reservation it
+	// belongs to. Consuming the slot and claiming the actions are one decision;
+	// splitting them into two commits made them two facts that could disagree.
+	if atUnixNano != 0 {
+		if _, err := tx.Exec(
+			`INSERT INTO call_log (mandate_id, at_unix_nano) VALUES (?, ?)`,
+			s.mandateID, atUnixNano); err != nil {
+			return fmt.Errorf("storage: reserve: record call: %w", err)
+		}
+		// Pruning rides along for free: it is already inside a transaction that
+		// is about to fsync, so bounding the table costs nothing here. Doing it
+		// as its own statement outside would have doubled the cost of every
+		// refund to buy tidiness (F23).
+		if _, err := tx.Exec(
+			`DELETE FROM call_log WHERE mandate_id = ? AND at_unix_nano < ?`,
+			s.mandateID, atUnixNano-int64(callLogRetention)); err != nil {
+			return fmt.Errorf("storage: reserve: prune call log: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

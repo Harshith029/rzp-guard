@@ -4,7 +4,7 @@
     "no_majority": 24,
     "unlabelable": 0
   },
-  "inputs_sha256": "4f46bd92923a5db7c784d7655d224076d3db8d2a1150376eb3d028bc0649ed83",
+  "inputs_sha256": "83146d79eaac5bdf4b99a3fd41751c22b394bfd9403553a099f1ac7853037ae7",
   "labels_sha256": {
     "labels-armE-r1.csv": "71b3eabb29669e33ba020005df88bb5cbc48715e1a518a45cfc89c4d27c1af46",
     "labels-armE-r2.csv": "1e9885437d71dc6f54992de1be282461ad8e9acff14f2ad2b194e77ff4ba8bab"
@@ -17,14 +17,12 @@
   },
   "note": "Everything the arm E numbers depend on. `rzp-arme verify` recomputes and compares.",
   "policy_tree": {
-    "current_tree": "b063b5cabcababd4de682b541b310d36a349c2e3",
+    "current_tree": "49f7493bf66b8396dab94b0044149c599e5c96b2",
     "decisions_differing": 0,
     "declared_frozen_at": "fb87b12",
     "declared_frozen_tree": "f18c634e303ee980d164e43321c149223701205f",
     "equivalence_checked": "2026-09-05",
     "identical": false,
-    "rows_checked": 120,
-    "superseded_reason": "internal/policy changed again in the operator-grant work (override.go plus the Decide call sites and two new Decision fields). All 120 arm E decisions and rule strings verified identical under the new tree -- decisions_sha256 is unchanged and only inputs_sha256 moved. The new path cannot fire on this corpus by construction: it requires an operator grant, arm E has no grant source wired, and a Guard without one takes the branch not at all. See PROTOCOL-armE-AMENDMENT-3.md. No reported number changes.",
     "prior_supersessions": [
       {
         "current_tree": "2289146a3c350dfa961deba7bbd503dd603163eb",
@@ -36,7 +34,9 @@
         "rows_checked": 120,
         "superseded_reason": "internal/policy changed in 8a25767 AFTER the corpus existed (7d0405b). All 120 decisions and rule strings verified identical under both trees; see PROTOCOL-armE-AMENDMENT-2.md. No reported number changes."
       }
-    ]
+    ],
+    "rows_checked": 120,
+    "superseded_reason": "internal/policy changed twice in the CTO hardening work, both verified decision-identical. (1) The operator-grant path: override.go, three refusal sites in Decide passing through operatorOverride, and new Decision fields. (2) The durability change: the rate-window slot moved into the reservation's own transaction, so an authorized refund performs one fsync instead of two. Neither moved a decision -- decisions_sha256 is unchanged across both and only inputs_sha256 moved, twice. Re-scoring rewrote exactly one line each time. See PROTOCOL-armE-AMENDMENT-3.md for the equivalence checks and for why the grant path is unreachable on this corpus by construction."
   },
   "raters": 2
 }

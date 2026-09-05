@@ -71,8 +71,9 @@ including list and audit: they disclose payment ids, receipts, amounts and
 audit reasons.
 
 WHAT NEEDS THE GUARD STOPPED, AND WHAT DOES NOT.
-  Runs beside a live guard:  list, audit, queue, approve, decline
+  Runs beside a live guard:  list, audit, queue, approve, decline, backup
   Needs the guard stopped:   resolve, rotate, init
+  Needs nothing at all:      verify-backup, mandate-keygen, mandate-sign
 The line is not read versus write. It is whether the command moves state the
 guard is holding in its own memory: a live guard serves decisions from a ledger
 it restored at startup, so resolving an action underneath it would leave it
@@ -153,6 +154,12 @@ func run() error {
 		return cmdMandateKeygen(args[1:])
 	case "mandate-sign":
 		return cmdMandateSign(args[1:])
+	case "verify-backup":
+		// Deliberately here, before -mandate is required and before any state
+		// file is opened. The moment a backup needs verifying is the moment the
+		// original is gone, and a verifier that needs the thing it is standing in
+		// for is not a verifier.
+		return cmdVerifyBackup(*out, *asJSON)
 	}
 
 	if *mandatePath == "" {
@@ -271,6 +278,8 @@ func run() error {
 			return errors.New("decline needs a denial id; run `queue` for the ids")
 		}
 		return cmdDecline(store, grant, args[1], *reason)
+	case "backup":
+		return cmdBackup(store, grant, *out, *asJSON)
 	default:
 		flag.Usage()
 		return fmt.Errorf("unknown command %q", args[0])
@@ -640,10 +649,15 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate, grant opauth.Grant,
 // during an incident.
 func mutatesGuardState(cmd string) bool {
 	switch cmd {
-	case "list", "audit", "queue", "approve", "decline":
+	case "list", "audit", "queue", "approve", "decline", "backup":
 		// Reads, plus the two that write only to tables the guard never caches:
 		// denial resolutions and operator grants. The guard consults both from
 		// the database at the moment it needs them.
+		//
+		// backup is here because VACUUM INTO holds a read transaction: a live
+		// writer serializes behind it briefly rather than producing a torn copy.
+		// A backup you have to stop the payment proxy for is one nobody takes on
+		// a schedule, and an untaken backup is the same as none.
 		return false
 	default:
 		// resolve, rotate, init, init-ephemeral, and anything added later.

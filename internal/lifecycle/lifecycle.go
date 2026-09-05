@@ -61,6 +61,26 @@ type Persister interface {
 	SetStateMany(actionIDs []string, from, to string) error
 }
 
+// RateReserver is a Persister that can also consume the rate-window slot in the
+// SAME transaction as the reservation.
+//
+// It is a SEPARATE, OPTIONAL interface rather than a fifth method on Persister
+// for one reason: a store that cannot do it must still be usable, and every
+// test double in this repository implements Persister. Widening Persister would
+// have forced a method onto each of them that none of them needs, and the usual
+// answer to that -- a stub that returns nil -- would be a durable write silently
+// not happening on a money path.
+//
+// WHY IT MATTERS. Two commits at synchronous=FULL cost about 13ms; one costs
+// about 6.5. That is the difference between the measured 15.3ms per authorized
+// refund and roughly half of it. More importantly it removes a state that could
+// exist: reserved actions holding budget against a call whose rate slot was
+// never recorded, which the caller could only paper over with a rollback it
+// admitted was best-effort.
+type RateReserver interface {
+	ReserveManyWithCall(receipt string, rs []Reservation, atUnixNano int64) error
+}
+
 // ResolveStore performs the operator's decision and its audit record atomically.
 type ResolveStore interface {
 	ResolveInDoubt(actionID, toState, actor, reason string, refundLanded bool) error
@@ -195,11 +215,20 @@ func (l *Ledger) Reserve(actionID, receipt string, amountPaise int64) error {
 }
 
 // ReserveMany claims every action one forwarded call consumes.
+func (l *Ledger) ReserveMany(receipt string, rs []Reservation) error {
+	return l.ReserveManyAt(receipt, rs, 0)
+}
+
+// ReserveManyAt claims every action one forwarded call consumes, and records the
+// call's rate-window slot alongside them when the store supports it.
 //
 // All checks run against the WHOLE set before anything is written: every action
 // must be Available, and the combined amount must fit the remaining budget.
 // Checking them one at a time would let a set pass whose total exceeds the cap.
-func (l *Ledger) ReserveMany(receipt string, rs []Reservation) error {
+//
+// atUnixNano of 0 means "no slot", which is what every caller outside the
+// policy's forward path wants.
+func (l *Ledger) ReserveManyAt(receipt string, rs []Reservation, atUnixNano int64) error {
 	if len(rs) == 0 {
 		return errors.New("reserve: no actions given")
 	}
@@ -229,7 +258,15 @@ func (l *Ledger) ReserveMany(receipt string, rs []Reservation) error {
 	}
 
 	if l.store != nil {
-		if err := l.store.ReserveMany(receipt, rs); err != nil {
+		var err error
+		if rr, ok := l.store.(RateReserver); ok && atUnixNano != 0 {
+			// One transaction, one fsync, and no state in which the actions are
+			// claimed but the call was never counted against the rate limit.
+			err = rr.ReserveManyWithCall(receipt, rs, atUnixNano)
+		} else {
+			err = l.store.ReserveMany(receipt, rs)
+		}
+		if err != nil {
 			// Durability failed, so the reservation does not exist. Fail closed:
 			// no in-memory claim either, for any action in the set.
 			return fmt.Errorf("durable reserve failed, refusing to forward: %w", err)

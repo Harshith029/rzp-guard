@@ -53,7 +53,14 @@ knowing about before someone cites the file as evidence.
 
 ## Is anything stuck right now?
 
-Without touching the running guard:
+Three ways, none of which touches the running guard:
+
+```bash
+# The one to alert on, if -admin-addr is set.
+curl -s localhost:9090/metrics | grep rzp_guard_in_doubt_actions
+```
+
+Or from the status file:
 
 ```bash
 cat "$STATUS_FILE" | jq '{needs_operator, in_doubt_count, in_doubt_actions, encumbered_paise}'
@@ -61,9 +68,16 @@ cat "$STATUS_FILE" | jq '{needs_operator, in_doubt_count, in_doubt_actions, encu
 
 Requires the guard to have been started with `-status-file`. The document is
 rewritten atomically, so a read never sees a partial file, and it is published
-**without taking the state file's lock** — reading it cannot disturb the guard.
+**without taking any lock** — reading it cannot disturb the guard.
 
 `needs_operator: true` is the single field worth alerting on.
+
+Or, if you have the operator credential, ask the state file directly — this now
+works while the guard is running:
+
+```bash
+rzp-guard-operator -mandate m.json -state rzp-guard.db list
+```
 
 ### Actions held RESERVED, which are not IN_DOUBT
 
@@ -88,9 +102,15 @@ long-running guard a stranded reservation could not be seen at all.
 
 ## Resolving a stuck refund
 
-**This requires stopping the guard.** The operator CLI needs the state file and
-the guard holds an exclusive lock on it for its entire lifetime. Reading status
-is lock-free; *resolving* is a write, and writes are what the lock serialises.
+**This requires stopping the guard**, and it is the only common task that still
+does. The line is not read versus write: `queue`, `approve`, `decline` and
+`backup` all write and all run beside a live guard. It is whether the command
+moves state the guard is holding **in its own memory**. A running guard restores
+a ledger at startup and decides from it, so resolving an action underneath it
+would leave it authorizing against a view that is no longer true.
+
+If a guard is live, the CLI says so with the holder's pid rather than failing
+with a lock error.
 
 ```bash
 # 1. Stop the guard. In-flight calls are locked, not lost.
@@ -166,16 +186,163 @@ The guard refuses rather than warns. Each message names its own remedy.
 
 ---
 
+## A refund the guard wrongly refused
+
+The guard blocks about **45% of legitimate refunds** by its own published
+measurement (`study/RESULTS-armE.md`). That is survivable only if somebody
+unblocks them, and until recently nobody could: the guard held a file-wide
+exclusive lock, so every operator action needed the payment proxy stopped first.
+It does not any more.
+
+**None of this needs the guard stopped.**
+
+```bash
+# 1. What was refused, deduplicated, with how many times the agent retried.
+rzp-guard-operator -mandate m.json -state rzp-guard.db queue
+
+# 2. Decide. Either the mandate was written narrower than the merchant meant,
+#    in which case approve the specific refusal --
+rzp-guard-operator -mandate m.json -state rzp-guard.db approve 14 \
+  -operator you@merchant.example -reason "customer produced the order confirmation"
+
+#    -- or the guard was right, in which case say so, so the queue can tell
+#    "worked and correct" from "nobody has looked".
+rzp-guard-operator -mandate m.json -state rzp-guard.db decline 14 \
+  -operator you@merchant.example -reason "already refunded on 2026-09-01"
+
+# 3. Tell the agent to retry. The guard picks up the grant within a second.
+```
+
+### What an approval can and cannot do
+
+| | |
+| --- | --- |
+| Amount | **Exactly** what was refused. Taken from the recorded refusal, never from a flag, so you cannot approve a refund nobody asked for. |
+| Uses | **One.** It becomes an ordinary row in the same ledger as any mandate action. |
+| Life | 15 minutes by default, one hour maximum. |
+| Cumulative cap | **Still applies.** An operator can correct a wrong refusal; an operator cannot raise the merchant's own ceiling. That one needs the merchant. |
+| Expired mandate | **Cannot be overridden.** Ask the merchant for a new mandate. |
+| Attribution | Every grant carries the operator's name and reason into the audit table. |
+
+### Reading the queue
+
+A queue that only ever grows means nobody is working it, and the false-positive
+cost model assumes somebody is. Two numbers are worth watching:
+
+- `rzp_guard_operator_approved_total` rising means **mandates are being written
+  narrower than merchants intend**. The fix is upstream, in `rzp-mandate`, not
+  here.
+- `decline` outnumbering `approve` means the guard is mostly right and the
+  refusals are correct — which is the good case, and it is only visible because
+  declines are recorded.
+
+---
+
+## Backups
+
+**RPO and RTO are set by how often you run this, not by what it does.** The
+figures below are what the mechanism supports; the schedule is yours.
+
+| | |
+| --- | --- |
+| **RPO** | The age of the last backup. A daily backup means up to 24h of ledger history lost. |
+| **RTO** | Minutes: stop the guard, copy the file, start it. Nothing to rebuild. |
+| **What loss costs** | Not money — Razorpay is the system of record for whether a refund happened. It costs the record of *which authorizations were consumed*, so every action returns to AVAILABLE and a replayed mandate can spend its authority a second time. Every IN_DOUBT refund awaiting a human vanishes along with the question. |
+
+```bash
+# Takeable WHILE THE GUARD RUNS. VACUUM INTO holds a read transaction, so a
+# concurrent writer serializes behind it rather than producing a torn copy.
+rzp-guard-operator -mandate m.json -state rzp-guard.db backup \
+  -operator you@merchant.example -out backups/rzp-guard-$(date -u +%Y%m%dT%H%M%SZ).db
+```
+
+It refuses to overwrite. The copy carries no lease, so restoring it starts
+cleanly rather than blaming a process that no longer exists.
+
+**Never `cp` the state file while the guard runs.** In WAL mode that copies the
+main database without the `-wal`, so it is missing every committed transaction
+that has not been checkpointed — a file that opens cleanly and is silently out
+of date, which is the worst shape a backup can have.
+
+### Verify before you need it
+
+```bash
+rzp-guard-operator verify-backup -out backups/rzp-guard-20260905T101500Z.db
+```
+
+Needs no state file, no mandate and no running guard — the moment this is needed
+is the moment the original is gone. It runs `integrity_check`, refuses a schema
+version this build cannot read, and confirms the **operator credential** is
+present, without which a restored file is one the guard refuses to start against.
+
+The counts it prints are the point: "1.2 MB written" says nothing, "3 mandates,
+412 actions, 2 awaiting an operator" is something you can sanity-check.
+
+### Restoring
+
+```sh
+# 1. Stop the guard.
+# 2. Verify the backup (above). Do not skip this.
+# 3. cp backups/<chosen>.db rzp-guard.db
+# 4. Start the guard, then immediately:
+rzp-guard-operator -mandate m.json -state rzp-guard.db list
+```
+
+Step 4 matters: a restored file may hold IN_DOUBT actions from before the
+backup, and those refunds may have landed since. Reconcile them against Razorpay
+by receipt before letting an agent near it.
+
+---
+
+## Production mode
+
+```sh
+rzp-guard -mode production ...     # or RZP_GUARD_MODE=production
+```
+
+It **refuses to start** unless every optional protection is present, and reports
+all of them at once:
+
+| Requirement | Why |
+| --- | --- |
+| `-mandate-pubkey` and a valid signature | Unsigned, anyone who can write the mandate file grants authority. Every other check assumes the mandate is genuine and nothing else establishes it. |
+| `-decision-log` | Without it, an incident review has only stderr. |
+| `-refund-timeout` | A hung child otherwise holds a reservation and its budget indefinitely. |
+| `-admin-addr` or `-status-file` | With neither, nothing reports a refund stuck awaiting an operator. |
+
+Set it in the unit file or container spec rather than on the command line: it
+then survives somebody retyping an argument list at 3am.
+
+---
+
+## Metrics and health
+
+```sh
+rzp-guard -admin-addr 127.0.0.1:9090 ...
+```
+
+**Loopback only, and refused otherwise** — not warned about. A `0.0.0.0` bind is
+a metrics port enumerating a merchant's refund activity.
+
+| Endpoint | Means |
+| --- | --- |
+| `/healthz` | The process is alive. Nothing more, deliberately: a liveness probe that fails on a dependency gets the process restarted, and a restart here promotes every in-flight reservation to IN_DOUBT. |
+| `/readyz` | Not ready when operator grants cannot be read — a guard in that state refuses refunds a human already approved, and looks identical to one nobody has issued grants to. IN_DOUBT actions do *not* make it unready: they need a person, not a load balancer. |
+| `/metrics` | Prometheus text format. **Aggregates only** — no action ids, payment ids or receipts. A scrape is stored and forwarded; identifiers should not travel that way. The status file carries them instead, at 0600. |
+
+The one to alert on is `rzp_guard_in_doubt_actions > 0`. The one that tells you
+something about your *mandates* rather than your guard is
+`rzp_guard_operator_approved_total`.
+
+---
+
 ## What is not here
 
-No backup procedure, no supervisor configuration, no capacity plan, no timed
-drill. Those are real gaps and they are listed as such in the README's limits
-rather than papered over here.
-
-**Backups:** the state file is a single SQLite database. Copying it while the
-guard runs is unsafe — the guard holds an exclusive lock and a copy taken
-mid-transaction is not guaranteed consistent. There is no supported online
-backup path today.
+No supervisor configuration, no capacity plan, no timed restore drill. Those are
+real gaps and they are listed as such in the README's limits rather than papered
+over here. In particular: the backup path above has never been exercised under
+an actual failure, only under tests, and an untested restore is a plan rather
+than a capability.
 
 ---
 

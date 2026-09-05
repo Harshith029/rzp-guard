@@ -270,16 +270,30 @@ func (r *rateLimiter) hasHeadroom(now time.Time) bool {
 // leave a slot consumed by a call that was never forwarded when the durable
 // write fails, so a transient SQLite error would silently shrink the merchant's
 // legitimate rate allowance.
+//
+// USED ONLY WHERE THE DURABLE SLOT IS NOT ALREADY WRITTEN. The forward path
+// writes it inside the reservation's own transaction (see reserveSet) and then
+// calls note() instead, because two commits for one decision cost twice the
+// fsync and could half-succeed.
 func (r *rateLimiter) record(now time.Time) error {
 	if r.store != nil {
 		if err := r.store.RecordCall(now.UnixNano()); err != nil {
 			return err
 		}
 	}
+	r.note(now)
+	return nil
+}
+
+// note appends to the in-memory window for a slot that is ALREADY durable.
+//
+// It cannot fail, and that is the point: the durable half committed with the
+// reservation, so there is no error left to handle and no window in which the
+// two disagree.
+func (r *rateLimiter) note(now time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.times = append(r.times, now)
-	return nil
 }
 
 // Guard is session-scoped authorization state, bound to the process lifetime.
@@ -536,7 +550,20 @@ func (g *Guard) reserveSet(tool string, args map[string]any, amountPaise int64,
 		}
 		rs = append(rs, lifecycle.Reservation{ActionID: a.ActionID, AmountPaise: amt})
 	}
-	if err := g.ledger.ReserveMany(receipt, rs); err != nil {
+	// THE RATE SLOT IS CLAIMED IN THE SAME TRANSACTION AS THE RESERVATION.
+	//
+	// It used to be a second durable write after this one, and that cost two
+	// fsyncs -- 15.3ms per authorized refund against 6.5 for one commit, which is
+	// what set the ~65/s ceiling. Worse, the two could half-succeed, and the
+	// only available repair was a rollback this code admitted was best-effort:
+	// the rate write failing usually means the store is broken, so the release
+	// would fail too, leaving actions RESERVED against a refund that never left
+	// the building for an operator to ask about at the next restart.
+	//
+	// One transaction removes the failure rather than compensating for it. Both
+	// rows are still durable before a byte reaches the child, which is the
+	// guarantee that actually mattered; performing it twice never was.
+	if err := g.ledger.ReserveManyAt(receipt, rs, now.UnixNano()); err != nil {
 		rule := CumulativeCapExceeded
 		if errors.Is(err, lifecycle.ErrNotAvailable) {
 			rule = ActionConsumed
@@ -544,24 +571,10 @@ func (g *Guard) reserveSet(tool string, args map[string]any, amountPaise int64,
 		return deny(tool, rule, err.Error(), first)
 	}
 
-	// Only now is the rate slot consumed: this call really is going to the child.
-	// If the durable write fails the reservation is rolled back, because a
-	// forwarded call that is not in the rate window is a bypass.
-	//
-	// The rollback is attempted, not guaranteed: the rate write failing usually
-	// means the store is broken, so the release will fail too. Then the actions
-	// stay RESERVED, holding their budget, and recovery surfaces them as
-	// IN_DOUBT at the next start. Nothing was forwarded, so that is a refund an
-	// operator will be asked about that never left the building -- the
-	// conservative error, and the right one to make. Releasing actions whose
-	// release could not be durably recorded is the alternative, and that one can
-	// be replayed.
-	if err := g.rate.record(now); err != nil {
-		_ = g.ledger.ReleaseConfirmedRejectionMany(ids)
-		return deny(tool, MalformedArguments,
-			fmt.Sprintf("durable rate-window write failed, refusing to forward: %v", err),
-			first)
-	}
+	// The durable half committed above; this only mirrors it in memory, so there
+	// is nothing left that can fail between claiming the actions and counting
+	// the call.
+	g.rate.note(now)
 
 	forwarded := make(map[string]any, len(args)+1)
 	for k, v := range args {
