@@ -245,8 +245,10 @@ func run() error {
 			"establish that authority itself", *statePath)
 	}
 
+	var statusW *statusWriter
 	if *statusFile != "" {
 		sw := newStatusWriter(*statusFile, boot.Guard, m.MandateID)
+		statusW = sw
 		stopStatus := make(chan struct{})
 		go sw.run(stopStatus, *statusEvery)
 		// Registered BEFORE `defer finalize` below. Defers run LIFO, so finalize
@@ -389,19 +391,41 @@ func run() error {
 	// reporting path.
 	store := boot.Store
 	var queueWarned sync.Once
+
+	// COALESCED AND RATE CAPPED, and the reason is a regression this same change
+	// introduced. Recording every refusal puts a durable write on the deny path,
+	// which used to cost 779 nanoseconds and touch nothing -- so an agent looping
+	// on a refused call could saturate the state file the money path depends on.
+	// That is a worse property than the noisy-log one the queue was added to fix.
+	//
+	// See denials.go: identical refusals are counted in memory and flushed on an
+	// interval, the first of anything new still reaches disk immediately, and
+	// whatever the cap drops is counted rather than silent.
+	denials := newDenialRecorder(store, func(err error) {
+		counters.queueWriteFailed.Add(1)
+		queueWarned.Do(func() {
+			fmt.Fprintf(os.Stderr, "%s QUEUE_BROKEN reason=%q\n", alertToken,
+				"refusals are no longer being recorded for operator review: "+err.Error())
+		})
+	})
+	// Registered before `defer finalize`: defers run LIFO, so the last few
+	// seconds of buffered refusals reach disk after the session has locked
+	// whatever was in flight. Those are exactly the ones somebody will ask about.
+	defer denials.Flush()
+	// The status file is the no-dependencies view, so the "queue is incomplete"
+	// signal has to reach it too -- not only the metrics endpoint, which a
+	// deployment may not have.
+	if statusW != nil {
+		statusW.setDenials(denials)
+	}
+
 	recordingSink := func(d policy.Decision, id json.RawMessage) {
 		sink(d, id)
 		counters.observe(d)
 		if d.Allowed || d.Tool != policy.RefundTool {
 			return
 		}
-		if err := store.RecordDenial(d.Tool, d.Rule, d.PaymentID,
-			d.RequestedPaise, clip(d.Reason, 512)); err != nil {
-			queueWarned.Do(func() {
-				fmt.Fprintf(os.Stderr, "%s QUEUE_BROKEN reason=%q\n", alertToken,
-					"refusals are no longer being recorded for operator review: "+err.Error())
-			})
-		}
+		denials.record(d.Tool, d.Rule, d.PaymentID, d.RequestedPaise, d.Reason)
 	}
 
 	// Where operator grants are read from. Set BEFORE any traffic; a Guard
@@ -423,11 +447,33 @@ func run() error {
 	// and this is an outcome. Conflating them would bury the event that needs a
 	// human among thousands that do not.
 	r.SetAlerter(func(actionID, reason string) {
+		counters.inDoubtTransition.Add(1)
 		alertMu.Lock()
 		defer alertMu.Unlock()
 		fmt.Fprintf(os.Stderr, "%s IN_DOUBT action=%s reason=%q\n",
 			alertToken, actionID, reason)
 	})
+
+	// The admin endpoint, if one was asked for.
+	//
+	// Started BEFORE the child, so a port conflict fails the launch rather than
+	// leaving a guard running with the monitoring its operator asked for
+	// silently absent -- which is the same failure shape as a warning where a
+	// control was wanted.
+	if *adminAddr != "" {
+		admin, err := newAdminServer(*adminAddr, boot.Guard, counters, m.MandateID)
+		if err != nil {
+			return err
+		}
+		admin.denials = denials
+		if err := admin.Start(); err != nil {
+			return err
+		}
+		defer admin.Close()
+		fmt.Fprintf(os.Stderr,
+			"rzp-guard: admin endpoint on http://%s (healthz, readyz, metrics)\n",
+			admin.Addr())
+	}
 
 	if err := child.Start(); err != nil {
 		return fmt.Errorf("start child (is Docker running?): %w", err)

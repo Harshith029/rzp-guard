@@ -79,6 +79,10 @@ type adminServer struct {
 	born     time.Time
 	srv      *http.Server
 
+	// denials reports refusals the deny-path rate cap could not record. Nil in
+	// tests that do not wire one.
+	denials *denialRecorder
+
 	// bound is the address actually listened on. It differs from srv.Addr when
 	// the port was 0, which is how a test gets a free port -- and reporting the
 	// requested address rather than the real one is how such a test then talks
@@ -208,6 +212,10 @@ func (a *adminServer) metrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 
 	inDoubt := len(a.guard.InDoubtActions())
+	var droppedDenials int64
+	if a.denials != nil {
+		droppedDenials = a.denials.Dropped()
+	}
 	grantErr := 0
 	if a.guard.GrantSourceError() != nil {
 		grantErr = 1
@@ -258,6 +266,11 @@ func (a *adminServer) metrics(w http.ResponseWriter, r *http.Request) {
 		{"rzp_guard_queue_write_failed_total",
 			"Failures recording a refusal for operator review.", "counter",
 			a.counters.queueWriteFailed.Load()},
+		{"rzp_guard_denials_unrecorded_total",
+			"Refusals the deny-path rate cap did not record. Non-zero means the " +
+				"queue is incomplete -- a short queue because it overflowed must not " +
+				"look like a short queue because nothing was refused.",
+			"counter", droppedDenials},
 		{"rzp_guard_grant_source_failing",
 			"1 when operator grants cannot be read, so approved refunds are being " +
 				"refused anyway.", "gauge", int64(grantErr)},

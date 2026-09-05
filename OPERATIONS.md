@@ -224,6 +224,25 @@ rzp-guard-operator -mandate m.json -state rzp-guard.db decline 14 \
 | Expired mandate | **Cannot be overridden.** Ask the merchant for a new mandate. |
 | Attribution | Every grant carries the operator's name and reason into the audit table. |
 
+### If the queue says it is incomplete
+
+The deny path is rate limited, because recording every refusal puts a durable
+write on a path that used to cost 779 nanoseconds — and an agent looping on a
+refused call would otherwise saturate the state file the money path depends on.
+Identical refusals are coalesced; a flood of *distinct* ones is capped.
+
+What the cap drops is counted, never silent:
+
+```bash
+curl -s localhost:9090/metrics | grep rzp_guard_denials_unrecorded_total
+jq .denials_unrecorded "$STATUS_FILE"
+```
+
+**Non-zero means the queue below is incomplete.** A short queue because it
+overflowed must not be mistaken for a short queue because nothing was refused.
+In practice a non-zero value means an agent is generating refusals faster than
+any merchant legitimately can, which is itself the finding.
+
 ### Reading the queue
 
 A queue that only ever grows means nobody is working it, and the false-positive
