@@ -6,6 +6,25 @@ It sits between the agent and Razorpay's official MCP server, and lets a refund
 through only if a merchant authorized it in advance — normally as an exact
 amount, which is the default and the form every shipped mandate uses.
 
+```bash
+git clone https://github.com/Harshith029/rzp-guard.git
+cd rzp-guard && ./run.sh demo
+```
+
+**No `.env`, no keys, no account.** Docker is the only prerequisite. This is what
+it prints:
+
+![One refund allowed, four refused, and the money counted both ways](.github/demo.svg)
+
+Two numbers, deliberately the same size. **₹1,095 of unauthorized movement
+stopped — and ₹120 the merchant actually wanted, that the guard blocked.** A
+control that reports only what it stopped is showing you half a ledger, so this
+one prints both and [prices them](study/FP-COST.md).
+
+Measured against labels from two people who saw neither the authorization nor the
+decision: **recall 0.733, false-positive rate 0.455.** Eight requests got through
+and [every one is named](study/RESULTS-armE.md).
+
 ---
 
 ## Track 02 — AI Risk Manager
