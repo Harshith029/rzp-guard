@@ -131,8 +131,25 @@ cmd_operator_setup() {
 # be able to check in fifteen seconds is not "there is code for it" but "a
 # refusal can be seen and unblocked by a person while the guard is running".
 cmd_unblock_demo() {
-  gorun go test ./internal/bootstrap/ ./internal/storage/ ./internal/policy/     -run "Unblock|Wrongly|Grant|Denial|Queue|Retri|Override|Operator" -v 2>&1 |
-    grep -E "^(=== RUN|--- (PASS|FAIL)|ok|FAIL)" || true
+  # NOT `| grep ... || true`. The first version of this piped the output
+  # through grep and swallowed the exit status, so on a machine with no Docker
+  # it printed its conclusion having run nothing at all -- which is FAILURES.md
+  # F29 exactly: a gate reported green without being run. The status is checked
+  # before a single claim is made.
+  # `set -e` is on, so the assignment has to be allowed to fail before its
+  # status can be read. Without the `|| status=$?` the script exits on a failing
+  # test and prints nothing at all, which is a quieter version of the same
+  # defect: no output and no explanation.
+  local out status=0
+  out="$(gorun go test ./internal/bootstrap/ ./internal/storage/ ./internal/policy/     -run "Unblock|Wrongly|Grant|Denial|Queue|Retri|Override|Operator" -v 2>&1)" ||
+    status=$?
+  echo "$out" | grep -E "^(=== RUN|--- (PASS|FAIL)|ok|FAIL)" || true
+  if [ "$status" -ne 0 ]; then
+    echo >&2
+    echo "THE TESTS DID NOT PASS, so nothing below would have been proved." >&2
+    echo "$out" | tail -20 >&2
+    return 1
+  fi
   echo
   echo "The path proved above:"
   echo "  guard refuses a legitimate refund   -> durable queue entry"
