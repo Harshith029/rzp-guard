@@ -11,13 +11,19 @@ git clone https://github.com/Harshith029/rzp-guard.git
 cd rzp-guard && ./run.sh demo
 ```
 
-**No `.env`, no keys, no account.** Docker is the only prerequisite. This is what
-it prints:
+**No `.env`, no keys, no account.** Docker is the only prerequisite. Twelve
+seconds later it has allowed one refund, refused four, rejected a tampered
+authorization, and printed this:
 
-<img src=".github/demo.png" width="640"
-     alt="Terminal output: one refund allowed, four refused, a tampered authorization rejected, and the money counted in both directions.">
+```
+UNAUTHORIZED MONEY STOPPED     109500 paise   (Rs 1095.00)
+  a replay, an over-refund, and a refund against a payment the
+  merchant never mentioned -- none reached the provider
 
-*A real capture of that command's output, not a mockup.*
+LEGITIMATE REFUND DELAYED       12000 paise   (Rs 120.00)
+  the partial refund. The merchant wanted it and the guard said no.
+  Delayed, not lost -- a human unblocks it and the money still moves.
+```
 
 Two numbers, deliberately the same size. **₹1,095 of unauthorized movement
 stopped — and ₹120 the merchant actually wanted, that the guard blocked.** A
