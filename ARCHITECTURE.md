@@ -270,7 +270,7 @@ the reason the guard cannot catch it, and the reason it does not pretend to.
 | An authorized refund does, and the receipt round-trips | G1.6, `evidence/g16/`, `./run.sh verify-refund-evidence` |
 | Child death leaves a durable `IN_DOUBT` surviving restart | `./run.sh process-recover` — 6 assertions |
 | What the guard did against real agent traffic | [study/RESULTS.md](study/RESULTS.md), [study/FINDINGS.md](study/FINDINGS.md) |
-| Everything that went wrong on the way | [FAILURES.md](FAILURES.md) — 21 entries, each with the real output |
+| Everything that went wrong on the way | [FAILURES.md](FAILURES.md) — 51 entries, each with the real output |
 
 Every gate re-runs against the **committed redacted projection**, not a private
 artifact, so the published evidence is exactly what the assertions checked.

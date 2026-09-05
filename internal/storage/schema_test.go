@@ -277,3 +277,95 @@ func TestMigrationIsIdempotent(t *testing.T) {
 		_ = s.Close()
 	}
 }
+
+// The version inference must read the file's STRUCTURE, not its prose.
+//
+// THIS TEST EXISTS BECAUSE THE INFERENCE FAILED THIS WAY. It matched
+// strings.Contains(ddl, "UNIQUE") against sqlite_master.sql, which stores the
+// CREATE TABLE statement verbatim -- and the current action_state carries a
+// comment saying receipt is "NOT UNIQUE any more". Every new file matched, so
+// every new file was adopted as v1 and migrated twice on creation.
+//
+// The first assertion below is the trap: the current DDL really does contain
+// the word, and an inference that looks at the text will keep passing the
+// second assertion only by accident.
+func TestTheVersionInferenceReadsIndexesNotComments(t *testing.T) {
+	fresh := filepath.Join(t.TempDir(), "fresh.db")
+	db, err := openDB(fresh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	var ddl string
+	if err := db.QueryRow(
+		`SELECT sql FROM sqlite_master WHERE type='table' AND name='action_state'`).
+		Scan(&ddl); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(ddl, "UNIQUE") {
+		t.Fatal("the current action_state DDL no longer contains the word UNIQUE " +
+			"anywhere, so this test no longer proves what it was written to prove. " +
+			"Check why the comment changed before deleting it")
+	}
+	if v1, err := declaresUniqueReceipt(db); err != nil {
+		t.Fatal(err)
+	} else if v1 {
+		t.Fatal("a current file was read as v1. The inference is matching the " +
+			"comment text again, and every new state file is about to be " +
+			"migrated twice on creation")
+	}
+
+	// The same question, asked of a file that genuinely is v1.
+	old := filepath.Join(t.TempDir(), "v1.db")
+	buildV1File(t, old, nil)
+	odb, err := sql.Open("sqlite", old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer odb.Close()
+	odb.SetMaxOpenConns(1)
+	if v1, err := declaresUniqueReceipt(odb); err != nil {
+		t.Fatal(err)
+	} else if !v1 {
+		t.Fatal("a real v1 file was not recognised, so it would be adopted at " +
+			"the current version and read with assumptions its layout does not meet")
+	}
+}
+
+// The consequence, stated where it can be observed: a new file must reach the
+// current version by being STAMPED, not by being rebuilt.
+//
+// migrateV1toV2 recreates action_state, and a recreated table carries no
+// comments. So the comment surviving in the stored DDL is the proof that no
+// migration touched a file that never needed one.
+func TestAFreshFileIsStampedRatherThanMigrated(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "new.db")
+	s, err := Open(path, "mnd_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	var v int
+	if err := s.db.QueryRow(`SELECT version FROM schema_meta WHERE id = 1`).
+		Scan(&v); err != nil {
+		t.Fatal(err)
+	}
+	if v != schemaVersion {
+		t.Fatalf("a new file was stamped v%d, want v%d", v, schemaVersion)
+	}
+
+	var ddl string
+	if err := s.db.QueryRow(
+		`SELECT sql FROM sqlite_master WHERE type='table' AND name='action_state'`).
+		Scan(&ddl); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(ddl, "NOT UNIQUE any more") {
+		t.Fatal("action_state was rebuilt while creating a brand-new file, so a " +
+			"migration ran that had nothing to migrate. Two write transactions " +
+			"per open, and under contention they are what makes concurrent " +
+			"startup fail with SQLITE_BUSY")
+	}
+}

@@ -2948,7 +2948,7 @@ written by hand, and now a lease copied into a file where liveness is
 meaningless. **The unit under test has to be the unit that ships**, and here that
 meant restoring rather than inspecting.
 
-## F48 — The grant validator on the money path had no test at all
+## F50 — The grant validator on the money path had no test at all
 
 **Severity: P2.** Found by red-teaming the hardening branch before merging it,
 not by anything in CI.
@@ -2982,3 +2982,119 @@ not a budget.
 because the package that uses it is heavily tested. Coverage of a caller is not
 coverage of the invariant, and a validator is exactly the kind of code whose
 tests are the only thing keeping its clauses honest.
+
+---
+
+## F51 — The schema version was inferred from a comment, so every new state file migrated itself twice
+
+**Found:** 2026-09-05, from CI going red on two commits that changed no code.
+
+`1ffbe6d` and `91201de` touched a README paragraph and an image file. Both failed
+the `reproducibility` workflow. The commit before them passed.
+
+```
+--- FAIL: TestTheMandateLeaseHoldsUnderConcurrentOpens (2.04s)
+    concurrent_test.go:267: open 7 was refused with bootstrap: acquire state
+    file: storage: migrate v2->v3: database is locked (5) (SQLITE_BUSY),
+    want storage.ErrNotOwner
+FAIL	github.com/harshith/rzp-guard/internal/bootstrap	46.907s
+```
+
+### The wrong hypothesis chased first
+
+That a README commit had broken a build gate — the digest gate in `cmd/rzp-arme`
+is the one that reads files outside Go, and it had failed on path separators
+before. It had not run: the failure is in `internal/bootstrap`, and neither
+commit touches anything it compiles. The two red runs were a coincidence of
+timing, which is what a flaky test looks like from the outside.
+
+### The question that found it
+
+The file in that test is created by `t.TempDir()` milliseconds earlier. A new
+file is stamped at the current version and never enters the migration loop at
+all. So `migrate v2->v3` should have been unreachable — **how does a file that
+did not exist a moment ago come to be at version 2?**
+
+By being read as version 1 first.
+
+```go
+if derr := db.QueryRow(
+    `SELECT sql FROM sqlite_master WHERE type='table' AND name='action_state'`).
+    Scan(&ddl); derr == nil && strings.Contains(ddl, "UNIQUE") {
+    initial = 1
+}
+```
+
+`sqlite_master.sql` stores the `CREATE TABLE` statement **verbatim, comments
+included.** The current `action_state` carries this one:
+
+```
+-- NOT UNIQUE any more, and that is the point of schema v2.
+```
+
+So the substring matched on every file this build has ever created. Each new
+state file was adopted as v1 and run through both migrations against a schema
+that was already current. Measured directly, on a fresh file:
+
+```
+DDL contains UNIQUE: true
+final stamped version: 3
+after checkSchemaVersion, DDL still has the comment: false
+```
+
+### Why it survived review
+
+It ends at the right version, with the right schema, holding the right rows. And
+`migrateV1toV2` **rebuilds** `action_state`, so the rebuilt table has no
+comments — the file looks wrong only for the few milliseconds it takes to
+migrate, and looks right for the rest of its life. Line three above is the whole
+story: the evidence deletes itself.
+
+**No ledger was ever wrong because of this, and no money claim is affected.** The
+cost was two unnecessary write transactions at the birth of every state file, and
+they are what broke under contention: sixteen processes opening one unstamped
+file all infer v1, all stamp it, and all migrate at once. A migration error was
+not classified as lock contention either, so the bounded retry in
+`openWithDeadline` returned it instead of going second.
+
+### Measured, both directions
+
+`go test -race ./internal/bootstrap/ -run TestTheMandateLeaseHoldsUnderConcurrentOpens
+-count=40`, in the pinned container at `--cpus=0.25`:
+
+| | failures in 40 |
+|---|---|
+| before | **5**, each the CI error verbatim |
+| after | **0** |
+
+The regression test was also run against the unfixed code and fails there, so it
+pins the defect rather than describing it.
+
+### Fixed
+
+The question is put to the indexes instead of the prose. v1 declared
+`receipt TEXT NOT NULL UNIQUE`, which SQLite implements as a unique index over
+exactly that one column; v3's only unique index is the primary key, over
+`(mandate_id, action_id)`. A comment cannot forge an index.
+
+A migration that lost a race to another process's migration is now wrapped as
+`errLockContended`, which hands it to the retry that already exists — with its
+deadline and its fail-closed exit — instead of refusing an upgrade that merely
+needed to go second.
+
+### The lesson
+
+The comment above that code said:
+
+> *Reading the DDL is deliberate. It asks the file what it IS rather than
+> trusting what it is labelled, which is the whole reason this check exists.*
+
+It then read the label. The distinction it drew was the right one and the code
+under it did the opposite, which is the failure mode a confident comment
+produces: it argues for a property convincingly enough that nobody checks
+whether the lines below deliver it.
+
+The narrower lesson is about SQLite specifically. **A comment inside a
+`CREATE TABLE` is not documentation, it is persisted data** — it is stored in the
+file and returned by every query that reads the schema. Prose written for a human
+reader ended up as input to a decision about money-bearing state.

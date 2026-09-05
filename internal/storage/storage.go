@@ -423,6 +423,15 @@ func openOnce(path, mandateID string) (*Store, error) {
 	// contents have been half-understood.
 	if err := checkSchemaVersion(db); err != nil {
 		db.Close()
+		// A migration that lost a race to another process's migration is
+		// contention, not a file this build cannot read. Hand it to the retry
+		// in openWithDeadline, which has the deadline and the fail-closed
+		// exit; returning it here would refuse an upgrade that merely needed
+		// to go second. Several guards starting together on one pre-v3 file is
+		// exactly the case an upgrade produces.
+		if lockContended(err) {
+			return nil, fmt.Errorf("%w (%v)", errLockContended, err)
+		}
 		return nil, err
 	}
 
@@ -708,6 +717,44 @@ func (s *Store) reserveMany(receipt string, rs []lifecycle.Reservation,
 //
 // INSERT OR IGNORE, not INSERT: a file created before this table existed gets
 // stamped v1 on first open, which is correct -- the schema it holds IS v1.
+// uniqueIndexOnReceiptOnly counts the unique indexes over exactly one column,
+// and that column is receipt. v1 declared `receipt TEXT NOT NULL UNIQUE`, which
+// SQLite implements as precisely such an index. v3's only unique index is the
+// primary key, over (mandate_id, action_id).
+const uniqueIndexOnReceiptOnly = `
+SELECT COUNT(*) FROM pragma_index_list('action_state') il
+WHERE il."unique" = 1
+  AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 1
+  AND (SELECT ii.name FROM pragma_index_info(il.name) ii) = 'receipt'`
+
+// declaresUniqueReceipt reports whether action_state carries v1's uniqueness
+// constraint, structurally.
+//
+// IT USED TO READ THE DDL TEXT: strings.Contains(ddl, "UNIQUE") against
+// sqlite_master.sql. sqlite_master stores CREATE TABLE statements verbatim,
+// COMMENTS INCLUDED, and the v3 action_state carries a comment explaining that
+// receipt is "NOT UNIQUE any more". So the string matched on every file this
+// build has ever created: each new state file was adopted as v1 and run through
+// both migrations against a schema that was already current.
+//
+// It finished stamped correctly, which is why it survived review. migrateV1toV2
+// rebuilds action_state, and the rebuilt table has no comments -- so the file
+// looked wrong only for the few milliseconds it took to migrate, and looked
+// right forever after.
+//
+// It was not harmless. Sixteen processes opening one new file each ran two
+// unnecessary write transactions against it, and CI failed on the contention:
+// SQLITE_BUSY out of migrate v2->v3, in TestTheMandateLeaseHoldsUnderConcurrentOpens.
+//
+// An index cannot be forged by prose, so the question is now put to the indexes.
+func declaresUniqueReceipt(db *sql.DB) (bool, error) {
+	var n int
+	if err := db.QueryRow(uniqueIndexOnReceiptOnly).Scan(&n); err != nil {
+		return false, fmt.Errorf("storage: inspect action_state indexes: %w", err)
+	}
+	return n > 0, nil
+}
+
 func checkSchemaVersion(db *sql.DB) error {
 	// An UNSTAMPED file is not necessarily a new one.
 	//
@@ -717,8 +764,9 @@ func checkSchemaVersion(db *sql.DB) error {
 	// assumptions. So the version is INFERRED FROM STRUCTURE when the stamp is
 	// missing: v1's action_state declares receipt UNIQUE and v2's does not.
 	//
-	// Reading the DDL is deliberate. It asks the file what it IS rather than
-	// trusting what it is labelled, which is the whole reason this check exists.
+	// The question is put to the file's INDEXES, for the reason in
+	// declaresUniqueReceipt. It asks what the file IS rather than what it is
+	// labelled, which is the whole point of inferring at all.
 	initial := schemaVersion
 	var stamped int
 	switch err := db.QueryRow(`SELECT version FROM schema_meta WHERE id = 1`).
@@ -726,10 +774,11 @@ func checkSchemaVersion(db *sql.DB) error {
 	case err == nil:
 		initial = stamped
 	case errors.Is(err, sql.ErrNoRows):
-		var ddl string
-		if derr := db.QueryRow(
-			`SELECT sql FROM sqlite_master WHERE type='table' AND name='action_state'`).
-			Scan(&ddl); derr == nil && strings.Contains(ddl, "UNIQUE") {
+		v1, ierr := declaresUniqueReceipt(db)
+		if ierr != nil {
+			return ierr
+		}
+		if v1 {
 			initial = 1
 		}
 	default:
