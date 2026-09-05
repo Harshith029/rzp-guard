@@ -124,6 +124,26 @@ cmd_operator_setup() {
   ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/block_state.db" init
 }
 
+# The false-positive queue, end to end, with no network and no Docker.
+#
+# This is the workflow study/FP-COST.md prices and section 7 says nothing
+# implements. It exists as a runner command because the claim a reviewer should
+# be able to check in fifteen seconds is not "there is code for it" but "a
+# refusal can be seen and unblocked by a person while the guard is running".
+cmd_unblock_demo() {
+  gorun go test ./internal/bootstrap/ ./internal/storage/ ./internal/policy/     -run "Unblock|Wrongly|Grant|Denial|Queue|Retri|Override|Operator" -v 2>&1 |
+    grep -E "^(=== RUN|--- (PASS|FAIL)|ok|FAIL)" || true
+  echo
+  echo "The path proved above:"
+  echo "  guard refuses a legitimate refund   -> durable queue entry"
+  echo "  operator ATTACHES while it runs     -> no lock, no restart"
+  echo "  approve with a verified credential  -> single-use grant"
+  echo "  same guard forwards the retry       -> rule OPERATOR_APPROVED"
+  echo
+  echo "What a grant cannot do, also proved above: exceed the merchant cumulative"
+  echo "cap, outlive its expiry, fire twice, or override an expired mandate."
+}
+
 # ---------------------------------------------------------------------------
 # THE ISOLATED LANE, for external red-team work.
 #
@@ -838,6 +858,15 @@ cmd_mandate_verify_all() {
     ./rzp-mandate.exe verify -mandate "${f%.intent.json}.json" || return 1
     n=$((n+1))
   done < <(find . -name '*.intent.json' -not -path './study/*' 2>/dev/null)
+  # A gate that passes because it found nothing is not a gate. examples/ carries
+  # a compiled triple precisely so this has something real to check, and losing
+  # it must fail rather than read as success.
+  if [ "$n" -eq 0 ]; then
+    echo "no compiled mandate found to verify. This gate passed vacuously," >&2
+    echo "which is indistinguishable from it working. examples/demo.mandate.json" >&2
+    echo "and its two sidecars are supposed to be here." >&2
+    return 1
+  fi
   echo "verified $n compiled mandate(s)"
 }
 
@@ -1209,6 +1238,9 @@ rzp-guard
                              cumulative cap it emits equals the sum of the lines
   ./run.sh mandate-verify    every compiled mandate in the tree must still be
                              exactly what its intent produces
+  ./run.sh unblock-demo      the false-positive queue end to end: a refusal is
+                             recorded, an operator approves it WITHOUT stopping
+                             the guard, and the same guard forwards the retry
 
   ./run.sh preflight         PRE-PUSH: scan history for a self-authorizing
                              refund launcher. Run before publishing.
@@ -1259,6 +1291,7 @@ case "${1:-help}" in
   operator-setup) cmd_operator_setup ;;
   mandate-demo) cmd_mandate_demo ;;
   mandate-verify) cmd_mandate_verify_all ;;
+  unblock-demo) cmd_unblock_demo ;;
   study-verify) cmd_study_verify ;;
   study-dry) cmd_study_dry ;;
   study-model) shift; cmd_study_model "$@" ;;

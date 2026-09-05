@@ -418,36 +418,75 @@ Details: `study/PRELABEL-FINDING-armC.md`, `study/PROTOCOL-armC-AUDIT.md`.
 
 ## Known limits
 
-**There is no per-refund timeout.** Once a refund is forwarded, the relay waits
-for the child's reply for as long as the session stays open; the ten-second grace
-period only starts after the agent's stdin closes. A child that hangs and never
-answers leaves its action `RESERVED`, holding budget, until the guard restarts —
-at which point recovery promotes it to `IN_DOUBT` so a human looks.
+**A per-refund timeout exists but is off by default.** Without
+`-refund-timeout`, a forwarded refund waits for the child's reply for as long as
+the session stays open; the ten-second grace period only starts after the agent's
+stdin closes. A child that hangs leaves its action `RESERVED`, holding budget,
+until the guard restarts.
 
-This is deliberate rather than unfinished. A timeout on a money path is a guess
-about how slow a provider is allowed to be, and guessing short turns a slow
-refund into an `IN_DOUBT` that needs an operator. What was fixed instead is
-visibility: `rzp-guard-operator list` now reports actions held `RESERVED`
-alongside those `IN_DOUBT`, so a stuck refund is something you can see rather
-than something you discover on the next restart.
+The reason it was declined for so long was that a timeout on a money path looked
+like a guess about how slow a provider is allowed to be. The direction is what
+makes a value defensible: **expiry never releases an authorization.** It marks
+the action `IN_DOUBT` and alerts, which is the same outcome a dead child already
+produces — reached sooner, and by a rule rather than by somebody noticing. So a
+badly chosen deadline can only turn a slow provider into an operator's question,
+never a double spend.
 
-**Mandate signing is available but off by default.** Without
-`-mandate-pubkey`, the guard reads the mandate from disk and does not verify who
-wrote it: anyone who can write that file can grant authority, including after
-the fact. With a key configured, the mandate must carry a valid ed25519
-signature over its exact bytes at `<mandate>.sig`, and an unsigned or altered
-mandate refuses to start — verified before parsing, so no re-serialisation sits
-between what was signed and what is enforced.
+It stays off by default because turning it on would change the behaviour of every
+existing deployment and every piece of committed evidence, on a number nobody has
+measured against a real Razorpay latency distribution. `-mode production`
+requires it, and `OPERATIONS.md` says what to watch to pick a value.
 
-It is opt-in because every fixture in this repository is unsigned, and defaulting
-it on would break them all. **Nothing here is enforced by default, and the
-unconfigured path prints a warning saying exactly what is not being checked.**
+**Mandate signing is available but off by default — except in production mode.**
+Without `-mandate-pubkey`, the guard reads the mandate from disk and does not
+verify who wrote it: anyone who can write that file can grant authority,
+including after the fact. With a key configured, the mandate must carry a valid
+ed25519 signature over its exact bytes at `<mandate>.sig`, and an unsigned or
+altered mandate refuses to start — verified before parsing, so no
+re-serialisation sits between what was signed and what is enforced.
+
+It is opt-in by default because every fixture in this repository is unsigned, and
+defaulting it on would break them all. **`-mode production` refuses to start
+without it**, along with a decision log, a refund deadline and some form of
+observability — because a warning is not a control, and the previous mitigation
+for this was a warning.
+
 Signing also authenticates the file, not the human: a compromised key issues
 mandates the guard will honour, and key custody is outside this program.
 
 So the claim stays narrow. The guard enforces that an agent cannot exceed the
 authority *presented to it*, and makes every grant single-use, durable and
 auditable.
+
+**A wrongly refused refund can be unblocked, by a person, without stopping the
+guard.** The measured false-positive rate is 0.455 and the cost model for it
+assumes somebody unblocks those refunds. Now something does: refusals land in a
+durable queue, and `rzp-guard-operator approve` issues a single-use grant against
+one — exact payment, exact amount, expiring, attributed, and reserved through the
+same ledger as any mandate action, so it **cannot exceed the merchant's
+cumulative cap**. An operator can correct a wrong refusal; an operator cannot
+raise the merchant's own ceiling.
+
+**What that does not fix:** it is a mechanism, not staffing. A queue nobody works
+leaves the false-positive rate exactly where it was, and this repository cannot
+assert that anyone is working it. The published arm E numbers still describe the
+guard's *mandate* decisions, and measuring the loop with humans in it is arm F's
+problem, not something claimed here.
+
+**Ownership is per mandate, not per host, and the store is still SQLite.** Many
+mandates can share one state file — which is what lets ten merchants share one
+operator credential, one queue and one alert sink — but the throughput ceiling is
+still one process's fsync rate, now about 400 authorized refunds per second on
+the development machine after the allow path was reduced from two commits to
+one. Beyond one host this architecture would be replaced rather than tuned; the
+decision ladder, the lifecycle and the receipt discipline carry over intact.
+
+**There is a backup procedure now, and it has never been used in anger.**
+`rzp-guard-operator backup` takes a consistent copy while the guard runs and
+`verify-backup` opens it without needing the original. `OPERATIONS.md` states the
+RPO and RTO the mechanism supports. What is still missing is a timed restore
+drill: an untested restore is a plan rather than a capability, and this one has
+only ever been exercised by tests.
 
 **Combining is deliberately bounded.** A refund can be covered by several
 authorized entries summing to it, but the search stops at eight. Exact
