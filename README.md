@@ -149,7 +149,7 @@ a digest-pinned Go image and takes about a minute; every run after that is
 | **Go 1.25+** | **Optional** — only for the verification commands below, which run on the host rather than in the container. Skip it and everything in *Two minutes* still works. |
 
 ```bash
-./run.sh help     # all 25 commands, grouped, with what each one does and does not cover
+./run.sh help     # every command, grouped, with what each one does and does not cover
 ```
 
 ### Check the evaluation yourself
@@ -316,7 +316,7 @@ create symlinks, so it can only run on Linux.
 
 ## Defence-only
 
-**Across the released command surface** — the 25 commands `run.sh` exposes —
+**Across the released command surface** — every command `run.sh` exposes —
 there is no payment or order creation, no checkout flow, no direct Razorpay
 client, no refund launcher, and no realistic card or token fixtures. That is a
 statement about what this repository ships, verified by reading that surface;

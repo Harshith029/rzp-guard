@@ -2947,3 +2947,38 @@ failing writer's count, F44's manifest rebuilt from scratch and erasing a key
 written by hand, and now a lease copied into a file where liveness is
 meaningless. **The unit under test has to be the unit that ships**, and here that
 meant restoring rather than inspecting.
+
+## F48 — The grant validator on the money path had no test at all
+
+**Severity: P2.** Found by red-teaming the hardening branch before merging it,
+not by anything in CI.
+
+`opgrant.Grant.Validate` is called at `internal/storage/unblock.go:220`, on the
+path that issues an operator grant — the object that turns a refusal into an
+allow. It enforces eight things: the id pattern, a mandate, a payment, a positive
+amount, an attributed actor, a stated reason, an expiry in the future, and a TTL
+inside the one-hour ceiling.
+
+**No test called it.** `internal/opgrant` was 132 lines of source and zero lines
+of test. The override path was well covered — single use, scope, non-overridable
+rules — but every one of those tests constructs a grant directly and never goes
+through the validator that production uses.
+
+So the reasoning in those clauses was load-bearing and unverified. The two that
+matter most are not mechanical:
+
+- **no actor** — *"an unattributed grant is not a decision anyone can be held to"*
+- **TTL ceiling** — *"a grant that outlives the incident is standing authority
+  nobody revisits, and it is invisible in the mandate a reviewer reads"*
+
+Both are accountability properties. A silent regression in either would not break
+a refund; it would remove the record of who authorized one.
+
+Now covered: every rejection clause individually, both sides of the TTL boundary,
+and `Admits` pinned as exact on payment, amount and expiry instant — a grant is
+not a budget.
+
+**The lesson is about indirect coverage.** `internal/opgrant` looked tested
+because the package that uses it is heavily tested. Coverage of a caller is not
+coverage of the invariant, and a validator is exactly the kind of code whose
+tests are the only thing keeping its clauses honest.
