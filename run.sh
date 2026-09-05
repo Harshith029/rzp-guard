@@ -124,6 +124,43 @@ cmd_operator_setup() {
   ./rzp-guard-operator.exe -mandate "$MANDATE" -state "$EV/block_state.db" init
 }
 
+# The false-positive queue, end to end, with no network and no Docker.
+#
+# This is the workflow study/FP-COST.md prices and section 7 says nothing
+# implements. It exists as a runner command because the claim a reviewer should
+# be able to check in fifteen seconds is not "there is code for it" but "a
+# refusal can be seen and unblocked by a person while the guard is running".
+cmd_unblock_demo() {
+  # NOT `| grep ... || true`. The first version of this piped the output
+  # through grep and swallowed the exit status, so on a machine with no Docker
+  # it printed its conclusion having run nothing at all -- which is FAILURES.md
+  # F29 exactly: a gate reported green without being run. The status is checked
+  # before a single claim is made.
+  # `set -e` is on, so the assignment has to be allowed to fail before its
+  # status can be read. Without the `|| status=$?` the script exits on a failing
+  # test and prints nothing at all, which is a quieter version of the same
+  # defect: no output and no explanation.
+  local out status=0
+  out="$(gorun go test ./internal/bootstrap/ ./internal/storage/ ./internal/policy/     -run "Unblock|Wrongly|Grant|Denial|Queue|Retri|Override|Operator" -v 2>&1)" ||
+    status=$?
+  echo "$out" | grep -E "^(=== RUN|--- (PASS|FAIL)|ok|FAIL)" || true
+  if [ "$status" -ne 0 ]; then
+    echo >&2
+    echo "THE TESTS DID NOT PASS, so nothing below would have been proved." >&2
+    echo "$out" | tail -20 >&2
+    return 1
+  fi
+  echo
+  echo "The path proved above:"
+  echo "  guard refuses a legitimate refund   -> durable queue entry"
+  echo "  operator ATTACHES while it runs     -> no lock, no restart"
+  echo "  approve with a verified credential  -> single-use grant"
+  echo "  same guard forwards the retry       -> rule OPERATOR_APPROVED"
+  echo
+  echo "What a grant cannot do, also proved above: exceed the merchant cumulative"
+  echo "cap, outlive its expiry, fire twice, or override an expired mandate."
+}
+
 # ---------------------------------------------------------------------------
 # THE ISOLATED LANE, for external red-team work.
 #
@@ -798,7 +835,56 @@ cmd_build() {
   go build -buildvcs=false -o rzp-guard.exe ./cmd/rzp-guard
   go build -buildvcs=false -o gate-verify.exe ./cmd/gate-verify
   go build -buildvcs=false -o rzp-guard-operator.exe ./cmd/rzp-guard-operator
-  echo "built ./rzp-guard.exe ./gate-verify.exe ./rzp-guard-operator.exe"
+  go build -buildvcs=false -o rzp-mandate.exe ./cmd/rzp-mandate
+  echo "built ./rzp-guard.exe ./gate-verify.exe ./rzp-guard-operator.exe ./rzp-mandate.exe"
+}
+
+# The authoring layer, end to end, on the example intent.
+#
+# It exists as a runner command for the same reason everything else does: the
+# documented door is the one people use. But it is also the demonstration that
+# matters most to a reviewer, because it shows the one failure class the guard
+# structurally cannot catch being caught upstream of it -- and it shows the
+# hand-written examples/mandate.json failing the check that the compiled one
+# passes.
+cmd_mandate_demo() {
+  go build -buildvcs=false -o rzp-mandate.exe ./cmd/rzp-mandate
+  local out; out="$(mktemp -d)"
+  echo "--- compiling examples/intent.json ---"
+  ./rzp-mandate.exe compile -intent examples/intent.json -out "$out/mandate.json"
+  echo
+  echo "--- verifying the grant is still exactly what that intent compiles to ---"
+  ./rzp-mandate.exe verify -mandate "$out/mandate.json"
+  echo
+  echo "--- what the guard would have been handed instead, hand-written ---"
+  echo "    examples/mandate.json caps cumulative spend at 200000 paise over a"
+  echo "    single 50000 paise action: 150000 paise of authority no sentence"
+  echo "    asked for. The compiled mandate caps it at 50000, by construction."
+  rm -rf "$out"
+}
+
+# Every compiled mandate in the tree must still be the one its intent produces.
+#
+# This is the CI shape of the authoring guarantee: compile-time refusal stops a
+# bad grant being written, and this stops a good one being edited afterwards.
+cmd_mandate_verify_all() {
+  go build -buildvcs=false -o rzp-mandate.exe ./cmd/rzp-mandate
+  local n=0 f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    ./rzp-mandate.exe verify -mandate "${f%.intent.json}.json" || return 1
+    n=$((n+1))
+  done < <(find . -name '*.intent.json' -not -path './study/*' 2>/dev/null)
+  # A gate that passes because it found nothing is not a gate. examples/ carries
+  # a compiled triple precisely so this has something real to check, and losing
+  # it must fail rather than read as success.
+  if [ "$n" -eq 0 ]; then
+    echo "no compiled mandate found to verify. This gate passed vacuously," >&2
+    echo "which is indistinguishable from it working. examples/demo.mandate.json" >&2
+    echo "and its two sidecars are supposed to be here." >&2
+    return 1
+  fi
+  echo "verified $n compiled mandate(s)"
 }
 
 # Benchmarks. Run in the pinned container like everything else, or the numbers
@@ -1163,6 +1249,16 @@ rzp-guard
   ./run.sh release [VERSION] stamped static linux/amd64 build + checksums
   ./run.sh operator-setup    ONCE: create the recovery credential (deployment step)
 
+  ./run.sh mandate-demo      compile examples/intent.json into a mandate and
+                             verify it. The authoring layer: it refuses an
+                             ambiguous intent rather than resolving one, and the
+                             cumulative cap it emits equals the sum of the lines
+  ./run.sh mandate-verify    every compiled mandate in the tree must still be
+                             exactly what its intent produces
+  ./run.sh unblock-demo      the false-positive queue end to end: a refusal is
+                             recorded, an operator approves it WITHOUT stopping
+                             the guard, and the same guard forwards the retry
+
   ./run.sh preflight         PRE-PUSH: scan history for a self-authorizing
                              refund launcher. Run before publishing.
 
@@ -1210,6 +1306,9 @@ case "${1:-help}" in
   bench) cmd_bench ;;
   release) shift; cmd_release "$@" ;;
   operator-setup) cmd_operator_setup ;;
+  mandate-demo) cmd_mandate_demo ;;
+  mandate-verify) cmd_mandate_verify_all ;;
+  unblock-demo) cmd_unblock_demo ;;
   study-verify) cmd_study_verify ;;
   study-dry) cmd_study_dry ;;
   study-model) shift; cmd_study_model "$@" ;;

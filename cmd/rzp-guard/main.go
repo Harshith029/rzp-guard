@@ -79,6 +79,20 @@ func run() error {
 		decisionLog = flag.String("decision-log", "", "append-only JSONL decision log")
 		statusFile  = flag.String("status-file", "", "publish a lock-free status document here (see status.go)")
 		statusEvery = flag.Duration("status-interval", 5*time.Second, "how often to refresh -status-file")
+		refundWait  = flag.Duration("refund-timeout", 0, "bound how long a forwarded "+
+			"refund may go unanswered before it is locked IN_DOUBT for an operator. "+
+			"0 (default) waits indefinitely, which is what this build has always "+
+			"done. Expiry never RELEASES an authorization: a timeout is not "+
+			"evidence of rejection, so the outcome is a human looking at it. "+
+			"120s is a defensible starting point against a provider whose own "+
+			"round trip is 100-500ms; see OPERATIONS.md")
+		adminAddr = flag.String("admin-addr", "", "serve /healthz, /readyz and "+
+			"/metrics here. LOOPBACK ONLY and refused otherwise; off by default. "+
+			"Aggregates only -- no action ids, payment ids or receipts.")
+		modeFlag = flag.String("mode", "", "development (default) | production. "+
+			"Production requires every optional protection to be present and REFUSES "+
+			"TO START otherwise, rather than warning and continuing. Also read from "+
+			"RZP_GUARD_MODE, which survives somebody retyping an argument list at 3am.")
 		showVersion = flag.Bool("version", false, "print build identity and exit")
 		mandateKey  = flag.String("mandate-pubkey", "", "hex ed25519 public key of the "+
 			"merchant that issues mandates. When set, the mandate MUST carry a valid "+
@@ -139,6 +153,59 @@ func run() error {
 		return err
 	}
 
+	// PRODUCTION MODE, checked before any durable state is touched.
+	//
+	// Every requirement is reported at once and the process refuses to start.
+	// The audit's one still-OPEN HIGH finding is that mandate signing is opt-in
+	// and unsigned means anyone who can write the file grants authority -- and
+	// the mitigation was a warning, which is not a control. This is the control.
+	mode, err := parseMode(*modeFlag)
+	if err != nil {
+		return err
+	}
+	if mode == modeProduction {
+		if err := enforceProduction([]productionRequirement{
+			{
+				name: "the mandate must be signed by the merchant",
+				ok:   auth.Verified,
+				why: "unsigned, anyone who can write the mandate file grants the " +
+					"agent authority over the merchant's money. Every other check " +
+					"this guard performs assumes the mandate is genuine, and nothing " +
+					"else establishes that",
+				fix: "-mandate-pubkey <hex ed25519 key>, with a detached signature " +
+					"at <mandate>.sig (rzp-guard-operator mandate-sign)",
+			},
+			{
+				name: "every authorization decision must be recorded",
+				ok:   *decisionLog != "",
+				why: "without it there is no forensic record of what was allowed " +
+					"or refused, and an incident review has only the process's stderr",
+				fix: "-decision-log <path>",
+			},
+			{
+				name: "a forwarded refund must have a deadline",
+				ok:   *refundWait > 0,
+				why: "a hung child otherwise holds a reservation and its budget " +
+					"indefinitely, and the only recovery is somebody noticing",
+				fix: "-refund-timeout 120s (expiry locks for an operator; it never " +
+					"releases, because a timeout is not evidence of rejection)",
+			},
+			{
+				name: "the process must be observable",
+				ok:   *adminAddr != "" || *statusFile != "",
+				why: "with neither, the only signal a monitor can act on is a " +
+					"greppable token in stderr, and nothing reports a refund stuck " +
+					"awaiting an operator",
+				fix: "-admin-addr 127.0.0.1:9090 (metrics and health), or " +
+					"-status-file <path>, or both",
+			},
+		}); err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stderr, "rzp-guard: production mode: signed mandate, "+
+			"decision log, refund deadline and observability all present")
+	}
+
 	boot, err := bootstrap.Open(*statePath, m, time.Now().UTC())
 	if err != nil {
 		return err
@@ -178,8 +245,10 @@ func run() error {
 			"establish that authority itself", *statePath)
 	}
 
+	var statusW *statusWriter
 	if *statusFile != "" {
 		sw := newStatusWriter(*statusFile, boot.Guard, m.MandateID)
+		statusW = sw
 		stopStatus := make(chan struct{})
 		go sw.run(stopStatus, *statusEvery)
 		// Registered BEFORE `defer finalize` below. Defers run LIFO, so finalize
@@ -188,6 +257,22 @@ func run() error {
 		// other way round, the final status would omit exactly the refunds an
 		// operator most needs to find.
 		defer close(stopStatus)
+	}
+
+	// Unresolved work belonging to OTHER mandates in this state file.
+	//
+	// The storage layer used to REFUSE to open a file whose previous mandate had
+	// unresolved actions, because every query is scoped by mandate and opening
+	// under a new one hid them permanently. A file may now hold several mandates
+	// on purpose -- that is what lets ten merchants share one queue, one operator
+	// credential and one alert sink -- so the guarantee moved from refusing to
+	// reporting. It is reported at every start, not once, which is strictly more
+	// than the refusal ever did.
+	for mid, ids := range boot.StrandedElsewhere {
+		fmt.Fprintf(os.Stderr,
+			"%s OTHER_MANDATE_UNRESOLVED mandate=%s actions=%v reason=%q\n",
+			alertToken, mid, ids,
+			"another mandate in this state file has refunds awaiting an operator")
 	}
 
 	if len(boot.RecoveredInDoubt) > 0 {
@@ -205,6 +290,29 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Losing the mandate lease mid-session means another process now believes it
+	// owns this mandate's ledger. Two ledgers over one mandate is the condition
+	// the lease exists to prevent, and the only correct response is to stop
+	// forwarding: this process's in-memory view of what is consumed is no longer
+	// authoritative, so every further decision it makes could double-spend.
+	//
+	// Cancelling the context is what stops it. The child is torn down and the
+	// ordinary shutdown path runs, which marks anything in flight IN_DOUBT --
+	// the conservative direction, and the right one, because a refund forwarded
+	// under a lease this process no longer held is exactly the ambiguous case.
+	boot.OnLeaseLost(func(err error) {
+		fmt.Fprintf(os.Stderr,
+			"%s LEASE_LOST reason=%q\n", alertToken, err.Error())
+		fmt.Fprintln(os.Stderr, "rzp-guard: another process holds this mandate's "+
+			"lease; refusing to keep forwarding against a ledger that is no longer ours")
+		stop()
+	})
+
+	// Declared before the child is wired, because the evidence tee's failure
+	// handler closes over it. Every counter is an atomic, so a scrape never
+	// contends with an authorization decision.
+	counters := &adminCounters{}
 
 	child, err := newChild(ctx, keyID, keySecret)
 	if err != nil {
@@ -247,6 +355,7 @@ func run() error {
 		// stopped being able to prove what crossed the boundary, and that is
 		// not a thing to leave in an unread stderr line.
 		childWriter = relay.NewChildTee(childIn, tee, func(err error) {
+			counters.auditBroken.Add(1)
 			alertMu.Lock()
 			defer alertMu.Unlock()
 			fmt.Fprintf(os.Stderr, "%s AUDIT_BROKEN file=%q reason=%q\n",
@@ -260,18 +369,111 @@ func run() error {
 	}
 	defer closeSink()
 
-	r := relay.New(boot.Guard, childWriter, os.Stdout, sink)
+	// THE DENIAL QUEUE, and where the guard's half of the unblock workflow lives.
+	//
+	// The guard REFUSES 45% of legitimate refunds by its own published
+	// measurement, and until now a refusal went to stderr and, if configured, to
+	// an optional JSONL log. Neither is a queue: nothing tracked whether a
+	// blocked refund was ever looked at, and the decision log records the allowed
+	// calls too, so the events needing a human were buried among thousands that
+	// did not. Recording them durably is what gives rzp-guard-operator something
+	// to show, and what turns "a human unblocks it" from an assumption in a cost
+	// model into a thing somebody can actually do.
+	//
+	// The guard records refusals and NOTHING ELSE about this workflow. It cannot
+	// approve one: IssueGrant demands an opauth.Grant, which only the operator
+	// tool can obtain, and nothing on this side of the process can construct one.
+	//
+	// A failed write is reported once and then ignored. The refusal already
+	// happened and nothing was forwarded, so losing the queue entry costs
+	// visibility, not safety -- and a guard that died because it could not record
+	// something it correctly refused would be trading the money path against the
+	// reporting path.
+	store := boot.Store
+	var queueWarned sync.Once
+
+	// COALESCED AND RATE CAPPED, and the reason is a regression this same change
+	// introduced. Recording every refusal puts a durable write on the deny path,
+	// which used to cost 779 nanoseconds and touch nothing -- so an agent looping
+	// on a refused call could saturate the state file the money path depends on.
+	// That is a worse property than the noisy-log one the queue was added to fix.
+	//
+	// See denials.go: identical refusals are counted in memory and flushed on an
+	// interval, the first of anything new still reaches disk immediately, and
+	// whatever the cap drops is counted rather than silent.
+	denials := newDenialRecorder(store, func(err error) {
+		counters.queueWriteFailed.Add(1)
+		queueWarned.Do(func() {
+			fmt.Fprintf(os.Stderr, "%s QUEUE_BROKEN reason=%q\n", alertToken,
+				"refusals are no longer being recorded for operator review: "+err.Error())
+		})
+	})
+	// Registered before `defer finalize`: defers run LIFO, so the last few
+	// seconds of buffered refusals reach disk after the session has locked
+	// whatever was in flight. Those are exactly the ones somebody will ask about.
+	defer denials.Flush()
+	// The status file is the no-dependencies view, so the "queue is incomplete"
+	// signal has to reach it too -- not only the metrics endpoint, which a
+	// deployment may not have.
+	if statusW != nil {
+		statusW.setDenials(denials)
+	}
+
+	recordingSink := func(d policy.Decision, id json.RawMessage) {
+		sink(d, id)
+		counters.observe(d)
+		if d.Allowed || d.Tool != policy.RefundTool {
+			return
+		}
+		denials.record(d.Tool, d.Rule, d.PaymentID, d.RequestedPaise, d.Reason)
+	}
+
+	// Where operator grants are read from. Set BEFORE any traffic; a Guard
+	// without a source cannot take the override path at all, which is the
+	// behaviour every test that predates this feature relies on.
+	boot.Guard.SetGrantSource(store)
+
+	r := relay.New(boot.Guard, childWriter, os.Stdout, recordingSink)
+	// A hung child was the one failure mode in this design with no bounded
+	// outcome: the action stayed RESERVED, its budget held, until somebody
+	// restarted the process or happened to run the operator list. Off by
+	// default, because turning a deadline on by default would change the
+	// behaviour of every existing deployment on a value nobody has measured
+	// against a real Razorpay latency distribution.
+	r.SetRefundDeadline(*refundWait)
 
 	// Every mid-session IN_DOUBT transition, on stderr, one line each.
 	// Deliberately NOT the decision log: that records authorization decisions,
 	// and this is an outcome. Conflating them would bury the event that needs a
 	// human among thousands that do not.
 	r.SetAlerter(func(actionID, reason string) {
+		counters.inDoubtTransition.Add(1)
 		alertMu.Lock()
 		defer alertMu.Unlock()
 		fmt.Fprintf(os.Stderr, "%s IN_DOUBT action=%s reason=%q\n",
 			alertToken, actionID, reason)
 	})
+
+	// The admin endpoint, if one was asked for.
+	//
+	// Started BEFORE the child, so a port conflict fails the launch rather than
+	// leaving a guard running with the monitoring its operator asked for
+	// silently absent -- which is the same failure shape as a warning where a
+	// control was wanted.
+	if *adminAddr != "" {
+		admin, err := newAdminServer(*adminAddr, boot.Guard, counters, m.MandateID)
+		if err != nil {
+			return err
+		}
+		admin.denials = denials
+		if err := admin.Start(); err != nil {
+			return err
+		}
+		defer admin.Close()
+		fmt.Fprintf(os.Stderr,
+			"rzp-guard: admin endpoint on http://%s (healthz, readyz, metrics)\n",
+			admin.Addr())
+	}
 
 	if err := child.Start(); err != nil {
 		return fmt.Errorf("start child (is Docker running?): %w", err)
@@ -303,6 +505,39 @@ func run() error {
 	// child that exited cleanly was surfaced as "signal: killed".
 	waitErr := make(chan error, 1)
 	go func() { waitErr <- child.Wait() }()
+
+	// The deadline sweeper. It runs HERE rather than inside the relay, so that
+	// exactly one goroutine ever calls it and it is stopped before finalize
+	// runs -- a sweeper still marking things IN_DOUBT during CloseInflight would
+	// be a second writer to the ledger during shutdown.
+	if *refundWait > 0 {
+		stopSweep := make(chan struct{})
+		defer close(stopSweep)
+		// A quarter of the deadline, so a refund is locked within 25% of the
+		// stated bound rather than up to twice it. Bounded below, because a
+		// short deadline must not turn into a busy loop.
+		every := *refundWait / 4
+		if every < time.Second {
+			every = time.Second
+		}
+		go func() {
+			t := time.NewTicker(every)
+			defer t.Stop()
+			for {
+				select {
+				case <-stopSweep:
+					return
+				case <-t.C:
+					for _, id := range r.SweepDeadlines(time.Now().UTC()) {
+						counters.deadlineExpired.Add(1)
+						fmt.Fprintf(os.Stderr,
+							"%s IN_DOUBT action=%s reason=%q\n", alertToken, id,
+							"no reply within the refund deadline; forwarded, so it may have executed")
+					}
+				}
+			}
+		}()
+	}
 
 	agentDone := make(chan error, 1)
 	go func() { agentDone <- r.PumpAgent(os.Stdin) }()

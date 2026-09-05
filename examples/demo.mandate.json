@@ -1,0 +1,20 @@
+{
+  "mandate_id": "mnd_int_demo_001",
+  "expires_at": "2026-09-05T04:13:12Z",
+  "allowed_tools": [
+    "fetch_all_payments",
+    "fetch_payment",
+    "create_refund"
+  ],
+  "authorized_refund_actions": [
+    {
+      "action_id": "rfa_demo_001",
+      "payment_id": "pay_SYN00000000001",
+      "amount_paise": 50000
+    }
+  ],
+  "global": {
+    "max_cumulative_paise": 50000,
+    "max_calls_per_minute": 10
+  }
+}

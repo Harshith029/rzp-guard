@@ -192,15 +192,43 @@ safe to release; anything else is `IN_DOUBT`.
 
 `internal/storage/storage.go`, `internal/opauth/`, `internal/bootstrap/`.
 
-State is SQLite (pure Go, `CGO_ENABLED=0`) with `PRAGMA locking_mode=EXCLUSIVE` —
-single-instance ownership, enforced by the database rather than by convention.
-Reservations are durable before forwarding, so a crash mid-flight leaves a record
-that recovery promotes to `IN_DOUBT` rather than losing.
+State is SQLite (pure Go, `CGO_ENABLED=0`) in WAL mode. Ownership is a
+**per-mandate lease**: one row per mandate, acquired by a single conditional
+`UPDATE` so two racing processes cannot both win, renewed on a timer, and
+takeable once the heartbeat goes stale. Reservations are durable before
+forwarding, so a crash mid-flight leaves a record that recovery promotes to
+`IN_DOUBT` rather than losing.
 
-Resolving an `IN_DOUBT` action is the one privileged operation, and it requires an
-`opauth.Grant` — an unforgeable proof of authentication, not a boolean. The
-credential is an Argon2id salted verifier; `ResolveInDoubt` is the only exported
-path to clearing a reservation.
+The lease replaced `PRAGMA locking_mode=EXCLUSIVE`, and the reason is worth
+stating because the exclusive lock looked like the stronger choice.
+
+The money claim was never about the *file*: it is that two guards must not each
+restore an in-memory ledger for the **same mandate** and check the cumulative cap
+against their own copy. Every table here is already scoped by `mandate_id`, so
+leasing per mandate preserves that exactly. What the file-wide lock added on top
+was an operational cost with no safety return — it held the database for the
+guard's entire lifetime, so `rzp-guard-operator` could not open the state file at
+all while the guard ran. Every operator action, including merely listing what was
+stuck, required stopping the payment proxy. That is what made the false-positive
+unblock workflow impossible in practice, and it also forced one mandate per file,
+so ten merchants meant ten databases and ten IN_DOUBT queues.
+
+The cost of the lease, stated: after a *crash* the next guard waits out the 15s
+TTL, because a stale heartbeat and a busy process are not distinguishable from
+outside. A clean shutdown releases the lease, so an ordinary restart is instant.
+
+Two privileged operations require an `opauth.Grant` — an unforgeable proof of
+authentication, not a boolean — and both are the same kind of decision, a person
+accepting responsibility for money:
+
+- **Resolving an `IN_DOUBT` action.** `ResolveInDoubt` is the only exported path.
+- **Issuing an operator grant**, which authorizes one refund the mandate refused.
+  Exact payment, exact amount, single use, expiring, and reserved through the
+  same ledger as any mandate action — so it still cannot exceed the merchant's
+  cumulative cap. The guard has no path into that table: nothing on the
+  request-handling side can construct the argument `IssueGrant` demands.
+
+The credential behind both is an Argon2id salted verifier.
 
 **The guard refuses to run against an unprovisioned state file.** Otherwise the
 first writer wins, and an attacker who creates the state directory first owns the

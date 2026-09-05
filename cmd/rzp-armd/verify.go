@@ -115,6 +115,12 @@ var decisionPathDirs = []string{
 	"internal/lifecycle",
 	"internal/mandate",
 	"internal/opauth",
+	// Added when internal/policy grew the operator-grant path: the scorer now
+	// imports it transitively, and manifest_test.go refused to let it stay
+	// unhashed. A change in there could move a published decision while verify
+	// reported everything unchanged, which is precisely the gap this list exists
+	// to close.
+	"internal/opgrant",
 	"internal/policy",
 }
 

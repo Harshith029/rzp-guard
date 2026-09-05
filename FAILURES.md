@@ -2815,3 +2815,170 @@ and erased it, before any of it was committed — so the record that the freeze 
 broken was itself lost, which is a small version of the same failure. `score` now
 carries forward every key it does not own, and the preservation is verified by
 re-running it.
+
+---
+
+## F48 — The exclusive lock was what made the false-positive workflow impossible
+
+**Found:** 2026-09-05, while building the operator unblock path. Not a crash, not
+a wrong answer. A design decision whose operational cost was never priced.
+
+`PRAGMA locking_mode = EXCLUSIVE` held the database for the guard's **entire
+lifetime**. That was chosen for a real reason — two guards over one state file
+would each restore an in-memory ledger and check the cumulative cap against their
+own copy, so between them they could spend past it — and the reason is sound.
+
+What it also did: `rzp-guard-operator` could not open the state file **at all**
+while the guard ran. Every operator action, including merely listing what was
+stuck, required stopping the payment proxy. `OPERATIONS.md` said so plainly and
+treated it as a documented limitation.
+
+It is a documented limitation for *resolving an `IN_DOUBT` refund*, which is
+reconciliation nobody is waiting on. It is not one for **unblocking a refund the
+guard wrongly refused**, and the published false-positive rate is 0.455.
+`study/FP-COST.md` prices every one of those blocks on the assumption that a
+human unblocks it, and §7 says nothing implements that.
+
+Nobody was ever going to stop the payment proxy to unstick one refund. So the
+economic model rested on a workflow the storage layer made impossible, and the
+two facts sat in the repository for weeks without anyone putting them together.
+
+### The wrong hypothesis chased first
+
+That the fix was a second, lock-free surface for the operator — extend the status
+file, or add a read-only side channel. That is what `status.go` already is, and
+it is why the gap was invisible: *seeing* had been solved, so the missing half
+looked like a reporting problem rather than a write problem. It is not. An
+unblock is authority; it has to be written.
+
+### Fixed
+
+Ownership is a **per-mandate lease**, not a file-wide lock.
+
+The money claim was never about the file. It is that two guards must not each
+hold a ledger for the same *mandate*, and every table here is already scoped by
+`mandate_id` — actions, budget, rate window, receipts. So the exclusion moved to
+the level the guarantee actually lives at:
+
+- acquisition is one conditional `UPDATE`, so two racing processes cannot both
+  win — a read-then-write version would be a check-then-act race over money that
+  passes every single-process test;
+- the holder heartbeats, and a lease that stops beating becomes takeable, which
+  is how a crashed guard's mandate restarts without a human;
+- renewal is conditional on a per-acquisition token, so a process that lost its
+  lease while stalled cannot heartbeat its way back and produce two ledgers;
+- a clean shutdown releases it, so an ordinary restart stays instant.
+
+`rzp-guard-operator` now **attaches** without taking a lease. What it may do
+beside a live guard is decided per command, and the line is *not* read versus
+write — `queue`, `approve`, `decline` and `backup` all write. It is whether the
+command moves state the guard holds **in memory**: it decides from a ledger
+restored at startup, so resolving an action underneath it would leave it
+authorizing against a view that is no longer true. Those commands still need the
+guard stopped, and now say so with the holder's pid instead of a lock error.
+
+### The cost, stated
+
+After a **crash**, the next guard waits out the 15s TTL, because a stale
+heartbeat and a busy process are not distinguishable from outside. That crash
+already needs an operator — recovery promotes the in-flight reservation to
+`IN_DOUBT` — so the wait is not the expensive part of that morning.
+
+### What it also unlocked, which was not the goal
+
+One state file can now hold several mandates. Ten merchants on a host share one
+operator credential, one queue and one alert sink, instead of ten databases an
+operator has to guess between. The old refusal — opening a file under a different
+mandate was rejected if the previous one had unresolved work — **moved from
+refuse to surface**: `StrandedElsewhere` reports it at every start and to the
+operator continuously, which is strictly more than a refusal that fired once.
+
+---
+
+## F49 — The backup carried the running guard's lease, and refused the restore
+
+**Found:** 2026-09-05, by the restore test, on the first run. The backup code was
+written and reviewed; the defect was not visible in it.
+
+`VACUUM INTO` is the right way to copy a live SQLite database — `cp` in WAL mode
+omits every uncheckpointed transaction and produces a file that opens cleanly and
+is silently out of date, which is the worst shape a backup can have.
+
+It also copies **every table**, `owner_lease` included.
+
+So a backup taken while the guard ran carried that guard's lease: holder token,
+pid, hostname, and a heartbeat frozen at the moment of the copy. Restore it and
+the first guard to start is refused:
+
+```
+a restored backup does not open: state file is owned by another guard process:
+a live guard holds this mandate's lease: mnd_backup is held by pid 12064 on
+HarshaLdev, last heartbeat 121ms ago
+```
+
+The heartbeat is frozen, so it lapses after `leaseTTL` and the outage is fifteen
+seconds. The confusion, during a restore, would not have been fifteen seconds:
+the message names a process that may not have existed since the backup was taken,
+possibly on a machine that no longer exists, and the obvious reading is that
+something else is already running against the file you are trying to bring back.
+
+### Why the test found it and reading the code did not
+
+The test restores and **opens**. Every mental model of `VACUUM INTO` stops at
+"consistent copy of the data", and the lease *is* data, in the same database, in
+a table added the same week. Nothing about the copy is wrong; the defect is that
+one row means "a process is alive" and a process is exactly the thing a file
+cannot carry.
+
+### Fixed
+
+`Backup` opens the copy — never the source, or taking a backup would release the
+lease of the process taking it — and deletes every `owner_lease` row.
+`TestARestoredBackupCarriesNoLease` restores while the original guard is still
+running and holding its lease, which is the realistic case, and asserts both
+halves: the restore starts cleanly, and the original did not lose its lease to
+the backup that was taken from it.
+
+### The general shape
+
+This is the third entry in this file where a copy or a wrapper carried something
+whose meaning did not survive the journey — F23's `io.MultiWriter` returning the
+failing writer's count, F44's manifest rebuilt from scratch and erasing a key
+written by hand, and now a lease copied into a file where liveness is
+meaningless. **The unit under test has to be the unit that ships**, and here that
+meant restoring rather than inspecting.
+
+## F48 — The grant validator on the money path had no test at all
+
+**Severity: P2.** Found by red-teaming the hardening branch before merging it,
+not by anything in CI.
+
+`opgrant.Grant.Validate` is called at `internal/storage/unblock.go:220`, on the
+path that issues an operator grant — the object that turns a refusal into an
+allow. It enforces eight things: the id pattern, a mandate, a payment, a positive
+amount, an attributed actor, a stated reason, an expiry in the future, and a TTL
+inside the one-hour ceiling.
+
+**No test called it.** `internal/opgrant` was 132 lines of source and zero lines
+of test. The override path was well covered — single use, scope, non-overridable
+rules — but every one of those tests constructs a grant directly and never goes
+through the validator that production uses.
+
+So the reasoning in those clauses was load-bearing and unverified. The two that
+matter most are not mechanical:
+
+- **no actor** — *"an unattributed grant is not a decision anyone can be held to"*
+- **TTL ceiling** — *"a grant that outlives the incident is standing authority
+  nobody revisits, and it is invisible in the mandate a reviewer reads"*
+
+Both are accountability properties. A silent regression in either would not break
+a refund; it would remove the record of who authorized one.
+
+Now covered: every rejection clause individually, both sides of the TTL boundary,
+and `Admits` pinned as exact on payment, amount and expiry instant — a grant is
+not a budget.
+
+**The lesson is about indirect coverage.** `internal/opgrant` looked tested
+because the package that uses it is heavily tested. Coverage of a caller is not
+coverage of the invariant, and a validator is exactly the kind of code whose
+tests are the only thing keeping its clauses honest.

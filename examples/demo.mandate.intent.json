@@ -1,0 +1,25 @@
+{
+  "intent_id": "int_demo_001",
+  "mandate_id": "mnd_int_demo_001",
+  "issued_by": "support@merchant.example",
+  "issued_at": "2026-09-05T02:13:12Z",
+  "expires_at": "2026-09-05T04:13:12Z",
+  "compiled_by": "rzp-mandate/1",
+  "coverage": [
+    {
+      "item_id": "rfa_demo_001",
+      "payment_id": "pay_SYN00000000001",
+      "action_id": "rfa_demo_001",
+      "asked_paise": 50000,
+      "granted_paise": 50000,
+      "class": "exact",
+      "headroom_paise": 0,
+      "because": "customer returned the damaged jar; agreed full refund on that line"
+    }
+  ],
+  "total_asked_paise": 50000,
+  "total_granted_paise": 50000,
+  "total_headroom_paise": 0,
+  "intent_sha256": "05239a366dd6b5ea89ee7f17d3f7bb9a88a1b6003ed4471c0755e83c92696195",
+  "mandate_sha256": "2fa4f684677394c19bdeb32ee36d695110864f50c92b82855ff576a9be7c1b26"
+}

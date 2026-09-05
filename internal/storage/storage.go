@@ -36,7 +36,7 @@ import (
 // decision about files at the previous version -- migrate them, or refuse them
 // with instructions. Bumping it without that decision converts a silent
 // misread into a hard outage: better, but still bad.
-const schemaVersion = 2
+const schemaVersion = 3
 
 // callLogRetention is how much history RecordCall keeps. The rate limiter
 // only ever asks about the last 60 seconds; the surplus is deliberate slack so
@@ -53,10 +53,6 @@ var (
 	ErrNotOwner = errors.New("state file is owned by another guard process")
 	// ErrNoRowChanged means an expected-state write matched nothing.
 	ErrNoRowChanged = errors.New("no row changed: action was not in the expected state")
-	// ErrMandateMismatch means this state file already belongs to a different
-	// mandate that still has unresolved actions.
-	ErrMandateMismatch = errors.New("state file belongs to another mandate with unresolved actions")
-
 	// errLockContended is INTERNAL and never escapes Open. It marks the one
 	// failure worth retrying -- another connection held the exclusive lock at this
 	// instant -- as opposed to a decision this build has already reached about the
@@ -116,17 +112,57 @@ PRAGMA foreign_keys=ON;
 -- fails if this is ever weakened.
 PRAGMA synchronous=FULL;
 
--- Records which mandate owns this state file. READ on every Open: every query
--- in this package is scoped by mandate_id, so opening a populated file under a
--- different mandate would silently hide the previous mandate's unresolved
--- actions instead of surfacing them (FAILURES.md F22).
+-- Which process currently owns which mandate's ledger, as a LEASE.
 --
--- It does NOT force the exclusive lock. The schema statement above already
--- took it, which a mutation of the insert proves.
-CREATE TABLE IF NOT EXISTS owner (
-  id          INTEGER PRIMARY KEY CHECK (id = 1),
-  mandate_id  TEXT NOT NULL,
-  acquired_at TEXT NOT NULL
+-- This replaces PRAGMA locking_mode = EXCLUSIVE plus a one-row owner table,
+-- and the reason is operational rather than aesthetic.
+--
+-- WHAT THE EXCLUSIVE LOCK COST. It held the database lock for the guard's
+-- entire lifetime, so rzp-guard-operator could not open the state file at all
+-- while the guard ran. Every operator action -- including listing what is
+-- stuck -- required stopping the guard first. That is tolerable for resolving
+-- an IN_DOUBT refund, which is reconciliation nobody is waiting on. It is not
+-- tolerable for unblocking a refund the guard wrongly refused, because a
+-- customer IS waiting, and "stop the payment proxy to unstick one refund" is
+-- not a thing a support desk will do. The published false-positive cost model
+-- assumes a human is standing by to unblock; the lock is what made that human
+-- impossible.
+--
+-- It also forced one mandate per FILE, so ten merchants meant ten databases,
+-- ten IN_DOUBT queues and ten operator credentials, and an operator had to know
+-- which file held the refund they were looking for.
+--
+-- WHAT THE LEASE KEEPS. The money claim was never about the file. It is that
+-- two guards must not each restore an in-memory ledger for the SAME mandate and
+-- check the cumulative cap against their own copy, because between them they
+-- could spend past it. Every table here is already scoped by mandate_id --
+-- actions, budget, rate window, receipts -- so the claim is preserved exactly by
+-- leasing per mandate rather than per file.
+--
+-- HOW IT IS ENFORCED. Acquisition is one conditional UPDATE that succeeds only
+-- when no live lease exists, so it is atomic in SQLite rather than a
+-- read-then-write race. The holder renews on a timer; a lease whose heartbeat
+-- has gone stale is takeable, which is what lets a crashed guard's mandate be
+-- restarted without an operator command.
+--
+-- THE COST, STATED: after a crash the next guard waits out leaseTTL instead of
+-- starting instantly, because a stale heartbeat and a busy process are not
+-- distinguishable from here. A clean shutdown releases the lease, so the wait
+-- applies only to an actual crash -- which already requires operator attention,
+-- since recovery promotes the in-flight reservation to IN_DOUBT.
+CREATE TABLE IF NOT EXISTS owner_lease (
+  mandate_id   TEXT PRIMARY KEY,
+  -- Random per acquisition. Renewal and release are conditional on it, so a
+  -- process that lost its lease to a takeover cannot keep renewing one it no
+  -- longer holds, and cannot release the new holder's.
+  holder       TEXT    NOT NULL,
+  host         TEXT    NOT NULL,
+  pid          INTEGER NOT NULL,
+  acquired_at  TEXT    NOT NULL,
+  -- Unix nanoseconds, so staleness is an integer comparison rather than a
+  -- string one. A text timestamp compared lexically is a defect waiting for a
+  -- timezone.
+  heartbeat_ns INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS action_state (
@@ -217,13 +253,101 @@ CREATE TABLE IF NOT EXISTS audit (
   refund_landed INTEGER NOT NULL,
   reason        TEXT NOT NULL
 );
+
+-- Every refund the guard REFUSED, durably, so a human can see what was blocked.
+--
+-- Until this table existed, a refusal went to stderr and, if configured, to an
+-- optional JSONL decision log. Neither is a queue: nothing tracks whether a
+-- blocked refund was ever looked at, and the decision log records the allowed
+-- calls too, so the events needing a human are buried among thousands that do
+-- not. The published false-positive rate is 0.455. Blocking 45% of legitimate
+-- refunds is only survivable if somebody sees them, and nothing showed them.
+--
+-- DEDUPLICATED on (mandate, rule, payment, amount). An agent that retries a
+-- refused call in a loop is the normal case, not the exception, and one row per
+-- attempt would turn the queue into the same unreadable stream stderr already
+-- is. occurrences counts the retries; first_at and last_at bracket them.
+--
+-- CONTENT IS AGENT-CONTROLLED. payment_id comes straight off the wire and
+-- reason embeds it. Everything rendering this table must escape it, exactly as
+-- the decision log's comment says.
+CREATE TABLE IF NOT EXISTS denial (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  mandate_id   TEXT    NOT NULL,
+  tool         TEXT    NOT NULL,
+  rule         TEXT    NOT NULL,
+  payment_id   TEXT    NOT NULL,
+  amount_paise INTEGER NOT NULL,
+  reason       TEXT    NOT NULL,
+  first_at     TEXT    NOT NULL,
+  last_at      TEXT    NOT NULL,
+  occurrences  INTEGER NOT NULL DEFAULT 1,
+  -- OPEN | APPROVED | DECLINED. An operator decision, never the guard's.
+  resolution   TEXT    NOT NULL DEFAULT 'OPEN',
+  UNIQUE (mandate_id, rule, payment_id, amount_paise)
+);
+CREATE INDEX IF NOT EXISTS denial_open ON denial (resolution, last_at);
+
+-- A single-use authorization issued by a human for one refused refund.
+--
+-- THE GUARD NEVER WRITES THIS TABLE, exactly as it never writes
+-- operator_verifier. IssueGrant demands an opauth.Grant, which only opauth can
+-- mint and only after verifying the operator token, so the authority to widen a
+-- mandate lives behind the same credential as the authority to resolve an
+-- IN_DOUBT refund. Those are the same kind of decision -- a person accepting
+-- responsibility for money -- and they should not have different doors.
+--
+-- WHAT A GRANT DELIBERATELY CANNOT DO:
+--
+--   It is EXACT. There is no bounded form. A bound is discretion, and an
+--   operator unblocking one refused refund is not the moment to delegate a
+--   figure to the agent.
+--
+--   It EXPIRES, and soon. A grant that outlives the incident is standing
+--   authority nobody revisits, which is the failure the mandate's own expiry
+--   exists to prevent.
+--
+--   It is SINGLE USE, because it becomes an ordinary row in action_state and
+--   goes through the same lifecycle as any other action. There is no second
+--   money path; there is one path with one more way to enter it.
+--
+--   It COUNTS AGAINST THE MANDATE'S CUMULATIVE CAP. So an operator can correct
+--   a wrong refusal but cannot raise the merchant's own ceiling. That is the
+--   one limit a support desk should not be able to lift alone, and making the
+--   grant an ordinary action is what makes it hold without extra code.
+CREATE TABLE IF NOT EXISTS operator_grant (
+  grant_id     TEXT PRIMARY KEY,
+  mandate_id   TEXT    NOT NULL,
+  denial_id    INTEGER NOT NULL,
+  payment_id   TEXT    NOT NULL,
+  amount_paise INTEGER NOT NULL,
+  issued_at    TEXT    NOT NULL,
+  expires_at   TEXT    NOT NULL,
+  expires_ns   INTEGER NOT NULL,
+  actor        TEXT    NOT NULL,
+  reason       TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS grant_live ON operator_grant (mandate_id, expires_ns);
 `
 
 // Store is the durable side of the action lifecycle.
 type Store struct {
 	db        *sql.DB
 	mandateID string
+
+	// holder is this process's lease token, empty for an attached store. Renewal
+	// and release are conditional on it, so a process that lost its lease to a
+	// takeover cannot reclaim it by heartbeating or release the new holder's.
+	holder string
+
+	// attached marks a store opened WITHOUT a lease -- the operator's view while
+	// a guard is running. It leases nothing, renews nothing and releases nothing.
+	attached bool
 }
+
+// Attached reports whether this store was opened without taking a lease. The
+// operator CLI uses it to decide which commands are safe while a guard is live.
+func (s *Store) Attached() bool { return s.attached }
 
 // Open prepares the database and applies the schema, waiting out lock
 // contention for a bounded time.
@@ -290,31 +414,9 @@ func openWithDeadline(path, mandateID string, deadline time.Duration) (*Store, e
 // openOnce is one attempt. Every failure path closes the handle, which is what
 // releases the SHARED lock and lets a competing attempt make progress.
 func openOnce(path, mandateID string) (*Store, error) {
-	db, err := sql.Open("sqlite", path)
+	db, err := openDB(path)
 	if err != nil {
-		return nil, fmt.Errorf("storage: open: %w", err)
-	}
-	// One writer: the guard is a single process and SQLite writes serialize
-	// anyway. Avoids "database is locked" under concurrent reservations.
-	db.SetMaxOpenConns(1)
-
-	// Single-instance ownership. Two guard processes over one state file would
-	// each restore their own in-memory ledger and check the cumulative cap
-	// locally, so between them they could reserve past the mandate cap.
-	// SetMaxOpenConns(1) only serializes writers WITHIN one process.
-	//
-	// EXCLUSIVE locking mode makes this connection retain the database lock for
-	// its lifetime, so a second process fails fast instead of silently sharing.
-	if _, err := db.Exec(`PRAGMA locking_mode = EXCLUSIVE`); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("storage: locking mode: %w", err)
-	}
-	if _, err := db.Exec(schema); err != nil {
-		db.Close()
-		if lockContended(err) {
-			return nil, fmt.Errorf("%w (%v)", errLockContended, err)
-		}
-		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
+		return nil, err
 	}
 	// Before ANY read of the tables below. A file this build cannot correctly
 	// interpret must be refused while it is still untouched, not after its
@@ -323,92 +425,89 @@ func openOnce(path, mandateID string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	// Which mandate does this state file already belong to?
-	//
-	// Every query in this package is scoped by mandate_id, including recovery.
-	// So opening a populated state file under a DIFFERENT mandate does not fail
-	// -- it silently hides everything the previous mandate left behind. A refund
-	// that was RESERVED when the process died would never be promoted to
-	// IN_DOUBT, never appear in the operator console, and never be resolvable,
-	// while the money it represents may already have moved.
-	//
-	// That is not an exotic path: -state defaults to rzp-guard.db for both
-	// binaries while the mandate is a separate file supplied per run, and this
-	// repository alone carries 18 distinct mandate ids. Running any two of them
-	// without passing -state is enough.
-	//
-	// Refuse. The alternative -- recovering across mandates -- would surface one
-	// mandate's actions inside another's ledger and cap arithmetic, which is a
-	// worse trade for a component whose whole job is to keep authorization
-	// scoped.
-	var previous string
-	switch err := db.QueryRow(`SELECT mandate_id FROM owner WHERE id = 1`).Scan(&previous); {
-	case errors.Is(err, sql.ErrNoRows):
-		// Fresh state file; this mandate takes it below.
-	case err != nil:
-		db.Close()
-		return nil, fmt.Errorf("storage: read state file owner: %w", err)
-	case previous != mandateID:
-		stranded, serr := unresolvedFor(db, previous)
-		if serr != nil {
-			db.Close()
-			return nil, fmt.Errorf("storage: check for stranded actions: %w", serr)
-		}
-		if len(stranded) > 0 {
-			db.Close()
-			return nil, fmt.Errorf(
-				"storage: %w: %s holds %d unresolved action(s) [%s]; opening it as %s "+
-					"would hide them permanently, and a refund that was in flight may "+
-					"already have landed. Re-open with that mandate and resolve them "+
-					"(rzp-guard-operator -mandate <that mandate> list), or point -state "+
-					"at a different file",
-				ErrMandateMismatch, previous, len(stranded),
-				strings.Join(stranded, ", "), mandateID)
-		}
-		// The previous mandate left nothing unresolved, so reuse is safe.
-	}
 
-	// Record the owner. This does NOT force the exclusive lock -- the schema
-	// statement above already took it, which a mutation of this line proves. It
-	// is here so the check above has something to read on the next open.
-	if _, err := db.Exec(
-		`INSERT INTO owner (id, mandate_id, acquired_at) VALUES (1, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET mandate_id = excluded.mandate_id,
-		                               acquired_at = excluded.acquired_at`,
-		mandateID, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+	// Take the lease for THIS MANDATE. Not for the file: the money claim is that
+	// two ledgers must not exist over one mandate's actions and budget, and
+	// every table here is scoped by mandate_id, so that is the level the
+	// exclusion belongs at. See the owner_lease comment in the schema for what
+	// the file-wide exclusive lock cost and why it is gone.
+	holder, err := acquireLease(db, mandateID)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	return &Store{db: db, mandateID: mandateID, holder: holder}, nil
+}
+
+// Attach opens a state file WITHOUT taking a lease.
+//
+// This is how rzp-guard-operator reads and writes while a guard is running, and
+// it is the whole reason the exclusive lock had to go. An attached store must
+// not perform any operation that mutates state a live guard is holding in
+// memory -- the guard would keep serving from a stale ledger. Which operations
+// those are is decided by the caller, which can ask LeaseFor whether a guard is
+// live; the CLI refuses the mutating ones and permits the rest.
+//
+// Reading is always safe: WAL means a reader never blocks a writer or sees a
+// half-written transaction.
+func Attach(path, mandateID string) (*Store, error) {
+	db, err := openDB(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkSchemaVersion(db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return &Store{db: db, mandateID: mandateID, attached: true}, nil
+}
+
+// openDB applies the schema and the pragmas every caller needs, leasing nothing.
+func openDB(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, fmt.Errorf("storage: open: %w", err)
+	}
+	// One writer per process. SQLite serializes writes anyway; this keeps the
+	// pool from opening a second connection that would contend with the first.
+	db.SetMaxOpenConns(1)
+
+	// A bounded wait for the write lock, replacing the exclusive lock that used
+	// to make contention impossible by making sharing impossible.
+	//
+	// The old comment argued against a busy timeout, and it was right about the
+	// situation it described: under locking_mode = EXCLUSIVE a waiter sleeps
+	// while holding the SHARED lock everyone else needs, so the timeout cannot
+	// break the deadlock. Without EXCLUSIVE that deadlock does not form, and a
+	// busy timeout is exactly the right tool -- writes here are single-statement
+	// transactions measured in fractions of a millisecond, so the wait is for a
+	// queue of one or two, not for a long-running holder.
+	//
+	// The value is a ceiling on how long an authorized refund can stall behind
+	// another writer, so it is deliberately short. Exceeding it fails the
+	// reservation, and a failed reservation forwards nothing.
+	if _, err := db.Exec(`PRAGMA busy_timeout = 2000`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("storage: busy timeout: %w", err)
+	}
+	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		if lockContended(err) {
 			return nil, fmt.Errorf("%w (%v)", errLockContended, err)
 		}
 		return nil, fmt.Errorf("storage: %w (%v)", ErrNotOwner, err)
 	}
-	return &Store{db: db, mandateID: mandateID}, nil
+	return db, nil
 }
 
-// unresolvedFor lists the actions of some other mandate that still need a
-// human: RESERVED (mid-flight when the process died) or IN_DOUBT (recovered and
-// waiting). COMMITTED and terminal rows are finished business and do not block
-// reuse of the state file.
-func unresolvedFor(db *sql.DB, mandateID string) ([]string, error) {
-	rows, err := db.Query(`SELECT action_id FROM action_state
-		 WHERE mandate_id = ? AND state IN ('RESERVED', 'IN_DOUBT')
-		 ORDER BY action_id`, mandateID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
+// Close releases the lease before closing the handle, so an ordinary restart
+// does not wait out leaseTTL. Release is best-effort: the lease expires on its
+// own, and a missed release costs one TTL of delay, which is not worth failing
+// a shutdown over.
+func (s *Store) Close() error {
+	s.releaseLease()
+	return s.db.Close()
 }
-
-func (s *Store) Close() error { return s.db.Close() }
 
 // RecoverStartup promotes every still-RESERVED row to IN_DOUBT and returns the
 // action ids it locked. Call once, before accepting any traffic.
@@ -471,6 +570,40 @@ func (s *Store) Reserve(actionID, receipt string, amountPaise int64) error {
 // the same receipt, because that string is what an operator searches Razorpay
 // for -- rows disagreeing about it would mislead exactly when it matters.
 func (s *Store) ReserveMany(receipt string, rs []lifecycle.Reservation) error {
+	return s.reserveMany(receipt, rs, 0)
+}
+
+// ReserveManyWithCall reserves the actions AND records the rate-window slot in
+// ONE transaction, which is one fsync instead of two.
+//
+// WHY IT EXISTS -- THE PERFORMANCE HALF. At synchronous=FULL a commit costs
+// about 6.5ms on this hardware, and an allowed refund performed two of them:
+// 15.3ms measured end to end, against 779ns for a denial. Durability is the
+// whole design and is not up for negotiation, but performing it TWICE for one
+// decision was not a requirement, it was an artifact of the two writes living
+// in different packages. One transaction halves the cost of every authorized
+// refund and roughly doubles the ceiling, from ~65 to ~130 per second per
+// process, with no guarantee weakened -- both rows are still durable before a
+// byte reaches the child.
+//
+// WHY IT EXISTS -- THE CORRECTNESS HALF, WHICH MATTERS MORE. Two transactions
+// could half-succeed. policy.reserveSet dealt with that by attempting a
+// rollback, and said so honestly: "The rollback is attempted, not guaranteed:
+// the rate write failing usually means the store is broken, so the release will
+// fail too." That left a real state where actions sit RESERVED holding budget
+// against a refund that never left the building, discovered only at the next
+// restart as a spurious IN_DOUBT an operator has to ask about. One transaction
+// removes the state rather than compensating for it.
+//
+// atUnixNano of 0 means no slot -- the plain ReserveMany path, kept for callers
+// that do not own a rate window.
+func (s *Store) ReserveManyWithCall(receipt string, rs []lifecycle.Reservation,
+	atUnixNano int64) error {
+	return s.reserveMany(receipt, rs, atUnixNano)
+}
+
+func (s *Store) reserveMany(receipt string, rs []lifecycle.Reservation,
+	atUnixNano int64) error {
 	if len(rs) == 0 {
 		return errors.New("storage: reserve: no actions given")
 	}
@@ -534,6 +667,26 @@ func (s *Store) ReserveMany(receipt string, rs []lifecycle.Reservation) error {
 		return fmt.Errorf("storage: reserve: claim receipt: %w", err)
 	}
 
+	// The rate-window slot, in the SAME transaction as the reservation it
+	// belongs to. Consuming the slot and claiming the actions are one decision;
+	// splitting them into two commits made them two facts that could disagree.
+	if atUnixNano != 0 {
+		if _, err := tx.Exec(
+			`INSERT INTO call_log (mandate_id, at_unix_nano) VALUES (?, ?)`,
+			s.mandateID, atUnixNano); err != nil {
+			return fmt.Errorf("storage: reserve: record call: %w", err)
+		}
+		// Pruning rides along for free: it is already inside a transaction that
+		// is about to fsync, so bounding the table costs nothing here. Doing it
+		// as its own statement outside would have doubled the cost of every
+		// refund to buy tidiness (F23).
+		if _, err := tx.Exec(
+			`DELETE FROM call_log WHERE mandate_id = ? AND at_unix_nano < ?`,
+			s.mandateID, atUnixNano-int64(callLogRetention)); err != nil {
+			return fmt.Errorf("storage: reserve: prune call log: %w", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("storage: reserve: %w", err)
 	}
@@ -594,13 +747,35 @@ func checkSchemaVersion(db *sql.DB) error {
 		Scan(&found); err != nil {
 		return fmt.Errorf("storage: read schema version: %w", err)
 	}
+	// Migrations run in sequence, so a v1 file reaches v3 through v2 rather than
+	// needing a v1->v3 path nobody would ever exercise. Each step is its own
+	// transaction and each ends by stamping its own version, so a failure part
+	// way leaves a file at a version this build understands how to resume from.
+	for found < schemaVersion {
+		var err error
+		switch found {
+		case 1:
+			err = migrateV1toV2(db)
+		case 2:
+			err = migrateV2toV3(db)
+		default:
+			return fmt.Errorf("%w: file is version %d and no migration exists for "+
+				"that step, which is a defect in rzp-guard and not in your state "+
+				"file. Do NOT delete it: it may hold IN_DOUBT actions whose refunds "+
+				"already moved money", ErrSchemaVersion, found)
+		}
+		if err != nil {
+			return err
+		}
+		if err := db.QueryRow(`SELECT version FROM schema_meta WHERE id = 1`).
+			Scan(&found); err != nil {
+			return fmt.Errorf("storage: read schema version after migration: %w", err)
+		}
+	}
+
 	switch {
 	case found == schemaVersion:
 		return nil
-	case found == 1 && schemaVersion == 2:
-		// The first real migration, and the reason the version stamp was added
-		// while state files were still disposable.
-		return migrateV1toV2(db)
 	case found > schemaVersion:
 		return fmt.Errorf("%w: file is version %d, this build understands %d. "+
 			"It was written by a NEWER rzp-guard which may track state in columns "+
@@ -662,6 +837,44 @@ func migrateV1toV2(db *sql.DB) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("storage: migrate v1->v2: %w", err)
+	}
+	return nil
+}
+
+// migrateV2toV3 replaces the one-row owner table with a per-mandate lease, and
+// adds the denial queue and operator grants.
+//
+// THE OWNER ROW IS NOT CARRIED FORWARD AS A LIVE LEASE. A v2 file's owner row
+// records which mandate last used the file, not which process is running now --
+// the exclusive lock was what proved liveness, and the lock is gone. Copying it
+// in as a live lease would make the first guard to open a migrated file refuse
+// to start, blaming a process that exited weeks ago. The row is dropped and the
+// first opener takes a fresh lease, which is correct: nothing is running yet,
+// because a v2 build could not have been holding a v3 file open.
+//
+// One transaction. A half-migrated state file holding refund reservations is
+// worse than one that refuses to open.
+func migrateV2toV3(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("storage: migrate v2->v3: %w", err)
+	}
+	defer tx.Rollback()
+
+	// The tables themselves were created by the schema statement at open, which
+	// is CREATE TABLE IF NOT EXISTS throughout. What remains is retiring the old
+	// one and stamping the version -- the two things IF NOT EXISTS cannot do.
+	stmts := []string{
+		`DROP TABLE IF EXISTS owner`,
+		`UPDATE schema_meta SET version = 3 WHERE id = 1`,
+	}
+	for _, q := range stmts {
+		if _, err := tx.Exec(q); err != nil {
+			return fmt.Errorf("storage: migrate v2->v3: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("storage: migrate v2->v3: %w", err)
 	}
 	return nil
 }

@@ -40,6 +40,20 @@ type statusWriter struct {
 	mnd  string
 	pid  int
 	born time.Time
+
+	// denials reports refusals the deny-path rate cap could not record. Set
+	// after construction rather than passed in, because the recorder is built
+	// later in the startup order and reordering that path -- where the defer
+	// sequence is load-bearing and commented as such -- is not worth one field.
+	denials *denialRecorder
+}
+
+// setDenials wires the recorder once it exists. Nil-safe: a status file with no
+// recorder simply reports nothing dropped, which is true.
+func (s *statusWriter) setDenials(d *denialRecorder) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.denials = d
 }
 
 type statusDoc struct {
@@ -64,6 +78,14 @@ type statusDoc struct {
 	// computed here rather than left to the reader so every consumer agrees on
 	// what "needs a human" means.
 	NeedsOperator bool `json:"needs_operator"`
+
+	// DenialsUnrecorded counts refusals the deny-path rate cap did not write.
+	//
+	// Non-zero means the operator queue is INCOMPLETE. A short queue because it
+	// overflowed must never look like a short queue because nothing was refused,
+	// and this is the field that separates them for a reader with no metrics
+	// stack.
+	DenialsUnrecorded int64 `json:"denials_unrecorded"`
 }
 
 func newStatusWriter(path string, g *policy.Guard, mandateID string) *statusWriter {
@@ -91,7 +113,18 @@ func (s *statusWriter) snapshot(now time.Time) statusDoc {
 		CommittedPaise: s.g.Committed(),
 		RemainingPaise: s.g.Remaining(),
 		NeedsOperator:  len(inDoubt) > 0,
+
+		DenialsUnrecorded: droppedFrom(s.denials),
 	}
+}
+
+// droppedFrom is nil-safe so the snapshot cannot fail on a status writer that
+// was never given a recorder -- which is every test predating this field.
+func droppedFrom(d *denialRecorder) int64 {
+	if d == nil {
+		return 0
+	}
+	return d.Dropped()
 }
 
 // write publishes the current status atomically.

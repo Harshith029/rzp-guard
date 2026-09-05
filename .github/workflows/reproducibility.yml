@@ -118,6 +118,73 @@ jobs:
   # socket, so they are not run here. Their evidence is committed under
   # evidence/ and reproduced locally with ./run.sh live-block.
 
+  # THE AUTHORING LAYER, gated the same way the guard is.
+  #
+  # Every measured miss in arm E traces to a mandate that authorized more than
+  # the merchant's sentence asked for, and no change to internal/policy could
+  # have caught one: from the guard's side an over-broad grant and a correct one
+  # are the same document. cmd/rzp-mandate is where that is refused instead.
+  #
+  # Compile-time refusal stops a bad grant being WRITTEN. This job stops a good
+  # one being EDITED afterwards, which is the realistic way an over-broad mandate
+  # appears on a machine that has the compiler installed.
+  mandate-authoring-holds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26', cache: false }
+
+      - name: The example intent must still compile to the mandate beside it
+        run: bash ./run.sh mandate-demo
+
+      # examples/demo.mandate.json is a COMMITTED compiled triple -- the grant,
+      # the coverage record, and the intent it came from. It is here so this
+      # gate has something real to check: a verifier that passes because it
+      # found nothing is indistinguishable from one that works, so the runner
+      # fails on an empty sweep.
+      - name: Every compiled mandate in the tree must still verify
+        run: bash ./run.sh mandate-verify
+
+      - name: A hand-edited mandate must fail that verification
+        run: |
+          cp examples/demo.mandate.json /tmp/restore.json
+          sed -i 's/"max_cumulative_paise": 50000/"max_cumulative_paise": 500000/'             examples/demo.mandate.json
+          if bash ./run.sh mandate-verify; then
+            cp /tmp/restore.json examples/demo.mandate.json
+            echo "a mandate whose cap was raised by hand still verified; the" >&2
+            echo "coverage record is decoration rather than a control" >&2
+            exit 1
+          fi
+          cp /tmp/restore.json examples/demo.mandate.json
+          echo "a widened mandate is caught"
+
+      # The authoring tool must stay unable to reach Razorpay. A tool that could
+      # both write a mandate and issue a refund IS the self-authorizing launcher
+      # FAILURES.md F18 and F26 record removing from this repository.
+      - name: The mandate compiler must talk to nothing
+        run: |
+          deps="$(go list -deps ./cmd/rzp-mandate)"
+          for forbidden in net/http os/exec net; do
+            if echo "$deps" | grep -qx "$forbidden"; then
+              echo "cmd/rzp-mandate imports $forbidden. An authoring tool that can" >&2
+              echo "reach the network or launch a process is a refund-issuing" >&2
+              echo "command that writes its own authorizing mandate." >&2
+              exit 1
+            fi
+          done
+          echo "cmd/rzp-mandate reaches neither the network nor a subprocess"
+
+      # The unblock workflow, which is what the published false-positive cost
+      # model assumes exists. Its own section 7 said nothing implemented it.
+      - name: A wrongly refused refund must be unblockable without a restart
+        run: |
+          go test ./internal/bootstrap/ ./internal/storage/ ./internal/policy/ -run 'Unblock|Wrongly|Grant|Denial|Queue|Retri|Override|Operator' -count=1
+
+      # An operator grant must not become a way past the merchant's own ceiling.
+      - name: An operator grant must stay narrower than the mandate
+        run: go test ./internal/policy/ -run 'Overridable|GrantScope|SingleUse' -count=1 -v
+
   # THE COMBINED CONDITION -- the one that actually broke.
   #
   # Two jobs existed before this and neither reproduced the failure. The

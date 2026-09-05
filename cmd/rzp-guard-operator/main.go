@@ -12,12 +12,20 @@
 // merchant with a permanently stuck authorization and no supported way to clear
 // it.
 //
-// OPERATIONAL CONSTRAINT, stated plainly: the guard holds an EXCLUSIVE lock on
-// the state file for its lifetime, which is what prevents two guards from each
-// enforcing the cumulative cap against their own in-memory ledger. So this tool
-// requires the guard to be stopped. The workflow is: stop the guard, resolve,
-// restart. That is a real limitation, not a hidden one, and it is reported
-// clearly rather than surfacing as a confusing lock error.
+// It is also the human half of the FALSE-POSITIVE path, which for a long time
+// had no half at all. The guard refuses 45% of legitimate refunds by its own
+// published measurement, and the cost model for that assumes somebody unblocks
+// them. Nobody could: the guard held a file-wide exclusive lock for its entire
+// lifetime, so every operator action -- including merely listing what was stuck
+// -- required stopping the payment proxy first. Ownership is a per-mandate
+// lease now, this tool attaches without taking one, and queue/approve/decline
+// work while the guard runs.
+//
+// WHAT STILL NEEDS THE GUARD STOPPED: anything that moves state the guard holds
+// in memory. It restores a ledger at startup and decides from it, so resolving
+// an IN_DOUBT action underneath it would leave it authorizing against a view
+// that is no longer true. Those commands say so with the holder's pid rather
+// than surfacing as a confusing lock error.
 package main
 
 import (
@@ -62,7 +70,18 @@ ALL commands except init require RZP_GUARD_OPERATOR_TOKEN and -operator,
 including list and audit: they disclose payment ids, receipts, amounts and
 audit reasons.
 
-The guard must be STOPPED: it holds an exclusive lock on the state file.
+WHAT NEEDS THE GUARD STOPPED, AND WHAT DOES NOT.
+  Runs beside a live guard:  list, audit, queue, approve, decline, backup
+  Needs the guard stopped:   resolve, rotate, init
+  Needs nothing at all:      verify-backup, mandate-keygen, mandate-sign
+The line is not read versus write. It is whether the command moves state the
+guard is holding in its own memory: a live guard serves decisions from a ledger
+it restored at startup, so resolving an action underneath it would leave it
+authorizing against a view that is no longer true. Grants and denial
+resolutions are read from the database at the moment they are needed, so they
+are safe to write while it runs -- which is the whole point, because a refund
+wrongly refused is only worth unblocking while someone is still waiting for it.
+
 Set RZP_GUARD_OPERATOR_TOKEN to the generated token to authorise resolve/rotate.
 The guard never reads or writes this credential; only this command does.
 
@@ -87,6 +106,9 @@ func run() error {
 		reason      = flag.String("reason", "", "what you checked and found (resolve only)")
 		asJSON      = flag.Bool("json", false, "machine-readable output")
 		out         = flag.String("out", "", "init/rotate: NEW file to write the token to (must not exist)")
+		allMandates = flag.Bool("all", false, "queue: every mandate in this state file, not just this one")
+		queueState  = flag.String("state-filter", "OPEN", "queue: OPEN | APPROVED | DECLINED, or empty for all")
+		ttl         = flag.String("ttl", "", "approve: how long the grant lives (default 15m, ceiling 1h)")
 	)
 	allowUnprot := allowUnprotectedFlag()
 	acceptRisk := acceptRiskFlag()
@@ -124,14 +146,20 @@ func run() error {
 
 	// Merchant-side key handling runs BEFORE the state file is opened and before
 	// the operator credential is checked. Signing a mandate is not an operation on
-	// the guard's durable state, and requiring the guard's exclusive lock to do it
-	// would force the signing key onto the guard host -- the one place it must not
-	// be. See mandatesign.go.
+	// the guard's durable state, and requiring the state file to do it would force
+	// the signing key onto the guard host -- the one place it must not be.
+	// See mandatesign.go.
 	switch args[0] {
 	case "mandate-keygen":
 		return cmdMandateKeygen(args[1:])
 	case "mandate-sign":
 		return cmdMandateSign(args[1:])
+	case "verify-backup":
+		// Deliberately here, before -mandate is required and before any state
+		// file is opened. The moment a backup needs verifying is the moment the
+		// original is gone, and a verifier that needs the thing it is standing in
+		// for is not a verifier.
+		return cmdVerifyBackup(*out, *asJSON)
 	}
 
 	if *mandatePath == "" {
@@ -147,23 +175,58 @@ func run() error {
 		return err
 	}
 
-	store, err := storage.Open(*statePath, m.MandateID)
+	// ATTACH, do not lease.
+	//
+	// This tool used to call storage.Open, which took the same file-wide
+	// exclusive lock the guard held for its entire lifetime -- so every operator
+	// action, including merely listing what was stuck, required stopping the
+	// guard first. A support desk will not stop a payment proxy to unstick one
+	// refund, which is why the published false-positive cost model's "a human
+	// unblocks it" assumption had nothing behind it.
+	//
+	// Attaching reads and writes the same file without taking a lease. What is
+	// permitted while a guard is live is decided per command, from the lease
+	// itself: reading is always safe under WAL, issuing an operator grant is safe
+	// because the guard reads grants from the database rather than from memory,
+	// and anything that mutates state a live guard holds in memory is refused
+	// with an explanation rather than a lock error.
+	store, err := storage.Attach(*statePath, m.MandateID)
 	if err != nil {
-		// Two very different causes, and the wrong advice is expensive here.
-		// A mandate mismatch means nothing is running and the state file is
-		// healthy -- the operator is simply holding the wrong mandate, which is
-		// exactly the situation in which they are hunting for stranded actions.
-		// Telling them to stop the guard would send them after a process that
-		// does not exist.
-		if errors.Is(err, storage.ErrMandateMismatch) {
-			return fmt.Errorf("this state file belongs to a different mandate, and "+
-				"every query here is scoped by mandate.\n  %w", err)
-		}
-		return fmt.Errorf("could not take the state file — is the guard still "+
-			"running? It holds an exclusive lock for its lifetime, so stop it "+
-			"before resolving.\n  underlying: %w", err)
+		return fmt.Errorf("could not open the state file: %w", err)
 	}
 	defer store.Close()
+
+	// WHICH COMMANDS MAY RUN WHILE A GUARD IS LIVE.
+	//
+	// The distinction is not read versus write. It is whether the command
+	// mutates state the guard is holding in its own memory.
+	//
+	// A live guard restored an in-memory ledger at startup and serves every
+	// decision from it. Moving an action's state underneath that -- resolving an
+	// IN_DOUBT refund, say -- leaves the guard authorizing against a view of the
+	// world that is no longer true, and it would not find out until its next
+	// restart. So those commands still require the guard to be stopped, and now
+	// they say so with the pid rather than with a lock error.
+	//
+	// Everything else may run concurrently. Reads are safe under WAL. Issuing an
+	// operator grant is safe for a specific structural reason: the guard reads
+	// grants from the DATABASE on the refusal path, not from a snapshot taken at
+	// startup, so a grant written now is visible to a guard that started an hour
+	// ago. That is what makes unblocking a wrongly-refused refund possible while
+	// the refund is still worth unblocking.
+	lease, _, err := store.LeaseFor(m.MandateID)
+	if err != nil {
+		return err
+	}
+	if lease.Live && mutatesGuardState(args[0]) {
+		return fmt.Errorf(
+			"%q changes state a running guard is holding in memory, so it needs the "+
+				"guard stopped.\n  %s is held by pid %d on %s (last heartbeat %s ago).\n"+
+				"  Stop it, run this, restart.\n"+
+				"  Commands that DO work right now: list, audit, queue, approve, decline.",
+			args[0], m.MandateID, lease.PID, lease.Host,
+			time.Since(lease.Heartbeat).Truncate(time.Second))
+	}
 
 	// init is the only command that runs without a credential, because it is
 	// the one that creates it.
@@ -199,6 +262,24 @@ func run() error {
 			return errors.New("resolve needs an action_id")
 		}
 		return cmdResolve(store, m, grant, args[1], *outcome, *reason)
+	case "queue":
+		return cmdQueue(store, *allMandates, *queueState, *asJSON)
+	case "approve":
+		if len(args) < 2 {
+			return errors.New("approve needs a denial id; run `queue` for the ids")
+		}
+		d, terr := parseTTL(*ttl)
+		if terr != nil {
+			return terr
+		}
+		return cmdApprove(store, grant, args[1], *reason, d, lease)
+	case "decline":
+		if len(args) < 2 {
+			return errors.New("decline needs a denial id; run `queue` for the ids")
+		}
+		return cmdDecline(store, grant, args[1], *reason)
+	case "backup":
+		return cmdBackup(store, grant, *out, *asJSON)
 	default:
 		flag.Usage()
 		return fmt.Errorf("unknown command %q", args[0])
@@ -556,4 +637,30 @@ func cmdResolve(store *storage.Store, m *mandate.Mandate, grant opauth.Grant,
 	}
 	fmt.Printf("  Audited at %s by %s\n", time.Now().UTC().Format(time.RFC3339), grant.Subject())
 	return nil
+}
+
+// mutatesGuardState reports whether a command changes state a running guard
+// holds in memory.
+//
+// It is a DENY-BY-DEFAULT list: an unrecognised command is treated as mutating,
+// so a new command added later needs a deliberate decision to be allowed to run
+// beside a live guard. The alternative -- allow-by-default -- means the next
+// command anyone adds is concurrent-safe by accident, and finds out otherwise
+// during an incident.
+func mutatesGuardState(cmd string) bool {
+	switch cmd {
+	case "list", "audit", "queue", "approve", "decline", "backup":
+		// Reads, plus the two that write only to tables the guard never caches:
+		// denial resolutions and operator grants. The guard consults both from
+		// the database at the moment it needs them.
+		//
+		// backup is here because VACUUM INTO holds a read transaction: a live
+		// writer serializes behind it briefly rather than producing a torn copy.
+		// A backup you have to stop the payment proxy for is one nobody takes on
+		// a schedule, and an untaken backup is the same as none.
+		return false
+	default:
+		// resolve, rotate, init, init-ephemeral, and anything added later.
+		return true
+	}
 }

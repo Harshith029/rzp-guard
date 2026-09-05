@@ -1,24 +1,27 @@
 {
   "note": "Everything the published arm D numbers depend on. `rzp-armd verify` checks all of it and writes nothing. None of this makes the labels independent; see study/ASSESSMENT-armD.md.",
-  "recorded_at_utc": "2026-09-03T06:49:23Z",
+  "recorded_at_utc": "2026-09-05T00:11:47Z",
   "decision_path": {
     "note": "Non-test sources of the scorer's import closure (`go list -deps ./cmd/rzp-armd`), plus cmd/rzp-armd/main.go. internal/storage is absent because it is not in that closure: the scorer's persister is nil.",
     "packages": [
       "internal/lifecycle",
       "internal/mandate",
       "internal/opauth",
+      "internal/opgrant",
       "internal/policy",
       "cmd/rzp-armd"
     ],
-    "tree_sha256": "d92cfe24bc3c19116c4fe97eca87840efa9592359748402eacc656963709ef97",
+    "tree_sha256": "bca2d50c01739813ccff5fd5cabcb29f6265bad4fafe425f98aff289c62eecb2",
     "files": {
       "cmd/rzp-armd/main.go": "31901382821ac6fe506681c9f5db2761c3df4684fe2a4e9192911023ddf2640f",
-      "internal/lifecycle/lifecycle.go": "f5b59d977a35c05c300393b09a7a09adfead6a99cc2fa698684e7a16666c4f70",
+      "internal/lifecycle/lifecycle.go": "89ec3570bdd15e2c418f821c8bbf3b7d9cbf6b5408be654c509b7d17dd52a681",
       "internal/mandate/mandate.go": "0a71d4e5da13d3dcd5776f369341e5c94738b591ea8dd1aa423a7ba0bc3eaff4",
       "internal/opauth/deliver.go": "2c09319729a9b76e2f0a9b071ec3e0b8a9fc6a607074f0fa268f3621b66dfbc1",
       "internal/opauth/opauth.go": "f7541b9534aa7a0e33fbe5a9f7e2145dfb2dbc59d3c0f572830261cff85a0912",
       "internal/opauth/syncdir.go": "c055f5b59d667bf4aaf9a80fcd3927817c9cab0482f6e85bbf0a17589078d2ae",
-      "internal/policy/policy.go": "85d73b48464c9ef2a376afb4bed43174e80834bb33abd526da4f1f0e1b480876"
+      "internal/opgrant/opgrant.go": "90b20eff05ed5fe0d876ef0c573080100a689d62e915e71e57da33dc5e230f3d",
+      "internal/policy/override.go": "48c81116882c7423329ae61930aef6fe726c480b2aac1597b1df15a57718bf4b",
+      "internal/policy/policy.go": "78c61983edf9891ffe24f94b8e2713685873988e40a838902126475156e39a2c"
     }
   },
   "corpus": {
@@ -75,6 +78,20 @@
       "recorded_at_utc": "2026-09-02T10:19:04Z",
       "superseded_at_utc": "2026-09-03T06:49:23Z",
       "reason": "internal/mandate/mandate.go now refuses a mandate file carrying more than one JSON value. Load() decoded the first value and ignored the rest, so a second document would have been silently dropped and the authority a reviewer reads would not be the authority enforced. Arm D's 90 mandates each hold exactly one document, so all 90 decisions and the matrix TP 54 FP 17 TN 19 FN 0 are unchanged -- verified by this command before the stamp.",
+      "published_matrix_still_reproduced": true
+    },
+    {
+      "tree_sha256": "d92cfe24bc3c19116c4fe97eca87840efa9592359748402eacc656963709ef97",
+      "recorded_at_utc": "2026-09-03T06:49:23Z",
+      "superseded_at_utc": "2026-09-04T23:54:49Z",
+      "reason": "internal/policy grew the operator-grant path (override.go, plus three refusal sites in Decide passing through operatorOverride and three new Decision fields), and internal/opgrant joined the decision-path closure. Arm D is a RETRACTED arm preserved unedited; re-deciding all 90 requests still reproduces TP 54 FP 17 TN 19 FN 0. The new path cannot fire here: it needs a grant source, and the scorer wires none, so a Guard without one does not take the branch at all. See study/PROTOCOL-armE-AMENDMENT-3.md for the equivalent check on the live arm.",
+      "published_matrix_still_reproduced": true
+    },
+    {
+      "tree_sha256": "9c8494aa79aee4668f4b535dadc089f38e295d0a749f961d99efa8b2aa9b290a",
+      "recorded_at_utc": "2026-09-04T23:54:49Z",
+      "superseded_at_utc": "2026-09-05T00:11:47Z",
+      "reason": "Second decision-path change in the CTO hardening work: the rate-window slot moved into the reservation's own transaction (internal/policy reserveSet, internal/lifecycle ReserveManyAt), so an authorized refund performs one fsync instead of two -- 4.9ms to 2.5ms measured on the same machine. Arm D is a RETRACTED arm preserved unedited; re-deciding all 90 requests still reproduces TP 54 FP 17 TN 19 FN 0. Durability is unchanged: both rows are still written before any byte reaches the child, in one transaction rather than two. See study/PROTOCOL-armE-AMENDMENT-3.md.",
       "published_matrix_still_reproduced": true
     }
   ],

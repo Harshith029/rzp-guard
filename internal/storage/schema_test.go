@@ -195,7 +195,11 @@ func buildV1File(t *testing.T, path string, rows [][3]any) {
 // A v1 file must be adopted and upgraded, not refused: refusing would strand
 // every state file written before v2, including ones holding IN_DOUBT actions
 // whose refunds already moved money.
-func TestAV1FileIsMigratedToV2(t *testing.T) {
+//
+// It migrates all the way to the CURRENT version, through every intermediate
+// step. A v1->v3 shortcut would be a path nobody exercises, and the one thing
+// worse than no migration is one that has never run on a real file.
+func TestAV1FileIsMigratedToTheCurrentSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "v1.db")
 	buildV1File(t, path, [][3]any{
 		{"rfa_001", "rzpg_aaaaaaaaaaaa", "IN_DOUBT"},
@@ -212,8 +216,8 @@ func TestAV1FileIsMigratedToV2(t *testing.T) {
 	if err := s.db.QueryRow(`SELECT version FROM schema_meta WHERE id = 1`).Scan(&v); err != nil {
 		t.Fatal(err)
 	}
-	if v != 2 {
-		t.Fatalf("version is %d after migration, want 2", v)
+	if v != schemaVersion {
+		t.Fatalf("version is %d after migration, want %d", v, schemaVersion)
 	}
 
 	// Nothing may be lost. These rows are money in a known state.
