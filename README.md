@@ -11,24 +11,17 @@ git clone https://github.com/Harshith029/rzp-guard.git
 cd rzp-guard && ./run.sh demo
 ```
 
-**No `.env`, no keys, no account.** Docker is the only prerequisite. Twelve
-seconds later it has allowed one refund, refused four, rejected a tampered
-authorization, and printed this:
+**No `.env`, no keys, no account.** Docker is the only prerequisite. The
+merchant authorizes one refund; an agent then asks five times. That run, on this
+commit:
 
-```
-UNAUTHORIZED MONEY STOPPED     109500 paise   (Rs 1095.00)
-  a replay, an over-refund, and a refund against a payment the
-  merchant never mentioned -- none reached the provider
+![A terminal running ./run.sh demo. The merchant authorized exactly 24000 paise on pay_SYNDEMO001, single use. An agent asks five times: the first is ALLOWED, and the next four are REFUSED — a replay (ACTION_CONSUMED), 61500 paise (AMOUNT_NOT_AUTHORIZED), the right amount on a different payment (NO_AUTHORIZED_ACTION), and a smaller partial refund (AMOUNT_NOT_AUTHORIZED).](.github/demo.png)
 
-LEGITIMATE REFUND DELAYED       12000 paise   (Rs 120.00)
-  the partial refund. The merchant wanted it and the guard said no.
-  Delayed, not lost -- a human unblocks it and the money still moves.
-```
-
-Two numbers, deliberately the same size. **₹1,095 of unauthorized movement
-stopped — and ₹120 the merchant actually wanted, that the guard blocked.** A
-control that reports only what it stopped is showing you half a ledger, so this
-one prints both and [prices them](study/FP-COST.md).
+Twelve seconds. It goes on to reject a tampered authorization, then prints the
+ledger both ways — two numbers, deliberately the same size: **₹1,095 of
+unauthorized movement stopped, and ₹120 the merchant actually wanted that the
+guard blocked.** A control that reports only what it stopped is showing you half
+a ledger, so this one prints both and [prices them](study/FP-COST.md).
 
 Measured against labels from two people who saw neither the authorization nor the
 decision: **recall 0.733, false-positive rate 0.455.** Eight requests got through
