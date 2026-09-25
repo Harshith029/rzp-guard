@@ -309,6 +309,7 @@ func TestAGrantCannotBeIssuedAgainstARefusalNoGrantCanOverride(t *testing.T) {
 		"MALFORMED_ARGUMENTS",
 		"TOOL_NOT_SUPPORTED",
 		"TOOL_NOT_ALLOWED",
+		"ARGUMENT_NOT_AUTHORIZED",
 		// A rule that does not exist yet. The list is an allowlist, so a refusal
 		// the policy grows later is not grantable until someone decides it is.
 		"SOME_FUTURE_RULE",

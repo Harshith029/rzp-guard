@@ -249,3 +249,69 @@ func TestAnEmptyQueueChangesNothing(t *testing.T) {
 		t.Fatalf("allowed=%v rule=%s", no.Allowed, no.Rule)
 	}
 }
+
+// The whole chain from FAILURES.md F53, end to end, against a real state file.
+//
+// A refund the mandate DOES authorize is refused only because the agent added a
+// parameter it may not choose. If an operator could approve that refusal, the
+// grant would never be needed -- the clean retry passes on the mandate -- and it
+// would sit live until a replay of the same refund spent it. One authorization,
+// two refunds. This asserts the operator is stopped at the first step, and that
+// exactly one refund goes out however the agent behaves afterwards.
+func TestARefusedParameterCannotBeApprovedIntoASecondRefund(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	m := buildMandate(t, "mnd_arg", 1, 24000)
+	now := time.Now().UTC()
+	boot, err := Open(path, m, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer boot.Close()
+	boot.Guard.SetGrantSource(boot.Store)
+
+	payment := m.AuthorizedRefundActions[0].PaymentID
+	clean := map[string]any{"payment_id": payment, "amount": int64(24000)}
+	instant := map[string]any{"payment_id": payment, "amount": int64(24000),
+		"speed": "optimum"}
+
+	d := boot.Guard.Decide(policy.RefundTool, instant, now)
+	if d.Rule != policy.ArgumentNotAuthorized {
+		t.Fatalf("precondition: speed=optimum should be refused, got %s", d.Rule)
+	}
+	if err := boot.Store.RecordDenial(d.Tool, d.Rule, d.PaymentID,
+		d.RequestedPaise, d.Reason); err != nil {
+		t.Fatal(err)
+	}
+
+	op, err := storage.Attach(path, m.MandateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer op.Close()
+	queue, _ := op.Denials(storage.DenialOpen, false)
+	if len(queue) != 1 || queue[0].PaymentID != payment {
+		t.Fatalf("the refusal should be visible in the queue with its payment, "+
+			"got %+v", queue)
+	}
+	if _, err := op.IssueGrant(operatorCredential(t, op), queue[0].ID,
+		10*time.Minute, "looked like a false positive"); err == nil {
+		t.Fatal("an operator approved a refusal no grant can override")
+	}
+
+	forwarded := 0
+	for i, at := range []time.Time{now.Add(2 * time.Second), now.Add(4 * time.Second)} {
+		d := boot.Guard.Decide(policy.RefundTool, clean, at)
+		if d.Allowed {
+			forwarded++
+			if err := boot.Guard.CommitMany(d.MatchedActionIDs); err != nil {
+				t.Fatal(err)
+			}
+		} else if i == 0 {
+			t.Fatalf("the clean retry must pass on the mandate alone: %s", d.Reason)
+		}
+	}
+	if forwarded != 1 {
+		t.Fatalf("%d refunds of 24000 forwarded on %s; the merchant authorized one",
+			forwarded, payment)
+	}
+}

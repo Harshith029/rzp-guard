@@ -277,6 +277,7 @@ detects that. That is the honest version of the claim.
   AI agent  ──►  rzp-guard  ──►  Razorpay MCP server (official, unmodified)
                     │
                     ├─ is this tool allowed at all?        default-deny
+                    ├─ any argument it cannot authorize?   refused, e.g. a paid instant refund
                     ├─ does the mandate authorize it?      payment + amount, entry unused
                     ├─ reserve the entry BEFORE forwarding durable, survives a crash
                     └─ commit only on a matching receipt   or mark IN_DOUBT

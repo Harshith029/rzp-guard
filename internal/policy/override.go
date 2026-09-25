@@ -122,6 +122,16 @@ func (g *Guard) GrantSourceError() error {
 //	merchant's own ceilings. A support desk correcting a wrong refusal is one
 //	thing; a support desk raising the limit the merchant set is another, and it
 //	is the one boundary that must need the merchant.
+//
+//	ARGUMENT_NOT_AUTHORIZED is NOT here. A grant covers a payment and an amount
+//	and nothing else, so it cannot authorize the parameter that was refused --
+//	an instant-refund speed, say. If the payment and amount are authorized, the
+//	agent's retry without that parameter passes on its own. Approving it would
+//	only leave a live grant for a payment and amount the mandate already covers,
+//	and a replay of that refund would spend it: FAILURES.md F53.
+//
+// storage.IssueGrant enforces the same set when a grant is issued, and a test
+// fails if the two lists disagree.
 var overridableRules = map[string]struct{}{
 	NoAuthorizedAction:  {},
 	AmountNotAuthorized: {},

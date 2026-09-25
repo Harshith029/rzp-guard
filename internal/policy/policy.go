@@ -68,6 +68,23 @@ const (
 	ToolNotSupported      = "TOOL_NOT_SUPPORTED"
 	Allowed               = "ALLOWED"
 
+	// ArgumentNotAuthorized fires when a refund call carries a parameter this
+	// guard cannot authorize.
+	//
+	// A mandate authorizes a REFUND, and a refund is more than a payment and an
+	// amount. Razorpay's create_refund also accepts `speed`, and `speed:
+	// "optimum"` opts the merchant into Instant Refunds -- a chargeable
+	// value-added service, per Razorpay's own documentation. An agent that can
+	// set it can commit the merchant to a fee no human approved, while the
+	// amount and the payment both match the mandate perfectly.
+	//
+	// The tool surface is already default-deny and a mandate cannot widen it.
+	// This is the same rule applied one level down: the ARGUMENT surface is
+	// default-deny, and an agent cannot widen it either. That also means a
+	// parameter Razorpay adds after this build shipped is refused rather than
+	// inherited, which is the only safe direction on a money path.
+	ArgumentNotAuthorized = "ARGUMENT_NOT_AUTHORIZED"
+
 	// OperatorApproved is an ALLOW the mandate did not produce.
 	//
 	// It fires only where the mandate has already refused, only against a grant
@@ -379,6 +396,56 @@ func (g *Guard) Remaining() int64                      { return g.ledger.Remaini
 func (g *Guard) Committed() int64                      { return g.ledger.Committed() }
 func (g *Guard) InDoubtActions() []string              { return g.ledger.InDoubtActions() }
 
+// vettedRefundArgs returns the subset of a create_refund call that may cross
+// the boundary, or an error naming the first parameter that may not.
+//
+// It is the ONLY place that decides what reaches the child, so an argument
+// cannot be forwarded by being forgotten here. Every key is classified
+// deliberately:
+//
+//	payment_id, amount  authorized against the mandate by the caller
+//	receipt             guard-owned; the agent's value is discarded
+//	notes               forwarded -- metadata cannot change the amount, the
+//	                    destination or the cost, and merchants reconcile with it
+//	speed               refused unless the merchant authorized instant refunds
+//	anything else       refused
+//
+// Refusing rather than silently dropping is deliberate. A dropped parameter
+// gives the agent a refund it did not ask for with no signal that anything
+// changed; a refusal is a decision the merchant can read afterwards.
+func vettedRefundArgs(args map[string]any, lim mandate.Limits) (map[string]any, error) {
+	out := make(map[string]any, len(args)+1)
+	for k, v := range args {
+		switch k {
+		case "payment_id", "amount":
+			out[k] = v
+		case "receipt":
+			// Deliberately not copied. The guard derives the receipt it will
+			// inject, and an agent-supplied one is neither trusted nor echoed.
+		case "notes":
+			out[k] = v
+		case "speed":
+			s, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("speed must be a string, got %#v", v)
+			}
+			if s != "normal" && !lim.AllowInstantRefund {
+				return nil, fmt.Errorf(
+					"speed=%q requests an instant refund, which Razorpay charges the "+
+						"merchant for. This mandate does not set allow_instant_refund, "+
+						"so the agent may not choose it", s)
+			}
+			out[k] = v
+		default:
+			return nil, fmt.Errorf(
+				"%q is not a create_refund argument this guard can authorize; the "+
+					"argument surface is default-deny for the same reason the tool "+
+					"surface is", k)
+		}
+	}
+	return out, nil
+}
+
 func deny(tool, rule, reason, actionID string) Decision {
 	return Decision{Allowed: false, Rule: rule, Reason: reason, Tool: tool, MatchedActionID: actionID}
 }
@@ -443,6 +510,18 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 		d.PaymentID = paymentID
 		return d
 	}
+
+	// 3b. argument surface -- default-deny, before any action is matched. A
+	// refund whose amount and payment are both authorized can still carry a
+	// parameter that costs the merchant money.
+	vetted, err := vettedRefundArgs(args, g.mandate.Limits)
+	if err != nil {
+		d := deny(tool, ArgumentNotAuthorized, err.Error(), "")
+		d.PaymentID = paymentID
+		d.RequestedPaise = amountPaise
+		return d
+	}
+	args = vetted
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -576,6 +655,10 @@ func (g *Guard) reserveSet(tool string, args map[string]any, amountPaise int64,
 	// the call.
 	g.rate.note(now)
 
+	// args reached here through vettedRefundArgs, so every key in it has been
+	// classified as forwardable. Copying wholesale is safe ONLY because of
+	// that; if this ever runs on an unvetted map it becomes a passthrough for
+	// whatever Razorpay parameters exist at the time.
 	forwarded := make(map[string]any, len(args)+1)
 	for k, v := range args {
 		forwarded[k] = v

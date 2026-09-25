@@ -104,6 +104,20 @@ func (a Action) validate() error {
 type Limits struct {
 	MaxCumulativePaise int64 `json:"max_cumulative_paise"`
 	MaxCallsPerMinute  int   `json:"max_calls_per_minute"`
+
+	// AllowInstantRefund lets the agent request speed="optimum" on a refund.
+	//
+	// OFF BY DEFAULT, and deliberately so. Instant Refunds is a chargeable
+	// Razorpay service: an agent that can set the speed can commit the merchant
+	// to a fee while the payment and the amount both match the mandate exactly.
+	// Leaving it absent means the guard refuses the parameter and Razorpay's own
+	// default speed applies -- the guard never picks a speed on the merchant's
+	// behalf, it only declines to let the agent pick one.
+	//
+	// Turning it on is the same shape of decision as max_amount_paise: the
+	// merchant deliberately delegates a figure, and an agent choosing within
+	// that envelope is choosing something the merchant authorized.
+	AllowInstantRefund bool `json:"allow_instant_refund,omitempty"`
 }
 
 // Mandate is the complete grant for one proxy session.

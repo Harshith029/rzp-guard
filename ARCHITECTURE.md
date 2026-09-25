@@ -140,6 +140,30 @@ spontaneously sent `"receipt": "KD-4471-atta-refund"` — the exact field the gu
 uses as an idempotency key — and the guard replaced it with `rzpg_7c8da474e0f0`.
 **The agent cannot choose the idempotency key.**
 
+### The argument surface is default-deny
+
+A mandate authorizes a payment and an amount, and until F54 the guard forwarded
+every *other* argument the agent sent. Razorpay's `create_refund` also takes
+`speed`, and `speed: "optimum"` opts the merchant into Instant Refunds, which
+Razorpay charges for. Every `create_refund` argument is now classified in one
+function, `vettedRefundArgs`, and anything unclassified is refused as
+`ARGUMENT_NOT_AUTHORIZED` — the same rule the tool surface follows, one level
+down, so a parameter the provider adds later is refused rather than inherited:
+
+| argument | handling |
+| --- | --- |
+| `payment_id`, `amount` | authorized against the mandate; amount canonicalised |
+| `receipt` | guard-owned — the agent's value is discarded, not refused |
+| `notes` | forwarded — metadata cannot change the amount, destination or cost |
+| `speed` | `"normal"` passes; anything else needs `allow_instant_refund` in the mandate |
+| anything else | refused |
+
+The classification is not a guess. **Every one of the 340 refund calls in arm C's
+recorded traffic carried `notes` and `receipt`**, so refusing either would have
+refused them all. Run over those traces, the rule refuses exactly one call: an
+unprompted `speed: "optimum"` that the old guard forwarded, sent by the same
+model that chose `"normal"` for the same brief in its other two runs.
+
 If re-encoding the approved call fails for any reason, the original is **not**
 forwarded and the reservation is rolled back. Nothing was written, so releasing
 is provably safe there.
@@ -270,7 +294,7 @@ the reason the guard cannot catch it, and the reason it does not pretend to.
 | An authorized refund does, and the receipt round-trips | G1.6, `evidence/g16/`, `./run.sh verify-refund-evidence` |
 | Child death leaves a durable `IN_DOUBT` surviving restart | `./run.sh process-recover` — 6 assertions |
 | What the guard did against real agent traffic | [study/RESULTS.md](study/RESULTS.md), [study/FINDINGS.md](study/FINDINGS.md) |
-| Everything that went wrong on the way | [FAILURES.md](FAILURES.md) — 53 entries, each with the real output |
+| Everything that went wrong on the way | [FAILURES.md](FAILURES.md) — 54 entries, each with the real output |
 
 Every gate re-runs against the **committed redacted projection**, not a private
 artifact, so the published evidence is exactly what the assertions checked.

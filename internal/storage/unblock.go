@@ -181,6 +181,11 @@ var notGrantableBecause = map[string]string{
 		"incident decision",
 	"TOOL_NOT_ALLOWED": "the tool surface is the merchant's grant, not an " +
 		"incident decision",
+	"ARGUMENT_NOT_AUTHORIZED": "the refund carried a parameter a grant cannot " +
+		"authorize -- a grant covers a payment and an amount, nothing else. If " +
+		"those are authorized, the agent's retry without the parameter passes on " +
+		"its own. For an instant-refund speed, the merchant must set " +
+		"allow_instant_refund in the mandate",
 }
 
 // GrantableRules returns the refusal rules an operator grant can correct,

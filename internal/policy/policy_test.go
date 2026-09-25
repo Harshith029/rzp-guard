@@ -58,6 +58,9 @@ func cumulative(v int64) func(map[string]any) {
 func perMinute(v int) func(map[string]any) {
 	return func(d map[string]any) { d["global"].(map[string]any)["max_calls_per_minute"] = v }
 }
+func allowInstant() func(map[string]any) {
+	return func(d map[string]any) { d["global"].(map[string]any)["allow_instant_refund"] = true }
+}
 
 // jsonArgs decodes with UseNumber, exactly as the relay will when reading a
 // tools/call off the wire. Tests must not hand-build Go types the wire cannot
@@ -787,5 +790,87 @@ func TestAmountsMustBeJSONIntegersNotJustParseable(t *testing.T) {
 		if got != good.want {
 			t.Errorf("amount %q parsed to %d, want %d", good.in, got, good.want)
 		}
+	}
+}
+
+// ---------------------------------------------------------------- argument surface
+
+// A mandate authorizes a REFUND, not a (payment, amount) pair. Razorpay's
+// create_refund also takes `speed`, and speed="optimum" opts the merchant into
+// Instant Refunds -- a service Razorpay charges for. Before this was closed an
+// agent could send a refund whose payment and amount matched the mandate
+// perfectly and still commit the merchant to a fee no human approved.
+//
+// The argument surface is now default-deny for the same reason the tool surface
+// is: so a parameter the provider adds after this build shipped is refused
+// rather than inherited.
+func TestTheArgumentSurfaceIsDefaultDeny(t *testing.T) {
+	const acts = `[{"action_id":"rfa_1","payment_id":"pay_SYN0001","amount_paise":24000}]`
+	for _, tc := range []struct {
+		name string
+		args string
+		rule string
+	}{
+		{"the authorized refund, nothing else",
+			`{"payment_id":"pay_SYN0001","amount":24000}`, Allowed},
+		{"notes ride along -- metadata cannot move money",
+			`{"payment_id":"pay_SYN0001","amount":24000,"notes":{"ref":"ORD-1"}}`, Allowed},
+		{"an agent-supplied receipt is discarded, not refused",
+			`{"payment_id":"pay_SYN0001","amount":24000,"receipt":"forged"}`, Allowed},
+		{"speed=normal is the provider default anyway",
+			`{"payment_id":"pay_SYN0001","amount":24000,"speed":"normal"}`, Allowed},
+
+		{"speed=optimum charges the merchant for an instant refund",
+			`{"payment_id":"pay_SYN0001","amount":24000,"speed":"optimum"}`, ArgumentNotAuthorized},
+		{"reverse_all touches linked-account settlement",
+			`{"payment_id":"pay_SYN0001","amount":24000,"reverse_all":true}`, ArgumentNotAuthorized},
+		{"a parameter that does not exist yet",
+			`{"payment_id":"pay_SYN0001","amount":24000,"some_future_flag":"x"}`, ArgumentNotAuthorized},
+		{"speed that is not even a string",
+			`{"payment_id":"pay_SYN0001","amount":24000,"speed":7}`, ArgumentNotAuthorized},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := New(mustMandate(t, acts))
+			d := g.Decide(RefundTool, jsonArgs(t, tc.args), now)
+			if d.Rule != tc.rule {
+				t.Fatalf("rule = %s, want %s (reason: %s)", d.Rule, tc.rule, d.Reason)
+			}
+			if tc.rule != Allowed {
+				// A refusal must not have consumed the authorization.
+				if d2 := New(mustMandate(t, acts)).Decide(RefundTool,
+					jsonArgs(t, `{"payment_id":"pay_SYN0001","amount":24000}`), now); !d2.Allowed {
+					t.Fatalf("the clean refund stopped working after a refusal: %s", d2.Reason)
+				}
+				return
+			}
+			if got := d.Forwarded["receipt"]; got != d.Receipt {
+				t.Fatalf("forwarded receipt %v, want the derived %v", got, d.Receipt)
+			}
+			if _, leaked := d.Forwarded["some_future_flag"]; leaked {
+				t.Fatal("an unvetted key reached the forwarded arguments")
+			}
+		})
+	}
+}
+
+// The escape hatch belongs to the merchant, not the agent. This is the same
+// shape as max_amount_paise: absent means the narrow behaviour, and setting it
+// is a deliberate delegation the merchant made in writing.
+func TestInstantRefundIsAllowedOnlyWhenTheMandateSaysSo(t *testing.T) {
+	const acts = `[{"action_id":"rfa_1","payment_id":"pay_SYN0001","amount_paise":24000}]`
+	const args = `{"payment_id":"pay_SYN0001","amount":24000,"speed":"optimum"}`
+
+	if d := New(mustMandate(t, acts)).Decide(RefundTool, jsonArgs(t, args), now); d.Allowed {
+		t.Fatal("instant refund was allowed without the merchant authorizing it")
+	}
+
+	g := New(mustMandate(t, acts, allowInstant()))
+	d := g.Decide(RefundTool, jsonArgs(t, args), now)
+	if !d.Allowed {
+		t.Fatalf("a merchant who authorized instant refunds must get one: %s", d.Reason)
+	}
+	if d.Forwarded["speed"] != "optimum" {
+		t.Fatalf("speed = %v, want it forwarded as the merchant authorized",
+			d.Forwarded["speed"])
 	}
 }

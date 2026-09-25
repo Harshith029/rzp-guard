@@ -3281,3 +3281,99 @@ exactly until someone improves the data — and improving it here meant putting 
 payment on a refusal so a human could read it, which is the right change and the
 one that armed the defect. The check belongs where the decision is made, stated
 by name, so it stops depending on which fields happen to be empty.
+
+---
+
+## F54 — The guard authorized a payment and an amount, and forwarded whatever else the agent sent
+
+**Found:** 2026-09-25, in an architecture review of the money path.
+
+```go
+forwarded := make(map[string]any, len(args)+1)
+for k, v := range args {
+    forwarded[k] = v
+}
+forwarded["amount"] = amountPaise
+forwarded["receipt"] = receipt
+```
+
+`reserveSet` copied **every** argument into the forwarded call and overrode two.
+A probe through the relay, recording the bytes that reached the child:
+
+```
+{"amount":24000,"notes":{"who":"agent"},"payment_id":"pay_X",
+ "receipt":"rzpg_66c7f80cab8d","reverse_all":true,"speed":"optimum"}
+```
+
+`speed`, `notes` and `reverse_all` all crossed the boundary. The mandate models a
+payment and an amount and nothing else.
+
+### Why it matters
+
+Razorpay's documentation for `create_refund`: `speed: "optimum"` requests an
+Instant Refund, and *"Instant Refunds is a value-added service … Razorpay will
+charge due consideration."* So an agent could send a refund whose payment and
+amount matched the mandate perfectly and commit the merchant to a fee no human
+approved — the project's own threat model, inside the component built to prevent
+it. It is the same shape as F1.a: the thing authorized and the thing forwarded
+were never asserted equal. There it was the amount; here it was everything that
+was not the amount.
+
+### It had already happened, in this repository's own data
+
+Arm C's committed traces keep every argument the model sent. Of 340 refund calls,
+one — `G020_run1`, a full-order refund of 61500 paise — carried
+`speed: "optimum"`. The guard authorized the payment and amount and forwarded it,
+against the study's substituted child, so no fee was charged. The same brief on
+the same model sent `"normal"` in runs 2 and 3. **The agent chose the merchant's
+cost by chance, one run in three, and the guard passed whichever it picked.**
+
+Nobody saw it because the pre-registered projection hides `speed` from raters —
+correctly: the rubric asked whether a refund was *intended*, and speed does not
+change that. The failure was the guard inheriting the rubric's scope. What was
+measured was intent; what needed enforcing was intent **and cost**.
+
+### The wrong fix
+
+The purist version refuses everything but `payment_id` and `amount`. Run over the
+same traces, **it refuses all 340 calls**: every one carried `notes` and
+`receipt`. That fix would have closed the hole by making the guard useless.
+
+### Fixed
+
+One function, `vettedRefundArgs`, classifies every argument before any action is
+matched, and a new rule `ARGUMENT_NOT_AUTHORIZED` refuses the rest:
+
+- `payment_id`, `amount` — authorized against the mandate
+- `receipt` — guard-owned, discarded rather than refused
+- `notes` — forwarded; metadata cannot change the amount, destination or cost
+- `speed` — `"normal"` passes; anything else needs `allow_instant_refund`, a new
+  mandate field that is off by default, the same shape as `max_amount_paise`
+- **anything else — refused**, so a parameter Razorpay adds later is refused
+  rather than inherited
+
+On arm C's traffic it refuses exactly one call in 340, and it is `G020_run1`.
+`TestArmCTrafficUnderTheArgumentSurface` asserts that by running the real rule
+over the real traces, so the number is computed, not quoted.
+
+### A second defect it would have introduced
+
+The new refusal records the payment and amount, so an operator can see which
+payment an agent aimed a paid refund at. That made it approvable, and an
+approved one produced two refunds from one authorization. Caught before this was
+committed and fixed first: F53.
+
+### What it cost the published numbers
+
+Nothing. Every arm E and arm D request carries exactly `payment_id` and `amount`,
+so all of them pass through the new check and none moves.
+`PROTOCOL-armE-AMENDMENT-4.md` records the equivalence and why the corpus says
+nothing about the refusal branch.
+
+### The lesson
+
+**An authorization boundary has to know the whole shape of the action it
+authorizes.** The mandate was designed around the question the evaluation asked
+— is this refund intended? — and the forwarding code was written as if that were
+the only question. A refund can be intended, correctly sized, on the right
+payment, and still cost the merchant money it never agreed to spend.
