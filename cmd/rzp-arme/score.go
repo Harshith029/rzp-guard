@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -723,14 +722,17 @@ func score() error {
 		"raters":   len(raters),
 		"matrix":   map[string]int{"tp": tp, "fp": fp, "tn": tn, "fn": fn},
 		"excluded": map[string]int{"no_majority": noMajority, "unlabelable": unable},
-		"labels_sha256": func() map[string]string {
-			m := map[string]string{}
-			for _, r := range raters {
-				b, _ := os.ReadFile(filepath.Join(armEDir, r.name+".csv"))
-				m[r.name+".csv"] = fmt.Sprintf("%x", sha256.Sum256(b))
-			}
-			return m
-		}(),
+	}
+	{
+		names := make([]string, 0, len(raters))
+		for _, r := range raters {
+			names = append(names, r.name)
+		}
+		ld, err := labelDigests(names)
+		if err != nil {
+			return err
+		}
+		man["labels_sha256"] = ld
 	}
 	// The matrix is four integers, so it cannot detect a change that moves one
 	// row from TP to TN while moving another the other way -- nor say which
@@ -781,11 +783,11 @@ func verifyArmE() error {
 		return fmt.Errorf("no arm E manifest: score the corpus first: %w", err)
 	}
 	var man struct {
-		Raters    int            `json:"raters"`
-		Matrix    map[string]int `json:"matrix"`
-		Labels    map[string]string
-		Decisions string `json:"decisions_sha256"`
-		Inputs    string `json:"inputs_sha256"`
+		Raters    int               `json:"raters"`
+		Matrix    map[string]int    `json:"matrix"`
+		Labels    map[string]string `json:"labels_sha256"`
+		Decisions string            `json:"decisions_sha256"`
+		Inputs    string            `json:"inputs_sha256"`
 	}
 	if err := json.Unmarshal(b, &man); err != nil {
 		return err
@@ -801,6 +803,26 @@ func verifyArmE() error {
 	if len(raters) != man.Raters {
 		return fmt.Errorf("manifest records %d rater file(s); %d present",
 			man.Raters, len(raters))
+	}
+	// The labels ARE the ground truth, so they are checked first and a failure
+	// names the rater file that moved. inputs_sha256 would also catch a label
+	// change, but it can only say that one of five things differs.
+	if len(man.Labels) > 0 {
+		names := make([]string, 0, len(raters))
+		for _, r := range raters {
+			names = append(names, r.name)
+		}
+		got, lerr := labelDigests(names)
+		if lerr != nil {
+			return lerr
+		}
+		for f, want := range man.Labels {
+			if got[f] != want {
+				return fmt.Errorf("rater labels changed since scoring: %s recomputes "+
+					"to %.16s, the manifest records %.16s. The ground truth is not "+
+					"the ground truth that was published", f, got[f], want)
+			}
+		}
 	}
 	reqs, err := loadCorpus()
 	if err != nil {

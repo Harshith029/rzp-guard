@@ -116,3 +116,30 @@ func inputsDigest() (string, error) {
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
+
+// textSHA256 is the per-file digest, under the same rule inputsDigest applies:
+// a CRLF checkout and an LF checkout of one file must hash the same, because
+// line endings are the reader's git configuration, not the file's content.
+//
+// labels_sha256 used to hash raw bytes. The lesson recorded above had been
+// learned for inputsDigest and never carried to its sibling, so the published
+// digest for labels-armE-r2.csv was the digest of a Windows working copy with
+// CRLF endings -- a value nobody cloning the repository could reproduce, for a
+// file whose content had never changed.
+func textSHA256(b []byte) string {
+	sum := sha256.Sum256(bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")))
+	return hex.EncodeToString(sum[:])
+}
+
+// labelDigests recomputes labels_sha256 for the rater files present.
+func labelDigests(names []string) (map[string]string, error) {
+	out := make(map[string]string, len(names))
+	for _, n := range names {
+		b, err := os.ReadFile(filepath.Join(armEDir, n+".csv"))
+		if err != nil {
+			return nil, fmt.Errorf("integrity: %s.csv: %w", n, err)
+		}
+		out[n+".csv"] = textSHA256(b)
+	}
+	return out, nil
+}

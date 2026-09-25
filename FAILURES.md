@@ -3098,3 +3098,87 @@ The narrower lesson is about SQLite specifically. **A comment inside a
 `CREATE TABLE` is not documentation, it is persisted data** — it is stored in the
 file and returned by every query that reads the schema. Prose written for a human
 reader ended up as input to a decision about money-bearing state.
+
+---
+
+## F52 — A published label digest could only be reproduced on the machine that wrote it
+
+**Found:** 2026-09-25, while re-scoring arm E for an unrelated policy change.
+
+Re-running `rzp-arme score` is supposed to rewrite one line of
+`study/armE/manifest.json`. It rewrote two:
+
+```
+<     "labels-armE-r2.csv": "1e9885437d71dc6f54992de1be282461ad8e9acff14f2ad2b194e77ff4ba8bab"
+>     "labels-armE-r2.csv": "d273836db86112f66fd6c2c520e6e17c19781dc99d6daad1e0abd9e83a7373a4"
+```
+
+A digest over a rater's ground truth moving on a frozen evaluation is the most
+serious thing that file can say, so it was treated as a possible label change
+until proven otherwise.
+
+### It was not the labels
+
+```
+committed blob, labels-armE-r2.csv          d273836db86112f6   121 lines
+Windows working copy, CR stripped           d273836db86112f6   121 lines
+Windows working copy, as it sits on disk    1e9885437d71dc6f   121 CRs
+```
+
+The content is identical. The Windows working copy carries CRLF endings; the
+committed blob is LF. `labels_sha256` hashed **raw bytes**, so the value in the
+published manifest was the digest of one machine's checkout — a value nobody
+cloning the repository could reproduce, for a file that had never changed.
+
+### Why it had not been caught
+
+Two reasons, and the second is the real one.
+
+**The lesson had already been learned one function over.** `inputs_sha256` in the
+same package normalises line endings, and its comment says why: *"The first
+version hashed raw bytes and failed CI immediately … A gate that fires on the
+reader's git config is noise."* The fix was applied to that digest and never to
+its sibling.
+
+**Nothing read the field.** The manifest's own note says *"`rzp-arme verify`
+recomputes and compares."* For `labels_sha256` that was false. `verify` declared
+a `Labels map[string]string` with no JSON tag, so it unmarshalled from a key that
+does not exist and was always nil. It looked like a label check and checked
+nothing — the same shape as F47, where the gate *"compared four integers and
+called it verification."*
+
+`inputs_sha256` does include the labels, so a real label change would still have
+failed CI. What it could not do is say which of five inputs moved, and it only
+ran after the matrix check had already failed with a message blaming *"the
+policy or the returned labels."*
+
+### Fixed
+
+- One normaliser, `textSHA256`, used by both digests, so they cannot disagree
+  about what a line ending is again.
+- `verify` now reads `labels_sha256` and checks it **first**, because the labels
+  are the ground truth. A failure names the rater file.
+- A test that the published digests reproduce from the files in the tree. It does
+  not skip when the manifest is missing: a skipped integrity check reads as a pass
+  in a CI summary, which is the failure being fixed.
+
+### Proved both ways
+
+| | result |
+|---|---|
+| new test against the **old** manifest | **fails**: `labels-armE-r2.csv: recomputes to d273836db86112f6, manifest records 1e9885437d71dc6f` |
+| after re-scoring | exactly one manifest line moved; `inputs_sha256`, `decisions_sha256` and `RESULTS-armE.md` byte-identical |
+| r2 converted to CRLF (121 CRs, the Windows condition) | test and `verify` both **pass** |
+| one real label flipped (E025, `in-intent` → `out-of-intent`) | `verify` **fails**: *"rater labels changed since scoring: labels-armE-r2.csv recomputes to d55776064bf7789e, the manifest records d273836db86112f6"* |
+
+**No reported number changed.** Recall 0.733, FPR 0.455, precision 0.423,
+TP 22 / FP 30 / TN 36 / FN 8.
+
+### The lesson
+
+A recorded digest is a claim that someone can recompute it. If only the machine
+that wrote it can, it is a fingerprint of that machine, and every reader who
+tries to check it either gets a mismatch or — more likely — trusts it without
+checking. And a field that a verifier declares but never reads is worse than no
+field: it makes the manifest *look* protected in exactly the place a reviewer
+would look.
