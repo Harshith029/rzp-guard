@@ -3377,3 +3377,55 @@ authorizes.** The mandate was designed around the question the evaluation asked
 — is this refund intended? — and the forwarding code was written as if that were
 the only question. A refund can be intended, correctly sized, on the right
 payment, and still cost the merchant money it never agreed to spend.
+
+---
+
+## F55 — A malformed note could turn an authorized refund into operator work
+
+**Found:** 2026-09-25, reviewing what F54 still let through.
+
+After F54, `notes` was the one agent-controlled value forwarded without a check.
+It had been forwarded without one all along; F54 only made it the last.
+
+Razorpay documents at most **15 key-value pairs** in `notes`, each value at most
+**256 characters**, and rejects anything beyond that. The chain from there is
+three facts, each already established rather than argued:
+
+1. the guard forwarded `notes` byte-for-byte — the F54 relay probe;
+2. Razorpay rejects notes past its limits — its own documentation;
+3. an error reply locks the action `IN_DOUBT` with its budget held —
+   `TestErrorRepliesHoldTheActionAndBudgetInDoubt`, which exists because an
+   error is not proof the refund did not execute.
+
+So an **authorized** refund carrying a sixteenth note, or one long note, was
+never refused and never paid: it was parked for a human, holding budget. An agent
+under prompt injection could do that to every refund it sent. No money moves, but
+the workflow the false-positive cost model depends on — a person working the
+queue — fills with refunds that were never in doubt.
+
+### Fixed
+
+`notesRazorpayAccepts` refuses exactly what Razorpay calls invalid, as
+`MALFORMED_ARGUMENTS`, before anything is reserved or written to the child. It
+refuses nothing Razorpay would accept, because that would be a new false
+positive:
+
+- values that are not strings are left alone — a real agent sent an integer
+  order number;
+- length is counted in **characters, not bytes**. A note in Devanagari is about
+  three bytes a character, so byte-counting would refuse a legitimate Hindi note
+  of under ninety characters. Switching the check to `len(s)` makes
+  `TestNotesAreRefusedExactlyWhereRazorpayWouldRejectThem` fail on exactly that
+  case: *"notes["r"] is 768 characters"*.
+
+On arm C's 340 recorded refunds — at most 4 pairs, longest value 117 characters —
+it refuses none. No published number moved; `PROTOCOL-armE-AMENDMENT-4.md` is
+extended with the equivalence check.
+
+### The lesson
+
+A fail-closed design has a cost that is easy to miss: **every input the provider
+might reject becomes a way to manufacture doubt.** `IN_DOUBT` is the right
+answer to an ambiguous outcome, and precisely because it is, anything that can be
+refused *before* dispatch should be — an ambiguity the guard could have prevented
+is one it has chosen to hand to a person.

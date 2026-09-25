@@ -43,26 +43,51 @@ Also recorded: `33f9014` added `internal/policy/grant_scope_test.go`, a test
 only. It moved the directory's git tree and no input digest, since
 `inputs_sha256` covers non-test files.
 
+### Extended — the notes check, same day, same body of work
+
+Extended here rather than opening amendment 5, following amendment 3's
+precedent for one body of work committed on one day.
+
+With the surface default-deny, `notes` became the one agent-controlled value
+forwarded unchecked. Razorpay documents at most 15 pairs and 256 characters a
+value. A refund it rejects comes back as an error, and an error is not proof of
+non-execution, so an **authorized** refund carrying a malformed note would be
+locked `IN_DOUBT` with its budget held until a human resolved it — something an
+injected agent could do to every refund it sent. `notesRazorpayAccepts` now
+refuses exactly what the documentation calls invalid, as `MALFORMED_ARGUMENTS`,
+before anything is reserved.
+
+It counts characters, not bytes: a note in Devanagari is about three bytes a
+character, and byte-counting would refuse a legitimate Hindi note of under ninety
+characters. A test pins that, and was confirmed to fail when the check is
+switched to byte length. On arm C's traffic — at most 4 pairs, longest value 117
+characters — it refuses none of the 340 calls.
+
+`vettedRefundArgs` now also returns the rule, so the refusal is recorded as what
+it is: a note the provider would reject is malformed, not unauthorized.
+
 ## The equivalence check
 
 ```
 tree at amendment 3      49f7493bf66b8396dab94b0044149c599e5c96b2
 after 33f9014 (test)     f4a95b6c7089cbe9ea6ad0fca10961e0aacbdf67
-after this change        220d9b2cb2fe0ae4d876143daaa184f3331e46b3
+after the surface        220d9b2cb2fe0ae4d876143daaa184f3331e46b3   (5999092)
+after the notes check    8082522889fbc3d03e2e56933d5277434b3bba6a
 
-decisions_sha256   UNCHANGED
-matrix             TP 22 FP 30 TN 36 FN 8   UNCHANGED
-label digests      UNCHANGED
-inputs_sha256      83146d79… -> 2ef49a4f…   CHANGED
+decisions_sha256   UNCHANGED across both
+matrix             TP 22 FP 30 TN 36 FN 8   UNCHANGED across both
+label digests      UNCHANGED across both
+inputs_sha256      83146d79… -> 2ef49a4f… -> cdaeeb28…   CHANGED, twice
 ```
 
-Re-running `rzp-arme score` rewrote **exactly one line**: `inputs_sha256`.
-`RESULTS-armE.md` is byte-identical. Re-scoring a second time over the
-hand-maintained `policy_tree` record produced no diff at all.
+Each re-run of `rzp-arme score` rewrote **exactly one line**: `inputs_sha256`.
+`RESULTS-armE.md` is byte-identical. Re-scoring once more over the
+hand-maintained `policy_tree` record produced no diff at all, both times.
 
-Arm D gated it as well and its own tool refused to re-stamp until it had
-reproduced TP 54 FP 17 TN 19 FN 0. The previous decision-path hash is kept under
-`superseded_decision_paths` with `published_matrix_still_reproduced: true`.
+Arm D gated both as well and its own tool refused to re-stamp until it had
+reproduced TP 54 FP 17 TN 19 FN 0, each time. Every previous decision-path hash
+is kept under `superseded_decision_paths` with
+`published_matrix_still_reproduced: true`.
 
 ## Why it came out that way — and where that stops being evidence
 

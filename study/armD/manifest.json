@@ -1,6 +1,6 @@
 {
   "note": "Everything the published arm D numbers depend on. `rzp-armd verify` checks all of it and writes nothing. None of this makes the labels independent; see study/ASSESSMENT-armD.md.",
-  "recorded_at_utc": "2026-09-25T10:10:03Z",
+  "recorded_at_utc": "2026-09-25T10:25:08Z",
   "decision_path": {
     "note": "Non-test sources of the scorer's import closure (`go list -deps ./cmd/rzp-armd`), plus cmd/rzp-armd/main.go. internal/storage is absent because it is not in that closure: the scorer's persister is nil.",
     "packages": [
@@ -11,7 +11,7 @@
       "internal/policy",
       "cmd/rzp-armd"
     ],
-    "tree_sha256": "c9b9fdc714b6e3fdfd5aa8eeae27864c6c71d20b10881a7afff3c6c8d61640e8",
+    "tree_sha256": "7e577c7c0c013e93ee5f5b28143e36925746f9094ddc8351dc5eeb58aef0bab6",
     "files": {
       "cmd/rzp-armd/main.go": "31901382821ac6fe506681c9f5db2761c3df4684fe2a4e9192911023ddf2640f",
       "internal/lifecycle/lifecycle.go": "89ec3570bdd15e2c418f821c8bbf3b7d9cbf6b5408be654c509b7d17dd52a681",
@@ -21,7 +21,7 @@
       "internal/opauth/syncdir.go": "c055f5b59d667bf4aaf9a80fcd3927817c9cab0482f6e85bbf0a17589078d2ae",
       "internal/opgrant/opgrant.go": "90b20eff05ed5fe0d876ef0c573080100a689d62e915e71e57da33dc5e230f3d",
       "internal/policy/override.go": "b1767ac66e54222d0cd9185128c411fe93476abae62d82a207431212547fe524",
-      "internal/policy/policy.go": "295fa295f0d06cb69b0cff7a8ff616eecd104ad9d3c6a815a5c512acd9ba54b6"
+      "internal/policy/policy.go": "465d8bb4e9e9d4412435222b9bc19eb8292317c6ce660d52a3740f070df312e9"
     }
   },
   "corpus": {
@@ -99,6 +99,13 @@
       "recorded_at_utc": "2026-09-05T00:11:47Z",
       "superseded_at_utc": "2026-09-25T10:10:03Z",
       "reason": "internal/policy and internal/mandate changed: the create_refund argument surface became default-deny (vettedRefundArgs, new rule ARGUMENT_NOT_AUTHORIZED, mandate field allow_instant_refund defaulting false). Every arm D request carries exactly payment_id and amount, so all 90 pass through the new check and none moves: TP 54 FP 17 TN 19 FN 0 reproduced before this re-record was allowed. See study/PROTOCOL-armE-AMENDMENT-4.md.",
+      "published_matrix_still_reproduced": true
+    },
+    {
+      "tree_sha256": "c9b9fdc714b6e3fdfd5aa8eeae27864c6c71d20b10881a7afff3c6c8d61640e8",
+      "recorded_at_utc": "2026-09-25T10:10:03Z",
+      "superseded_at_utc": "2026-09-25T10:25:08Z",
+      "reason": "internal/policy changed again: the notes argument is checked against Razorpay documented limits (15 pairs, 256 characters a value) and refused as MALFORMED_ARGUMENTS beyond them, instead of being forwarded, rejected by the provider, and locking an authorized refund IN_DOUBT. No arm D request carries notes, so all 90 pass unchanged: TP 54 FP 17 TN 19 FN 0 reproduced before this re-record was allowed. See study/PROTOCOL-armE-AMENDMENT-4.md.",
       "published_matrix_still_reproduced": true
     }
   ],

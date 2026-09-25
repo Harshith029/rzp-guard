@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/harshith/rzp-guard/internal/lifecycle"
 	"github.com/harshith/rzp-guard/internal/mandate"
@@ -397,7 +398,8 @@ func (g *Guard) Committed() int64                      { return g.ledger.Committ
 func (g *Guard) InDoubtActions() []string              { return g.ledger.InDoubtActions() }
 
 // vettedRefundArgs returns the subset of a create_refund call that may cross
-// the boundary, or an error naming the first parameter that may not.
+// the boundary, or the rule and an error naming the first parameter that may
+// not.
 //
 // It is the ONLY place that decides what reaches the child, so an argument
 // cannot be forwarded by being forgotten here. Every key is classified
@@ -405,15 +407,16 @@ func (g *Guard) InDoubtActions() []string              { return g.ledger.InDoubt
 //
 //	payment_id, amount  authorized against the mandate by the caller
 //	receipt             guard-owned; the agent's value is discarded
-//	notes               forwarded -- metadata cannot change the amount, the
-//	                    destination or the cost, and merchants reconcile with it
+//	notes               forwarded if Razorpay will accept it -- metadata cannot
+//	                    change the amount, the destination or the cost, and
+//	                    merchants reconcile with it
 //	speed               refused unless the merchant authorized instant refunds
 //	anything else       refused
 //
 // Refusing rather than silently dropping is deliberate. A dropped parameter
 // gives the agent a refund it did not ask for with no signal that anything
 // changed; a refusal is a decision the merchant can read afterwards.
-func vettedRefundArgs(args map[string]any, lim mandate.Limits) (map[string]any, error) {
+func vettedRefundArgs(args map[string]any, lim mandate.Limits) (map[string]any, string, error) {
 	out := make(map[string]any, len(args)+1)
 	for k, v := range args {
 		switch k {
@@ -423,27 +426,83 @@ func vettedRefundArgs(args map[string]any, lim mandate.Limits) (map[string]any, 
 			// Deliberately not copied. The guard derives the receipt it will
 			// inject, and an agent-supplied one is neither trusted nor echoed.
 		case "notes":
+			if err := notesRazorpayAccepts(v); err != nil {
+				return nil, MalformedArguments, err
+			}
 			out[k] = v
 		case "speed":
 			s, ok := v.(string)
 			if !ok {
-				return nil, fmt.Errorf("speed must be a string, got %#v", v)
+				return nil, ArgumentNotAuthorized, fmt.Errorf(
+					"speed must be a string, got %#v", v)
 			}
 			if s != "normal" && !lim.AllowInstantRefund {
-				return nil, fmt.Errorf(
+				return nil, ArgumentNotAuthorized, fmt.Errorf(
 					"speed=%q requests an instant refund, which Razorpay charges the "+
 						"merchant for. This mandate does not set allow_instant_refund, "+
 						"so the agent may not choose it", s)
 			}
 			out[k] = v
 		default:
-			return nil, fmt.Errorf(
+			return nil, ArgumentNotAuthorized, fmt.Errorf(
 				"%q is not a create_refund argument this guard can authorize; the "+
 					"argument surface is default-deny for the same reason the tool "+
 					"surface is", k)
 		}
 	}
-	return out, nil
+	return out, "", nil
+}
+
+// Razorpay's documented limits on a refund's notes: at most 15 key-value
+// pairs, each value at most 256 characters.
+const (
+	maxNotePairs    = 15
+	maxNoteValueLen = 256
+)
+
+// notesRazorpayAccepts refuses notes the provider is documented to reject.
+//
+// WHY THE GUARD CHECKS A FIELD IT DOES NOT AUTHORIZE. A forwarded refund that
+// Razorpay rejects comes back as an error, and an error is not proof the refund
+// did not execute, so the action is locked IN_DOUBT with its budget held until a
+// human resolves it. A malformed notes field would therefore turn an AUTHORIZED
+// refund into operator work -- and an agent under prompt injection could do it
+// to every refund it sends. Refused here, it costs nothing: nothing is reserved,
+// nothing is written to the child, and the agent is told what to fix.
+//
+// It refuses only what the documentation says is invalid, because refusing
+// anything Razorpay would have accepted is a new false positive. So values that
+// are not strings are left alone, and length is counted in CHARACTERS, not
+// bytes: a note written in Devanagari is about three bytes a character, and a
+// byte count would refuse a legitimate note of under ninety characters.
+//
+// On arm C's 340 recorded refunds -- at most 4 pairs, longest value 117
+// characters -- this refuses none. TestArmCTrafficUnderTheArgumentSurface holds
+// that.
+func notesRazorpayAccepts(v any) error {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("notes must be an object of key-value pairs, got %T; "+
+			"Razorpay would reject it, and a rejected refund cannot be told apart "+
+			"from one that executed", v)
+	}
+	if len(m) > maxNotePairs {
+		return fmt.Errorf("notes has %d pairs; Razorpay accepts at most %d, and a "+
+			"rejected refund would be locked IN_DOUBT rather than refused",
+			len(m), maxNotePairs)
+	}
+	for k, val := range m {
+		s, isStr := val.(string)
+		if !isStr {
+			continue
+		}
+		if n := utf8.RuneCountInString(s); n > maxNoteValueLen {
+			return fmt.Errorf("notes[%q] is %d characters; Razorpay accepts at most "+
+				"%d, and a rejected refund would be locked IN_DOUBT rather than "+
+				"refused", k, n, maxNoteValueLen)
+		}
+	}
+	return nil
 }
 
 func deny(tool, rule, reason, actionID string) Decision {
@@ -514,9 +573,9 @@ func (g *Guard) Decide(tool string, args map[string]any, now time.Time) Decision
 	// 3b. argument surface -- default-deny, before any action is matched. A
 	// refund whose amount and payment are both authorized can still carry a
 	// parameter that costs the merchant money.
-	vetted, err := vettedRefundArgs(args, g.mandate.Limits)
+	vetted, rule, err := vettedRefundArgs(args, g.mandate.Limits)
 	if err != nil {
-		d := deny(tool, ArgumentNotAuthorized, err.Error(), "")
+		d := deny(tool, rule, err.Error(), "")
 		d.PaymentID = paymentID
 		d.RequestedPaise = amountPaise
 		return d

@@ -64,7 +64,7 @@ func TestArmCTrafficUnderTheArgumentSurface(t *testing.T) {
 			if _, ok := args["receipt"]; ok {
 				withReceipt++
 			}
-			if _, err := vettedRefundArgs(args, mandate.Limits{}); err != nil {
+			if _, _, err := vettedRefundArgs(args, mandate.Limits{}); err != nil {
 				refused = append(refused, filepath.Base(f)+": "+err.Error())
 			}
 		}

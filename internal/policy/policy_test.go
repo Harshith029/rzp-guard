@@ -874,3 +874,54 @@ func TestInstantRefundIsAllowedOnlyWhenTheMandateSaysSo(t *testing.T) {
 			d.Forwarded["speed"])
 	}
 }
+
+// notes are forwarded, but only where Razorpay will accept them: a refund the
+// provider rejects comes back as an error, is indistinguishable from one that
+// executed, and is locked IN_DOUBT for a human. So the guard refuses exactly
+// what Razorpay documents as invalid -- and nothing it would accept, because
+// that would be a new false positive.
+func TestNotesAreRefusedExactlyWhereRazorpayWouldRejectThem(t *testing.T) {
+	const acts = `[{"action_id":"rfa_1","payment_id":"pay_SYN0001","amount_paise":24000}]`
+	withNotes := func(notes any) map[string]any {
+		b, err := json.Marshal(map[string]any{
+			"payment_id": "pay_SYN0001", "amount": 24000, "notes": notes})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return jsonArgs(t, string(b))
+	}
+	pairs := func(n int) map[string]any {
+		m := make(map[string]any, n)
+		for i := 0; i < n; i++ {
+			m[fmt.Sprintf("k%02d", i)] = "v"
+		}
+		return m
+	}
+	// U+0915, three bytes in UTF-8. Razorpay's limit is 256 CHARACTERS; a check
+	// that counted bytes would refuse a Hindi note of under ninety characters.
+	const ka = "क"
+	for _, tc := range []struct {
+		name  string
+		notes any
+		rule  string
+	}{
+		{"15 pairs, the documented maximum", pairs(15), Allowed},
+		{"16 pairs", pairs(16), MalformedArguments},
+		{"256 ASCII characters", map[string]any{"r": strings.Repeat("a", 256)}, Allowed},
+		{"257 ASCII characters", map[string]any{"r": strings.Repeat("a", 257)}, MalformedArguments},
+		{"256 Devanagari characters, 768 bytes", map[string]any{"r": strings.Repeat(ka, 256)}, Allowed},
+		{"257 Devanagari characters", map[string]any{"r": strings.Repeat(ka, 257)}, MalformedArguments},
+		{"an integer value, as a real agent sent", map[string]any{"order": 9020}, Allowed},
+		{"notes that are not an object", "refund approved", MalformedArguments},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := New(mustMandate(t, acts)).Decide(RefundTool, withNotes(tc.notes), now)
+			if d.Rule != tc.rule {
+				t.Fatalf("rule = %s, want %s (reason: %s)", d.Rule, tc.rule, d.Reason)
+			}
+			if tc.rule != Allowed && d.PaymentID != "pay_SYN0001" {
+				t.Errorf("the refusal does not carry the payment it was aimed at")
+			}
+		})
+	}
+}

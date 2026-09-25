@@ -140,6 +140,17 @@ spontaneously sent `"receipt": "KD-4471-atta-refund"` — the exact field the gu
 uses as an idempotency key — and the guard replaced it with `rzpg_7c8da474e0f0`.
 **The agent cannot choose the idempotency key.**
 
+That it *is* an idempotency key is Razorpay's claim, not this project's: the
+refund API documentation states that `receipt` is treated as one, and a second
+refund with the same receipt is rejected with `Duplicate receipt found`. Because
+the guard derives the receipt from the action it spends, that also covers an
+operator's mistake. If an `IN_DOUBT` refund that did land is released as "did not
+land", a retry spending the same action carries the same receipt, the provider
+refuses the duplicate, and the error locks the action `IN_DOUBT` again instead of
+paying twice. An operator grant is a different action with its own receipt, which
+is correct: it authorizes a genuinely separate refund. How long Razorpay
+remembers a receipt is not documented, and nothing here assumes it is forever.
+
 ### The argument surface is default-deny
 
 A mandate authorizes a payment and an amount, and until F54 the guard forwarded
@@ -154,7 +165,7 @@ down, so a parameter the provider adds later is refused rather than inherited:
 | --- | --- |
 | `payment_id`, `amount` | authorized against the mandate; amount canonicalised |
 | `receipt` | guard-owned — the agent's value is discarded, not refused |
-| `notes` | forwarded — metadata cannot change the amount, destination or cost |
+| `notes` | forwarded if within Razorpay's documented limits — 15 pairs, 256 *characters* a value — and refused as `MALFORMED_ARGUMENTS` beyond them, because a note the provider rejects would lock an authorized refund `IN_DOUBT` (F55) |
 | `speed` | `"normal"` passes; anything else needs `allow_instant_refund` in the mandate |
 | anything else | refused |
 
@@ -294,7 +305,7 @@ the reason the guard cannot catch it, and the reason it does not pretend to.
 | An authorized refund does, and the receipt round-trips | G1.6, `evidence/g16/`, `./run.sh verify-refund-evidence` |
 | Child death leaves a durable `IN_DOUBT` surviving restart | `./run.sh process-recover` — 6 assertions |
 | What the guard did against real agent traffic | [study/RESULTS.md](study/RESULTS.md), [study/FINDINGS.md](study/FINDINGS.md) |
-| Everything that went wrong on the way | [FAILURES.md](FAILURES.md) — 54 entries, each with the real output |
+| Everything that went wrong on the way | [FAILURES.md](FAILURES.md) — 55 entries, each with the real output |
 
 Every gate re-runs against the **committed redacted projection**, not a private
 artifact, so the published evidence is exactly what the assertions checked.
