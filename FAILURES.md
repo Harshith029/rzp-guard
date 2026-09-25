@@ -3370,6 +3370,43 @@ so all of them pass through the new check and none moves.
 `PROTOCOL-armE-AMENDMENT-4.md` records the equivalence and why the corpus says
 nothing about the refusal branch.
 
+### It is in Razorpay's MCP server too
+
+The guard's bug was forwarding `speed`. The *reason* an agent sets it lives
+upstream. In `razorpay/razorpay-mcp-server`, `pkg/razorpay/refunds.go` on `main`
+(checked 2026-09-25):
+
+- the tool describes itself as creating a **normal** refund, and Razorpay's API
+  documents normal and instant refunds as two separate things;
+- its `speed` parameter is an unconstrained string, passed through by
+  `ValidateAndAddOptionalString`;
+- the description says only *"For instant refunds, speed is set as
+  'optimum'"* — nothing about the charge.
+
+This project's study served that tool schema byte-for-byte — confirmed by
+comparing the stub's embedded fixture against `evidence/tools_list.json`, captured
+from the pinned official image — so `G020_run1`'s agent chose the paid option
+reading Razorpay's own wording. And a merchant cannot currently prevent it without
+losing refunds entirely: the server's only controls, `TOOLSETS` and `READ_ONLY`,
+are all-or-nothing.
+
+The description fix went upstream as
+[razorpay/razorpay-mcp-server#143](https://github.com/razorpay/razorpay-mcp-server/pull/143):
+six lines, no behaviour change, passing the upstream test suite under `-race` and
+the golangci-lint version their Makefile pins. It is complementary to their open
+#107, which constrains `speed` to valid values; the question here is which valid
+value an agent should pick. The real fix — a merchant setting to pin the speed —
+is offered there rather than imposed.
+
+Reading that file also showed `amount` parsed as a float and converted with
+`int(...)`, which truncates: `12345.67` becomes a refund of `12345`. That is F1.a,
+the defect this project's own prototype shipped with. Their open #109 rewrites the
+same lines and keeps the truncation, so it was raised as
+[a comment on #109](https://github.com/razorpay/razorpay-mcp-server/pull/109#issuecomment-5835405559)
+rather than a competing pull request. The fix already exists in their
+`capture_payment`, whose integer validator rejects `12345.67` and still accepts
+`12345.0` — both checked against their code before saying so.
+
 ### The lesson
 
 **An authorization boundary has to know the whole shape of the action it

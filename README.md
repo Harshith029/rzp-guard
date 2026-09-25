@@ -27,6 +27,14 @@ Measured against labels from two people who saw neither the authorization nor th
 decision: **recall 0.733, false-positive rate 0.455.** Eight requests got through
 and [every one is named](study/RESULTS-armE.md).
 
+**Measuring it also found a gap in Razorpay's own MCP server.** Its
+`create_refund` tool lets an agent set `speed: "optimum"` — an Instant Refund,
+which Razorpay charges the merchant for — and its description doesn't say so. In
+this project's recorded agent traffic, one refund in 340 chose it unprompted, and
+the same model chose `"normal"` on the same task in its other two runs. The guard
+now refuses it unless the merchant allows it ([F54](FAILURES.md)); the
+description fix is [upstream as #143](https://github.com/razorpay/razorpay-mcp-server/pull/143).
+
 ---
 
 ## Track 02 — AI Risk Manager
