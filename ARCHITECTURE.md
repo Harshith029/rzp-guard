@@ -13,7 +13,30 @@ behaviour is not something you can specify or test exhaustively.
 
 The usual instinct is to make the agent safer. This does the opposite: it assumes
 the agent is untrustworthy and puts an authorization boundary between it and the
-money, so that *no* agent behaviour can produce an unauthorized refund.
+money, so that no refund the agent requests **through that boundary** can be one
+the merchant did not authorize.
+
+### The one assumption everything rests on
+
+That guarantee holds against any agent *behaviour* — any prompt, any reasoning,
+any injected instruction. It does not hold against an agent with **another route
+to Razorpay**, and an earlier version of this section claimed more than that.
+
+The credential is the merchant's API key. The guard receives it from its own
+environment, removes it from everything it passes on
+(`envWithoutRazorpayKeys`), and hands it to the child explicitly. But whatever
+launches the guard holds the key too. If the agent can read it — a shell tool, a
+file tool that can open the MCP host's configuration or a `.env`, an environment
+it can print — or can reach Razorpay's REST API through any other tool, it can
+refund without asking the guard, and nothing here will see it.
+
+So the deployment rule is: **the guard is the agent's only tool that reaches
+Razorpay, and nothing the agent can run can read the credential.** That is a
+property of how the agent host is configured, not something this program can
+enforce from inside the pipe. The red-team suite tests bypasses *through* the
+boundary; it cannot test a route around it. Closing that for good means authority
+the provider scopes itself — a key that can only do what the mandate says — which
+is the long-term item on the roadmap rather than a claim about this build.
 
 ```
    ┌─────────┐   JSON-RPC    ┌───────────┐   JSON-RPC   ┌──────────────────┐

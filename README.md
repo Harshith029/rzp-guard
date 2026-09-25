@@ -137,7 +137,7 @@ If you only have a few minutes, this is the whole project:
 |---|---|
 | **1. Watch it work** | `./run.sh demo` — 15 seconds, no credentials, no network |
 | **2. That it works** | `./run.sh test` — unit, lifecycle and race lanes in a digest-pinned container |
-| **3. That it cannot be bypassed** | `./run.sh redteam-negative` — ten bypasses that once worked, each must still fail |
+| **3. That it cannot be bypassed through it** | `./run.sh redteam-negative` — ten bypasses that once worked, each must still fail. Routes *around* it are a deployment question: see [Known limits](#known-limits) |
 | **4. What it costs** | [`study/FP-COST.md`](study/FP-COST.md) — both error directions priced, with the break-even |
 | **5. What it measured** | recall **0.733**, FPR **0.455**, independently labelled — and the 8 misses it did not catch |
 | **6. What it did about them** | `./run.sh mandate-demo` — the compiler that makes the class those 8 came from a compile error |
@@ -463,6 +463,15 @@ as the historical record of a study that was designed and then stopped.
 Details: `study/PRELABEL-FINDING-armC.md`, `study/PROTOCOL-armC-AUDIT.md`.
 
 ## Known limits
+
+**It guards the route it sits on, not every route.** No refund requested
+*through* the guard can be one the merchant did not authorize — whatever the
+agent is told or decides. But the guard holds the merchant's API key, and so does
+whatever launches it. An agent that can read that key, or that has any other tool
+able to reach Razorpay, can refund without asking. The deployment rule is that
+the guard is the agent's only route to Razorpay and nothing the agent can run can
+read the credential; that is a property of the agent host's configuration, which
+this program cannot enforce from inside the pipe. See `ARCHITECTURE.md` §1.
 
 **A per-refund timeout exists but is off by default.** Without
 `-refund-timeout`, a forwarded refund waits for the child's reply for as long as
