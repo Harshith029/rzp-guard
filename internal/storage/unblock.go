@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/harshith/rzp-guard/internal/opauth"
@@ -136,6 +137,63 @@ func newGrantID() (string, error) {
 	return "opg_" + hex.EncodeToString(b[:]), nil
 }
 
+// grantable is the complete set of refusals an operator grant can correct.
+//
+// IT IS AN ALLOWLIST, so a refusal rule added to the policy later is not
+// grantable until somebody decides it should be. That is the safe default: the
+// cost of a missing entry is a workflow that refuses, and the cost of an extra
+// one is below.
+//
+// It mirrors policy's overridableRules -- the set the guard will actually let a
+// grant override -- and TestGrantableRulesMatchWhatTheGuardOverrides in
+// internal/policy fails if the two disagree. They must agree in both
+// directions, because the failure is different each way:
+//
+//	grantable here, not overridable there: the grant is issued, the denial is
+//	marked APPROVED and audited as OPERATOR_GRANTED, and the guard still
+//	refuses. The operator believes they unblocked a refund that is still
+//	blocked. And the grant stays LIVE: it matches on payment and amount alone,
+//	so a later refusal of an overridable kind for the same payment and amount
+//	can spend it. The mandate allows the clean retry; a replay of it is then
+//	refused as ACTION_CONSUMED, finds the leftover grant, and goes out as a
+//	second refund.
+//
+//	overridable there, not grantable here: a refusal the guard would let a
+//	human correct cannot be corrected. Safe, but a broken workflow.
+var grantable = map[string]struct{}{
+	"NO_AUTHORIZED_ACTION":  {},
+	"AMOUNT_NOT_AUTHORIZED": {},
+	"ACTION_CONSUMED":       {},
+}
+
+// notGrantableBecause tells the operator what to do instead. It is advice, not
+// policy: a rule missing from here is still refused, with a generic reason.
+var notGrantableBecause = map[string]string{
+	"RATE_LIMIT_EXCEEDED": "it is the merchant's own rate limit. The same refund " +
+		"passes once the window clears, and a grant cannot raise the ceiling",
+	"CUMULATIVE_CAP_EXCEEDED": "it is the merchant's own cumulative cap. Only a " +
+		"new mandate from the merchant can raise it",
+	"MANDATE_EXPIRED": "the whole mandate lapsed. The answer is a new mandate " +
+		"from the merchant, not a patch from support",
+	"MALFORMED_ARGUMENTS": "the guard could not read the request, and approving " +
+		"it would authorize something nobody has read",
+	"TOOL_NOT_SUPPORTED": "the tool surface is a property of this build, not an " +
+		"incident decision",
+	"TOOL_NOT_ALLOWED": "the tool surface is the merchant's grant, not an " +
+		"incident decision",
+}
+
+// GrantableRules returns the refusal rules an operator grant can correct,
+// sorted, so the policy package can prove it agrees with this list.
+func GrantableRules() []string {
+	out := make([]string, 0, len(grantable))
+	for r := range grantable {
+		out = append(out, r)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // IssueGrant mints a single-use authorization for one refused refund.
 //
 // IT REQUIRES AN opauth.Grant, which only opauth can mint and only after
@@ -196,6 +254,24 @@ func (s *Store) IssueGrant(g opauth.Grant, denialID int64, ttl time.Duration,
 	if d.Resolution == DenialDeclined {
 		return opgrant.Grant{}, fmt.Errorf("denial %d was already declined; "+
 			"re-approving it would erase that decision without a record", denialID)
+	}
+	// Whether a grant can mean anything is a property of WHY the guard refused.
+	//
+	// This used to hold by accident. The refusal sites that cannot be overridden
+	// happened not to record a payment and a positive amount, so opgrant.Validate
+	// rejected the grant -- for a different reason, and only because of which
+	// fields a refusal happened to carry. A refusal that recorded both, which is
+	// exactly what an operator reading the queue wants to see, would have made it
+	// approvable, and FAILURES.md F53 shows that producing two refunds from one
+	// authorization. Checked by name, so it no longer depends on the fields.
+	if _, ok := grantable[d.Rule]; !ok {
+		why := notGrantableBecause[d.Rule]
+		if why == "" {
+			why = "no operator grant can override that refusal"
+		}
+		return opgrant.Grant{}, fmt.Errorf("denial %d was refused as %s, which an "+
+			"operator grant cannot correct: %s. Decline it instead, so the queue "+
+			"records that it was seen", denialID, d.Rule, why)
 	}
 	if d.MandateID != s.mandateID {
 		return opgrant.Grant{}, fmt.Errorf("denial %d belongs to %s, not %s; "+

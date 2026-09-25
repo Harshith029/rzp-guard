@@ -291,3 +291,59 @@ func TestApprovingAnUnknownDenialIsNamed(t *testing.T) {
 		t.Fatalf("got %v, want ErrNoSuchDenial", err)
 	}
 }
+
+// A grant against a refusal no grant can override is refused at the door, by
+// the refusal's rule -- not by whatever fields it happens to carry.
+//
+// THIS USED TO HOLD BY ACCIDENT. The non-overridable refusal sites happened not
+// to record a payment and a positive amount, so opgrant.Validate rejected the
+// grant for an unrelated reason. Every case below records BOTH, which is the
+// condition that made the accident stop protecting anything: FAILURES.md F53
+// shows a refusal shaped like this approved, left live, and spent later on a
+// replay as a second refund.
+func TestAGrantCannotBeIssuedAgainstARefusalNoGrantCanOverride(t *testing.T) {
+	for _, rule := range []string{
+		"RATE_LIMIT_EXCEEDED",
+		"CUMULATIVE_CAP_EXCEEDED",
+		"MANDATE_EXPIRED",
+		"MALFORMED_ARGUMENTS",
+		"TOOL_NOT_SUPPORTED",
+		"TOOL_NOT_ALLOWED",
+		// A rule that does not exist yet. The list is an allowlist, so a refusal
+		// the policy grows later is not grantable until someone decides it is.
+		"SOME_FUTURE_RULE",
+	} {
+		t.Run(rule, func(t *testing.T) {
+			s := openQueue(t)
+			if err := s.RecordDenial("create_refund", rule, "pay_SYN0009", 24000,
+				"refused"); err != nil {
+				t.Fatal(err)
+			}
+			rows, _ := s.Denials(DenialOpen, false)
+			_, err := s.IssueGrant(operatorGrant(t, "ops@merchant.example"),
+				rows[0].ID, 10*time.Minute, "looked like a false positive")
+			if err == nil {
+				t.Fatalf("a grant was issued against %s; the guard will not let it "+
+					"override that refusal, so it can only sit live until a later "+
+					"refusal of a different kind spends it", rule)
+			}
+			if !strings.Contains(err.Error(), rule) {
+				t.Errorf("the refusal does not name the rule, so the operator cannot "+
+					"tell why: %v", err)
+			}
+			// Nothing may have changed: still OPEN, no grant, no audit row
+			// claiming a refund was unblocked.
+			if open, _ := s.Denials(DenialOpen, false); len(open) != 1 {
+				t.Errorf("the denial left the queue (%d open) although nothing was "+
+					"approved", len(open))
+			}
+			trail, _ := s.AuditTrail()
+			for _, a := range trail {
+				if a.To == "OPERATOR_GRANTED" {
+					t.Errorf("an OPERATOR_GRANTED audit row exists for a grant that " +
+						"was refused")
+				}
+			}
+		})
+	}
+}

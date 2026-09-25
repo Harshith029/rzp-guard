@@ -3182,3 +3182,102 @@ tries to check it either gets a mismatch or — more likely — trusts it withou
 checking. And a field that a verifier declares but never reads is worse than no
 field: it makes the manifest *look* protected in exactly the place a reviewer
 would look.
+
+---
+
+## F53 — An operator could approve a refusal no grant can override, and the leftover grant paid a replay
+
+**Found:** 2026-09-25, while checking a new refusal rule for side effects before
+committing it.
+
+### The invariant that was never written down
+
+An operator grant only means something for three refusals — `NO_AUTHORIZED_ACTION`,
+`AMOUNT_NOT_AUTHORIZED` and `ACTION_CONSUMED`. `internal/policy` knew that:
+`operatorOverride` returns any other refusal unchanged. `internal/storage` did
+not. `IssueGrant` checked the operator's credential, the mandate, the TTL and
+whether the denial had been declined, and **never looked at the denial's rule**.
+
+And a grant matches on payment and amount alone. It carries no memory of the
+refusal it was issued against.
+
+### The wrong hypothesis first
+
+The obvious path was the rate limit: a refund the mandate authorizes, refused only
+because the agent was busy, approved by an operator who takes it for a false
+positive. The probe was written to show that producing two refunds. It showed
+this instead:
+
+```
+2. authorized refund, same min  -> RATE_LIMIT_EXCEEDED
+3. operator approves it         -> IssueGrant err = grant opg_c7bb… has no payment
+REFUNDS OF 24000 FORWARDED ON pay_SYNdblX: 1
+```
+
+**Safe — by accident.** The rate-limit refusal is built with `deny()`, not
+`refundDeny()`, so it records no payment and no amount, and `opgrant.Validate`
+refused the grant for a reason that had nothing to do with rate limits. Every
+non-overridable refusal site happened to be like that. The protection was the
+absence of two fields.
+
+### The change that removed the accident
+
+The argument-surface rule being added in the same session
+(`ARGUMENT_NOT_AUTHORIZED`, for `speed: "optimum"` and friends) records the
+payment and amount on purpose — an operator reading the queue should see which
+payment an agent aimed a chargeable instant refund at. The same probe, through
+that rule:
+
+```
+1. unrelated refund             -> ALLOWED
+2. same refund + speed=optimum  -> ARGUMENT_NOT_AUTHORIZED
+3. operator approves it         -> IssueGrant err = <nil>
+4. clean retry after the window -> ALLOWED            (the mandate's own action)
+5. replay of the same refund    -> OPERATOR_APPROVED  (the leftover grant)
+REFUNDS OF 24000 FORWARDED ON pay_SYNdblX: 2 (the merchant authorized ONE)
+```
+
+Step 4 needs no grant — the mandate authorizes that payment and amount — so the
+grant is never consumed and sits live for up to an hour. Step 5 is a replay the
+mandate correctly refuses as `ACTION_CONSUMED`, which *is* overridable, and the
+grant matches it. The operator meant to release one refund. Two went out.
+
+This was caught before that rule was committed. It was never on `master` in an
+exploitable form. It is recorded because the defect — an unenforced invariant
+held up by missing fields — was on `master`, and the next person to make a
+refusal more informative would have walked into it.
+
+### Fixed
+
+`IssueGrant` refuses a denial by its rule. The set is an **allowlist**, so any
+refusal rule added later is not grantable until someone decides it should be:
+
+```
+denial 1 was refused as RATE_LIMIT_EXCEEDED, which an operator grant cannot
+correct: it is the merchant's own rate limit. The same refund passes once the
+window clears, and a grant cannot raise the ceiling. Decline it instead, so the
+queue records that it was seen
+```
+
+The allowlist lives in `internal/storage`, beside the only function that issues
+grants. `policy.overridableRules` is the set the guard will actually override,
+and a test fails if the two ever differ — in either direction, because each
+direction fails differently.
+
+### Proved both ways
+
+| | result |
+|---|---|
+| new test against the unfixed `IssueGrant`, each non-overridable rule recorded **with** a payment and amount | **all 7 approved**, including `SOME_FUTURE_RULE`, a rule that does not exist |
+| with the fix | all 7 refused; denial stays OPEN; no grant row; no `OPERATOR_GRANTED` audit |
+| `RATE_LIMIT_EXCEEDED` added to storage's list only | pinning test **fails**, naming both lists |
+
+`OPERATIONS.md` now says which refusals are approvable and to decline the rest.
+
+### The lesson
+
+An invariant enforced by the shape of the data is not enforced. It survives
+exactly until someone improves the data — and improving it here meant putting the
+payment on a refusal so a human could read it, which is the right change and the
+one that armed the defect. The check belongs where the decision is made, stated
+by name, so it stops depending on which fields happen to be empty.

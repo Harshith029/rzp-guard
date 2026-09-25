@@ -217,6 +217,7 @@ rzp-guard-operator -mandate m.json -state rzp-guard.db decline 14 \
 
 | | |
 | --- | --- |
+| Which refusals | **Only** `NO_AUTHORIZED_ACTION`, `AMOUNT_NOT_AUTHORIZED` and `ACTION_CONSUMED` — the ones where the mandate was narrower than the merchant meant. The queue shows every refusal so you can see what the agent is doing, but `approve` refuses the rest and says why: a rate limit clears on its own, a cap or an expired mandate needs the merchant. **Decline those instead.** An approval that cannot unblock anything is not harmless — see `FAILURES.md` F53. |
 | Amount | **Exactly** what was refused. Taken from the recorded refusal, never from a flag, so you cannot approve a refund nobody asked for. |
 | Uses | **One.** It becomes an ordinary row in the same ledger as any mandate action. |
 | Life | 15 minutes by default, one hour maximum. |
